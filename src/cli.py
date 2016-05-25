@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-16 17:17:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-24 22:34:19
+# @Last Modified time: 2016-05-25 02:33:27
 
 import cmd
 import os
@@ -51,7 +51,12 @@ class CLI(cmd.Cmd):
                 if self.m_app.m_cfg.m_v > 0:
                     print('Unknown instrument')
                 return
-            self.m_app.m_instruments[arg[1]].Connect()
+            if narg == 2:
+                if not self.m_app.m_instruments[arg[1]].Connect():
+                    print('ERROR: Instrument not connected.')
+            else:
+                if not self.m_app.m_instruments[arg[1]].Connect(arg[2]):
+                    print('ERROR: Instrument not connected.')
         elif arg[0] == "close":
             if narg != 2:
                 print('WARNING: ' + arg[0] + ' takes 1 argument\n' +
@@ -65,8 +70,8 @@ class CLI(cmd.Cmd):
             self.m_app.m_instruments[arg[1]].Close()
         elif arg[0] == 'list':
             if narg > 2:
-                print('WARNING: ' + arg[0] + ' takes 1 argument\n' +
-                      '\t list ports or list instruments')
+                print('WARNING: ' + arg[0] + ' takes 1 argument maximum\n' +
+                      '\t list or list ports')
                 return
             if narg < 2:
                 # Display list of instruments
@@ -76,14 +81,30 @@ class CLI(cmd.Cmd):
                 print(foo, end='', flush=True)
             elif arg[1] == 'ports':
                 # Display list of ports
-                print('Listing ports')
+                self.m_app.m_com.ListPorts()
+                print(self.m_app.m_com)
             else:
                 print('WARNING: Unknown argument ' + arg[1] + ' for list')
+        elif arg[0] == 'read':
+            # Read Cache from instruments
+            if narg > 2:
+                print('WARNING: ' + arg[0] + ' takes 1 argument maximum\n' +
+                      '\t read or read [instrument_name]')
+                return
+            elif narg == 1:
+                for inst, inst in self.m_app.m_instruments.items():
+                    print(inst.ReadCache())
+            elif narg == 2:
+                if arg[1] not in self.m_app.m_instruments.keys():
+                    if self.m_app.m_cfg.m_v > 0:
+                        print('Unknown instrument')
+                    return
+                print(self.m_app.m_instruments[arg[1]].ReadCache())
         else:
             print('WARNING: Unknown command ' + line)
 
     def complete_instrument(self, text, line, begidx, endidx):
-        cmd_available = ['connect', 'close', 'list']
+        cmd_available = ['connect', 'close', 'list', 'read']
         if not text:
             completions = cmd_available
         else:
@@ -97,8 +118,12 @@ class CLI(cmd.Cmd):
               '\tconnect to instrument using specified port\n\t' +
               '<close> [instrument_name]\n\t' +
               '\tclose connection with instrument\n\t' +
-              '<list> [instruments|ports]\n\t' +
-              '\tlist all instruments or ports')
+              '<list> [|ports]\n\t' +
+              '\tlist all instruments or ports\n\t'
+              '<read> [|instrument_name]\n\t' +
+              '\tread instrument cache\n\t' +
+              '\tif [instrument_name] is not specified,\n\t' +
+              '\t\tread cache of all instruments')
 
     # Log
     def do_log(self, line):

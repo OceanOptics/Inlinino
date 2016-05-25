@@ -1,8 +1,8 @@
 {
   "instruments":{
     "SimulinoRnd":{
-      "module":"simulino",
-      "name":"gauss",
+      "module":"Simulino",
+      "name":"Gauss",
       "frequency":1,
       "variables":{
         "rnd1":{

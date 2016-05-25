@@ -3,24 +3,8 @@
     "BB3":{
       "module":"WETLabs",
       "name":"BB3",
-      "frequency":1,
-      "variables":{
-        "beta470":{
-          "wavelength":470,
-          "range":[0, 4096],
-          "units":"Volts"
-        },
-        "beta532":{
-          "wavelength":470,
-          "range":[0, 4096],
-          "units":"Volts"
-        },
-        "beta660":{
-          "wavelength":470,
-          "range":[0, 4096],
-          "units":"Volts"
-        }
-      }
+      "lambda":[470, 532, 660],
+      "varname_header":"beta"
     }
   }
 }

@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-24 22:34:51
+# @Last Modified time: 2016-05-25 02:30:14
 
 from threading import Thread
 from time import sleep
@@ -18,6 +18,7 @@ class Simulino(Instrument):
 
     # Parameters
     m_thread = None
+    m_timeout = None  # in seconds
     m_rnd = {}
     m_cache = {}
     m_seed = {}
@@ -25,8 +26,13 @@ class Simulino(Instrument):
     m_sigma = {}  # standard deviation
 
     def __init__(self, _name, _cfg):
-        Instrument.__init__(self, _name, _cfg)
+        Instrument.__init__(self, _name)
         # Load & Check configuration
+        if 'frequency' in _cfg.keys():
+            self.m_timeout = 1 / _cfg['frequency']
+        else:
+            print('Missing frequency in ' + _name + '.')
+            exit()
         if 'variables' in _cfg.keys():
             if any(_cfg['variables']):
                 for var, val in _cfg['variables'].items():
@@ -59,7 +65,8 @@ class Simulino(Instrument):
             else:
                 self.m_rnd[var] = Random(self.m_seed[var])
 
-    def Connect(self):
+    def Connect(self, _port=None):
+        # input _port not used
         self.m_thread = Thread(target=self.RunUpdateCache, args=())
         self.m_thread.daemon = True
         self.m_active = True
@@ -72,7 +79,9 @@ class Simulino(Instrument):
             if self.m_thread.isAlive():
                 self.m_thread.join(self.m_timeout * 1.1)
             else:
-                print(self.name + ' already close.')
+                print(self.m_name + ' already close.')
+        # Empty cache
+        self.EmptyCache()
 
     def RunUpdateCache(self):
         while(self.m_active):
