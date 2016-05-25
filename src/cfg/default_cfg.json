@@ -1,0 +1,14 @@
+{
+  "app_cfg":{
+    "verbosity":2,
+    "interface":"cli"
+  },
+  "log":{
+    "frequency":1,
+    "interval_write":60,
+    "length":60,
+    "header":"Inlinino",
+    "path":"data/"
+  },
+  "instruments":{}
+}

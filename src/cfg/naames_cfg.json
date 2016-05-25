@@ -1,0 +1,40 @@
+{
+  "log":{
+    "frequency":1,
+    "length":60,
+    "header":"Inlinino",
+    "path":"~/Desktop/NAAMES/"
+  },
+  "instruments":{
+    "BB3":{
+      "frequency":1,
+      "variables":{
+        "beta470":{
+          "wavelength":470,
+          "range":[0, 4096],
+          "units":"Volts"
+        },
+        "beta532":{
+          "wavelength":470,
+          "range":[0, 4096],
+          "units":"Volts"
+        },
+        "beta660":{
+          "wavelength":470,
+          "range":[0, 4096],
+          "units":"Volts"
+        }
+      }
+    },
+    "Arduino":{
+      "frequency":1,
+      "variables":{
+        "FDOM":{
+          "pin":"A0",
+          "range":[0 5],
+          "units":"Volts"
+        }
+      }
+    }
+  }
+}
