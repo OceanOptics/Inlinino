@@ -83,5 +83,11 @@ ENV/
 data/
 src/data/
 
+# Test
+test_*
+
+# Temp utils
+utils/
+
 # OSX
 .DS_Store
