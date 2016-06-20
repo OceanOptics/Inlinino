@@ -1,0 +1,30 @@
+{
+  "instruments":{
+    "SimulinoRnd":{
+      "module":"Simulino",
+      "name":"Gauss",
+      "frequency":1,
+      "variables":{
+        "rnd1":{
+          "mu":2.5,
+          "sigma":1,
+          "seed":1,
+          "units":"No Units"
+        },
+        "rnd2":{
+          "mu":0.5,
+          "sigma":0.2,
+          "seed":2,
+          "units":"No Units"
+        }
+      }
+    },
+    "BB3-349":{
+      "module":"WETLabs",
+      "name":"BB3",
+      "lambda":[470, 532, 660],
+      "varname_header":"beta",
+      "units":"counts"
+    }
+  }
+}

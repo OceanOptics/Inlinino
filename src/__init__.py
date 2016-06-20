@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:33
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 15:31:42
+# @Last Modified time: 2016-06-20 16:06:53
 
 import os
 import importlib
@@ -57,7 +57,8 @@ class Inlinino():
         self.m_com = Communication()
 
         # Initialize data logger
-        self.m_log_data = LogData(self.m_cfg.m_log, self.m_instruments, self.m_cfg.m_instruments)
+        self.m_log_data = LogData(
+            self.m_cfg.m_log, self.m_instruments, self.m_cfg.m_instruments)
 
         # Self-t   est
         # self.m_log_data.Start()
@@ -151,6 +152,8 @@ class Inlinino():
 if __name__ == '__main__':
     if len(sys.argv) == 2:
         inlinino = Inlinino(sys.argv[1])
+    elif __debug__:
+        inlinino = Inlinino(os.path.join('cfg', 'test_cfg.json'))
     else:
         inlinino = Inlinino(os.path.join('cfg', 'simulino_cfg.json'))
     print(inlinino)

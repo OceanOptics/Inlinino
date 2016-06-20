@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 14:45:13
+# @Last Modified time: 2016-06-20 16:09:00
 
 import os
 from threading import Thread
@@ -43,7 +43,7 @@ class LogData():
     m_varnames = []   # ordered list of the variables of all the instruments
     m_varunits = []
 
-    def __init__(self, _cfg, _instruments, _instruments_cfg = None):
+    def __init__(self, _cfg, _instruments, _instruments_cfg=None):
         # Load cfg
         if 'frequency' in _cfg.keys():
             # Takes about 0.01 s for the program to run
@@ -89,7 +89,8 @@ class LogData():
                 for varname in self.m_instruments[instr_key].m_varnames:
                     self.m_instnames[varname] = instr_key
                     self.m_varnames.append(varname)
-                    self.m_varunits.append(self.m_instruments[instr_key].m_units[varname])
+                    self.m_varunits.append(
+                        self.m_instruments[instr_key].m_units[varname])
 
         # Initialize buffer
         self.m_buffer['timestamp'] = RingBuffer(self.m_buffer_size)
@@ -232,8 +233,8 @@ class LogData():
         for instr in self.m_instruments.values():
             instr.m_n = 0
             instr.m_nNoResponse = 0
-        if __debug__:
-            print('LogData:ResetInstrumentCount')
+        # if __debug__:
+        #     print('LogData:ResetInstrumentCount')
 
     def __str__(self):
         return 'buffer_interval: ' + str(self.m_buffer_interval) + '\n'

@@ -2,21 +2,15 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 15:00:08
+# @Last Modified time: 2016-06-20 18:15:46
 
 import os
 import sys
-# from PyQt4 import QtGui, QtCore
-# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg
-# from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT
-# from matplotlib.figure import Figure
-# import random
-from pyqtgraph.Qt import QtGui, QtCore
-import numpy as np # Just for np.isnan
-import pyqtgraph as pg
-from functools import partial
-
 from time import sleep, gmtime, strftime, time
+from functools import partial
+from numpy import isnan as np_isnan
+from pyqtgraph.Qt import QtGui, QtCore
+import pyqtgraph as pg
 
 
 class GUI(QtGui.QMainWindow):
@@ -26,10 +20,7 @@ class GUI(QtGui.QMainWindow):
 
     def __init__(self, _app):
         super(GUI, self).__init__()
-
-        # Load _app
         self.m_app = _app
-
         self.initUI()
 
     def initUI(self):
@@ -51,19 +42,15 @@ class GUI(QtGui.QMainWindow):
                     print('app_cfg:ui_update_frequency is missing')
                 return False
 
-            # self.m_nVar = len(self.m_app.m_log_data.m_varnames)
-
         # Set window position/size
-        # self.setGeometry(300, 300, 250, 150) # window size and position
         self.resize(800, 600)
-        # self.resize(640, 480)
         self.center()
 
         # Set icon
         self.setWindowTitle('Inlinino')
         self.setWindowIcon(QtGui.QIcon(self.m_app_icon))
 
-        ### Set action of Menu Bar
+        # Set action of Menu Bar
         actInstrConnect = QtGui.QAction(QtGui.QIcon('none'), '&Connect', self)
         actInstrConnect.setShortcut('Ctrl+S')
         actInstrConnect.setStatusTip(
@@ -104,7 +91,6 @@ class GUI(QtGui.QMainWindow):
 
         # Set menu bar
         menuBar = self.menuBar()
-        # m_menuBar.setNativeMenuBar(False)
         # Add menu to menu bar
         menuInstr = menuBar.addMenu('&Instrument')
         menuLog = menuBar.addMenu('&Log')
@@ -120,12 +106,13 @@ class GUI(QtGui.QMainWindow):
         menuHelp.addAction(actHelpSupport)
         menuHelp.addAction(actHelpCredits)
 
-        ### Set docked sidebar (sd)
+        # Set docked sidebar (sd)
         # Display data
         sd_data = QtGui.QGridLayout()
-        wdgt, self.m_time_display, self.m_date_display = self.QVarDisplay('Time (Zulu)',
-            self.m_app.m_log_data.m_buffer['timestamp'].get()[0],
-            'yyyy/mm/dd')
+        wdgt, self.m_time_display, self.m_date_display = \
+            self.QVarDisplay('Time (Zulu)',
+                    self.m_app.m_log_data.m_buffer['timestamp'].get()[0],
+                    'yyyy/mm/dd')
         sd_data.addWidget(wdgt)
         self.m_var_display = {}
         for i in range(len(self.m_app.m_log_data.m_varnames)):
@@ -212,8 +199,7 @@ class GUI(QtGui.QMainWindow):
         self.dockWidget.setTitleBarWidget(QtGui.QWidget(None))
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockWidget)
 
-        # Set colors
-        # Set Colors to Flatland Momokai
+        # Set Colors
         palette = QtGui.QPalette()
         if (self.m_app.m_cfg.m_app['theme'] == "light" or
             self.m_app.m_cfg.m_app['theme'] == "outside"):
@@ -228,26 +214,8 @@ class GUI(QtGui.QMainWindow):
             pg.setConfigOption('foreground', QtGui.QColor('#F8F8F2'))
         self.setPalette(palette)
 
-        # palette.setColor(QtGui.QPalette.Base, QtGui.QColor('#49483E'))
-        # palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor())
-        # palette.setColor(QtGui.QPalette.ToolTipBase, QtGui.QColor())
-        # palette.setColor(QtGui.QPalette.ToolTipText, QtGui.QColor())
-        # palette.setColor(QtGui.QPalette.Text, QtGui.QColor())
-        # palette.setColor(palette.Button, QtGui.QColor('#49483E'))
-        # palette.setColor(palette.ButtonText, QtGui.QColor(''))
-        # palette.setColor(QtGui.QPalette.BrightText, QtGui.QColor('#000000'))
-
         # Button style is os dependend (can force with some CSS)
-        # sd_start_btn.setStyleSheet("background-color: #49483E")
-        #self.setStyleSheet("font-family: Helvetica Neue Light; color:#F8F8F2")
         self.setFont(QtGui.QFont("Helvetica Neue Light"))
-
-        # Set figure with matplotlib
-        # self.figure = Figure()
-        # self.canvas = FigureCanvasQTAgg(self.figure)
-        # # Set toolbar
-        # self.toolbar = NavigationToolbar2QT(self.canvas, self)
-        # Set figure with pyqtgraph
 
         # Set figure with pyqtgraph
         self.m_pw = pg.PlotWidget()
@@ -264,29 +232,12 @@ class GUI(QtGui.QMainWindow):
         self.m_plot.setXRange(0, 100)
         self.m_plot.setLimits(minYRange=0, maxYRange=4500) # In version 0.9.9
         self.m_plot.setMouseEnabled(x=False,y=True)
-        # self.updatePlot()
 
         # Set layout in main window
-        # widget = QtGui.QWidget()
-        # layoutv = QtGui.QVBoxLayout(widget)
-        # layoutv.addWidget(self.toolbar)
-        # layoutv.addWidget(self.canvas)
-        # layoutv.setSpacing(0)
-        # layoutv.setContentsMargins(0, 0, 0, 0);
-        # self.setCentralWidget(widget)
         widget = QtGui.QWidget()
         layout = QtGui.QVBoxLayout(widget)
         layout.addWidget(self.m_pw)
-        # layout.setContentsMargins(0, 0, 0, 0)
         self.setCentralWidget(widget)
-
-        # Generate first plot
-        # self.plot()
-
-        # Set status bar (original Qt Status Bar)
-        # self.m_statusBar = QtGui.QStatusBar()
-        # self.setStatusBar(self.m_statusBar)
-        # self.m_statusBar.showMessage('Inlinino is ready.')
 
         # Close splash screen before starting main app
         if not __debug__:
@@ -302,7 +253,6 @@ class GUI(QtGui.QMainWindow):
         # self.restorState()
 
         # Connect background thread refreshing info on UI
-        # QtCore.QObject.connect(self.m_sd_stop_btn, QtCore.SIGNAL('clicked()'), self.ActLogStop)
         self.m_refresh_thread = Thread()
         self.m_refresh_worker = Worker(1/self.m_app.m_cfg.m_app['ui_update_frequency'])
         self.m_refresh_worker.moveToThread(self.m_refresh_thread)
@@ -310,26 +260,6 @@ class GUI(QtGui.QMainWindow):
         self.m_refresh_worker.finished.connect(self.m_refresh_thread.quit)
         self.m_refresh_thread.started.connect(self.m_refresh_worker.RefreshPing)
         # self.m_refresh_thread.start()
-
-        # QtCore.QMetaObject.invokeMethod(obj, 'processA', Qt.QueuedConnection)
-
-    # # Update figure with matplotlib
-    # def plot(self):
-    #     ''' plot some random stuff '''
-    #     # random data
-    #     data = [random.random() for i in range(10)]
-
-    #     # create an axis
-    #     ax = self.figure.add_subplot(111)
-
-    #     # discards the old graph
-    #     ax.hold(False)
-
-    #     # plot data
-    #     ax.plot(data, '*-')
-
-    #     # refresh canvas
-    #     self.canvas.draw()
 
     # Set plot (pyQtGraph)
     def SetPlot(self):
@@ -341,8 +271,6 @@ class GUI(QtGui.QMainWindow):
 
     # Instrument Actions
     def ActInstrConnect(self, line, _instr_key=None):
-
-        # sender = self.sender()
         # Get instrument to connect
         if _instr_key == None:
             list_instr = list(self.m_app.m_instruments.keys())
@@ -440,7 +368,7 @@ class GUI(QtGui.QMainWindow):
     def SetInstrumentsVar(self):
         # Update time and date
         t = self.m_app.m_log_data.m_buffer['timestamp'].get()[0]
-        if not np.isnan(t):
+        if not np_isnan(t):
             zulu = gmtime(t)
             self.m_time_display.setText(strftime('%H:%M:%S', zulu))
             self.m_time_display.repaint()
@@ -469,7 +397,6 @@ class GUI(QtGui.QMainWindow):
                 self.m_instr_connect_btn[instr_key].show()
                 self.m_instr_close_btn[instr_key].hide()
             self.m_instr_status[instr_key].repaint()
-
 
     def SetInstrumentsPackets(self):
         for instr_key, instr_value in self.m_app.m_instruments.items():
@@ -641,7 +568,6 @@ class GUI(QtGui.QMainWindow):
         name = QtGui.QLabel(_name)
         # name.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         status_lbl1 = QtGui.QLabel(' [')
-        # status_lbl1.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         status_lbl2 = QtGui.QLabel('] : ')
         if _status:
             status_val = QtGui.QLabel('active')
@@ -653,15 +579,10 @@ class GUI(QtGui.QMainWindow):
         connect_btn.setToolTip('Connect ' + _name)
         close_btn = QtGui.QPushButton('o')
         close_btn.setToolTip('Disconnect ' + _name)
-        # status_val.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         pckt_received_lbl = QtGui.QLabel('  pckt received: ')
-        # pckt_received_lbl.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         pckt_received_val = QtGui.QLabel(str(_pckt_received))
-        # pckt_received_val.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         pckt_missed_lbl = QtGui.QLabel('  pckt missed: ')
-        # pckt_missed_lbl.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         pckt_missed_val = QtGui.QLabel(str(_pckt_missed))
-        # pckt_missed_val.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
         widget = QtGui.QWidget()
         group = QtGui.QVBoxLayout(widget)
@@ -707,21 +628,8 @@ class GUI(QtGui.QMainWindow):
             self.m_refresh_worker.m_active = False
 
 
-# class UpdateUI(QtCore.QThread):
-#     def __init__(self, _timeout):
-#         QtCore.QThread.__init__(self)
-#         self.m_timeout = _timeout
-#         self.m_active = True
-
-#     def __del__(self):
-#         self.m_active = False
-#         self.wait()
-
-#     def run(self):
-#         while(self.m_active):
-#             sleep(self.m_timeout)
-
-# Thread and Worker to refresh data
+# Thread and Workers to refresh data
+# From Matthew Levine on http://stackoverflow.com/questions/6783194
 class Worker(QtCore.QObject):
     refresh = QtCore.pyqtSignal()
     finished = QtCore.pyqtSignal()
@@ -746,14 +654,8 @@ class Worker(QtCore.QObject):
 
 
 class Thread(QtCore.QThread):
-    """Need for PyQt4 <= 4.6 only"""
     def __init__(self, _parent=None):
         QtCore.QThread.__init__(self, _parent)
-
-     # this class is solely needed for these two methods, there
-     # appears to be a bug in PyQt 4.6 that requires you to
-     # explicitly call run and start from the subclass in order
-     # to get the thread to actually start an event loop
 
     def start(self):
         QtCore.QThread.start(self)
