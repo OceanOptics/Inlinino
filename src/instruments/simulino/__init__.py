@@ -2,10 +2,10 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-25 02:30:14
+# @Last Modified time: 2016-06-20 13:39:37
 
 from threading import Thread
-from time import sleep
+from time import sleep, time
 from random import Random
 
 from instruments import Instrument
@@ -16,17 +16,17 @@ class Simulino(Instrument):
     Set frame for all instruments
     '''
 
-    # Parameters
-    m_thread = None
-    m_timeout = None  # in seconds
-    m_rnd = {}
-    m_cache = {}
-    m_seed = {}
-    m_mu = {}    # mean
-    m_sigma = {}  # standard deviation
-
     def __init__(self, _name, _cfg):
         Instrument.__init__(self, _name)
+
+        # Init Parameters
+        self.m_timeout = None  # in seconds
+        self.m_rnd = {}
+        self.m_seed = {}
+        self.m_mu = {}    # mean
+        self.m_sigma = {}  # standard deviation
+        self.m_connect_need_port = False
+
         # Load & Check configuration
         if 'frequency' in _cfg.keys():
             self.m_timeout = 1 / _cfg['frequency']
@@ -51,6 +51,12 @@ class Simulino(Instrument):
                     else:
                         print(_name + ':' + var + ' missing sigma')
                         exit()
+                    if 'units' in val.keys():
+                        self.m_units[var] = val['units']
+                    else:
+                        print(_name + ':' + var + ' missing units')
+                        exit()
+                    self.m_varnames.append(var)
             else:
                 print('No variables in ' + _name + '.')
                 exit()
@@ -71,6 +77,7 @@ class Simulino(Instrument):
         self.m_thread.daemon = True
         self.m_active = True
         self.m_thread.start()
+        return True
 
     def Close(self):
         # Stop thread updating cache
@@ -84,17 +91,19 @@ class Simulino(Instrument):
         self.EmptyCache()
 
     def RunUpdateCache(self):
+        start_time = time()
         while(self.m_active):
-            sleep(self.m_timeout)
             try:
                 self.UpdateCache()
+                self.m_n += 1
+                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
             except:
-                print('Unexpected error while updating cache.')
+                print(self.m_name + ': Unexpected error while updating cache.')
                 try:
-                    for var in self.m_cache.keys():
-                        self.m_cache[var] = None
+                    self.EmptyCache()
+                    self.m_nNoResponse += 1
                 except:
-                    print('Unexpected error while emptying cache')
+                    print(self.m_name + ': Unexpected error while emptying cache')
 
     def UpdateCache(self):
         # Update cache

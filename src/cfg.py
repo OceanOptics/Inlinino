@@ -2,10 +2,11 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:10
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-24 21:20:35
+# @Last Modified time: 2016-06-20 13:16:20
 
 import os
 import json
+from collections import OrderedDict
 
 
 class Cfg():
@@ -22,7 +23,6 @@ class Cfg():
     def __init__(self):
         # Load default configuration file
         self.m_path_app = os.path.dirname(os.path.realpath(__file__))
-        # os.path.dirname(os.path.realpath(__file__))
         cfgFile = os.path.join(self.m_path_app, 'cfg', 'default_cfg.json')
         if not self.Load(cfgFile):
             if self.m_v > 0:
@@ -31,7 +31,7 @@ class Cfg():
     def Load(self, _filename):
         # Load configuration from json file
         with open(_filename) as data_file:
-            d = json.load(data_file)
+            d = json.load(data_file, object_pairs_hook=OrderedDict)
             if 'app_cfg' in d.keys():
                 self.m_app = d['app_cfg']
                 if 'verbosity' in self.m_app.keys():

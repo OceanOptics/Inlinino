@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-25 02:32:15
+# @Last Modified time: 2016-06-20 15:30:32
 
 # To check sensor is working correctly:
 # On OSX:
@@ -22,7 +22,7 @@
 
 from serial import Serial
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 from instruments import Instrument
 
@@ -32,17 +32,14 @@ class WETLabs(Instrument):
     Interface to serial WET Labs sensors
     '''
 
-    # Parameters
-    m_thread = None
-    m_serial = None
-    # Non Responsive Counter
-    m_nNonResponse = 0
-    m_maxNonResponse = 10
-
     def __init__(self, _name, _cfg):
         Instrument.__init__(self, _name)
 
-        # Do specific configuration needed to date
+        # No Responsive Counter
+        self.m_maxNoResponse = 10
+
+        # Do specific configuration
+        self.m_connect_need_port = True
 
         # Initialize serial communication
         self.m_serial = Serial()
@@ -66,7 +63,7 @@ class WETLabs(Instrument):
 
         if self.m_serial.isOpen():
             # Create thread to update cache
-            self.m_thread = Thread(target=self.RunCacheUpdate, args=())
+            self.m_thread = Thread(target=self.RunUpdateCache, args=())
             self.m_thread.daemon = True
             self.m_active = True
             self.m_thread.start()
@@ -79,47 +76,62 @@ class WETLabs(Instrument):
         if self.m_thread is not None:
             self.m_active = False
             if self.m_thread.isAlive():
-                self.m_thread.join(self.m_timeout * 1.1)
+                self.m_thread.join(self.m_serial.timeout * 1.1)
             else:
-                print(self.m_name + 'thread already close.')
+                print(self.m_name + ' thread already close.')
         # Close serial connection
         if self.m_serial.isOpen():
             self.m_serial.close()
         else:
-            print(self.m_name + 'serial communication already close.')
+            print(self.m_name + ' serial communication already close.')
         # Empty cache
         self.EmptyCache()
 
     def RunUpdateCache(self):
+        start_time = time()
         while(self.m_active):
-            sleep(self.m_serial.timeout)
             try:
                 self.UpdateCache()
+                self.m_n += 1
+                sleep(self.m_serial.timeout - (time() - start_time) %
+                      self.m_serial.timeout)
             except:
-                print('Unexpected error while updating cache.\n'
+                print(self.m_name +
+                      ': Unexpected error while updating cache.\n'
                       'Serial adaptor might be unplug.')
                 try:
-                    for var in self.m_cache.keys():
-                        self.m_cache[var] = None
+                    self.EmptyCache()
+                    self.NoResponse()
                 except:
-                    print('Unexpected error while emptying cache')
+                    print(self.m_name +
+                          ': Unexpected error while emptying cache')
 
     def UpdateCache(self):
         # Update cache
         #   To be implemented by subclass
         pass
 
-    def NoResponse(self, _msg):
+    def NoResponse(self, _msg=None):
+        # Set meassage
+        if _msg is None:
+            msg = _msg
+        else:
+            msg = 'No data after updating cache.\n' + \
+                'Suggestions:\n' + \
+                '\t- Serial cable might be unplug.\n' + \
+                '\t- Sensor power is off.\n'
+
         # Set cache to None
         for key in self.m_cache.keys():
             self.m_cache[key] = None
+
         # Error message if necessary
-        self.m_nNonResponse += 1
-        if (self.m_nNonResponse >= self.m_maxNonResponse and
-                self.m_nNonResponse % 2400 == self.m_maxNonResponse):
+        self.m_nNoResponse += 1
+        if (self.m_nNoResponse >= self.m_maxNoResponse and
+                self.m_nNoResponse % 60 == self.m_maxNoResponse):
             print('%s did not respond %d times\n%s' % (self.m_name,
-                                                       self.m_nNonResponse,
-                                                       _msg))
+                                                       self.m_nNoResponse,
+                                                       msg))
 
 
 # Simple example logging the data
