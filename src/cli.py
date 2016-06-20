@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-16 17:17:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-25 02:33:27
+# @Last Modified time: 2016-06-15 17:32:31
 
 import cmd
 import os
@@ -22,9 +22,6 @@ class CLI(cmd.Cmd):
     # misc_header = 'misc_header'
     # undoc_header = 'undoc_header'
     # ruler = '-'
-
-    # Member variables
-    m_app = None
 
     # Initialize interface
     def __init__(self, _app):
@@ -76,8 +73,8 @@ class CLI(cmd.Cmd):
             if narg < 2:
                 # Display list of instruments
                 foo = ''
-                for inst, inst in self.m_app.m_instruments.items():
-                    foo += str(inst) + '\n'
+                for instr_key in self.m_app.m_instruments.keys():
+                    foo += str(instr_key) + '\n'
                 print(foo, end='', flush=True)
             elif arg[1] == 'ports':
                 # Display list of ports
@@ -118,7 +115,7 @@ class CLI(cmd.Cmd):
               '\tconnect to instrument using specified port\n\t' +
               '<close> [instrument_name]\n\t' +
               '\tclose connection with instrument\n\t' +
-              '<list> [|ports]\n\t' +
+              '<list> [ports]\n\t' +
               '\tlist all instruments or ports\n\t'
               '<read> [|instrument_name]\n\t' +
               '\tread instrument cache\n\t' +
@@ -127,20 +124,28 @@ class CLI(cmd.Cmd):
 
     # Log
     def do_log(self, line):
-        if line == "":
-            print('WARNING: Command log take an argument ' +
-                  '(start or stop).')
-        elif line == "start":
+        arg = line.split()
+        narg = len(arg)
+        if narg == 0 or narg > 2:
+            print('WARNING: Command log take 1 or 2 arguments ' +
+                  '(start, stop or header).')
+        elif arg[0] == "start":
             self.m_app.m_log_data.Start()
             print("Start logging data.")
-        elif line == "stop":
+        elif arg[0] == "stop":
             self.m_app.m_log_data.Stop()
             print("Stop logging data.")
+        elif arg[0] == "header":
+            if narg != 2:
+                print('WARNING: ' + arg[0] + ' takes 1 argument\n' +
+                      '\t header [log_file_name_header]')
+                return
+            self.m_app.m_log_data.m_file_header = arg[1]
         else:
             print('WARNING: Unknown command ' + line)
 
     def complete_log(self, text, line, begidx, endidx):
-        cmd_available = ['start', 'stop']
+        cmd_available = ['start', 'stop', 'header']
         if not text:
             completions = cmd_available
         else:
@@ -149,7 +154,8 @@ class CLI(cmd.Cmd):
         return completions
 
     def help_log(self):
-        print('log [arg]\n\t<start> logging data\n\t<stop> logging data')
+        print('log [arg]\n\t<start> logging data\n\t<stop> logging data\n\t' +
+              '<header> change file name header')
 
     # Status
     def do_status(self, line):
@@ -157,6 +163,40 @@ class CLI(cmd.Cmd):
 
     def help_status(self):
         print('status\n\tDisplay some parameters and state of instruments')
+
+    # Plot
+    def do_plot(self, line):
+        arg = line.split()
+        narg = len(arg)
+        if narg == 0 or narg > 2:
+            print('WARNING: Command plot take 1 argument ' +
+                  '(start or stop).')
+        elif arg[0] == "start":
+            self.m_app.m_plot.Start()
+        elif arg[0] == "stop":
+            self.m_app.m_plot.Stop()
+        elif arg[0] == "header":
+            if narg != 2:
+                print('WARNING: ' + arg[0] + ' takes 1 argument\n' +
+                      '\t header [log_file_name_header]')
+                return
+            self.m_app.m_log_data.m_file_header = arg[1]
+        else:
+            print('WARNING: Unknown command ' + line)
+
+    def complete_plot(self, text, line, begidx, endidx):
+        cmd_available = ['start', 'stop']
+        if not text:
+            completions = cmd_available
+        else:
+            completions = [f for f in cmd_available
+                           if f.startswith(text)]
+        return completions
+
+    def help_plot(self):
+        print('log [arg]\n\t<start> plotting data\n\t<stop> plotting data' +
+              '\n\tThis function has not been tested yet.' +
+              '\n\tBased on matplotlib')
 
     # Exit
     def do_exit(self, line):
