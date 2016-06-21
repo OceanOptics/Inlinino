@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 13:59:22
+# @Last Modified time: 2016-06-21 14:11:13
 
 import os
 import sys
@@ -467,10 +467,14 @@ class GUI(QtGui.QMainWindow):
 
     def SetLogFileVal(self):
         # sleep(0.01), in order to read after it was updated
-        if self.m_app.m_log_data.m_file_name is not None and self.m_app.m_log_data.m_active_log:
-            foo = os.path.join(self.m_app.m_log_data.m_file_path, self.m_app.m_log_data.m_file_name)
+        if (self.m_app.m_log_data.m_file_name is not None and
+                self.m_app.m_log_data.m_active_log):
+            foo = os.path.join(self.m_app.m_log_data.m_file_path,
+                               self.m_app.m_log_data.m_file_name)
         else:
-            foo = os.path.join(self.m_app.m_log_data.m_file_path, self.m_app.m_log_data.m_file_header) + '_yyyymmdd_HHMMSS.csv'
+            foo = os.path.join(self.m_app.m_log_data.m_file_path,
+                               self.m_app.m_log_data.m_file_header) \
+                + '_yyyymmdd_HHMMSS.csv'
         self.m_sd_log_fname_val.setText('...' + foo[-30:])
         self.m_sd_log_fname_val.repaint()
 
