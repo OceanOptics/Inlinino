@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 15:07:29
+# @Last Modified time: 2016-06-21 11:46:23
 
 
 from instruments.wetlabs import WETLabs
@@ -44,8 +44,7 @@ class BB3(WETLabs):
 
     def UpdateCache(self):
         # read all line in buffer
-        # data = self.m_serial.readlines()
-        data = self.m_serial.readline()
+        data = self.m_serial.readlines()
         if data:
             # keep only most recent data
             data = data[-1]
