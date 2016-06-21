@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 13:38:03
+# @Last Modified time: 2016-06-21 11:24:27
 
 import sys
 import glob
@@ -75,49 +75,51 @@ class Communication():
         self.robust = _robust
 
     def ListPorts(self):
-        # Method working on Python 2.7 Only
-        # self.m_port_list = serial.tools.list_ports.comports()
+        # Method working on Python 2.7
+        # pyserial version 2.7-py34_0 (default from conda) not working OSX py34
+        # pyserial version 3.1.1-py3.4 (2016-06-12) is working on OSX py34
+        self.m_port_list = serial.tools.list_ports.comports()
 
         # Method from Thomas (http://stackoverflow.com/users/300783/thomas)
         # Found on http://stackoverflow.com/questions/12090503
-        if sys.platform.startswith('win'):
-            ports = ['COM%s' % (i + 1) for i in range(256)]
-        elif (sys.platform.startswith('linux') or
-              sys.platform.startswith('cygwin')):
-            # this excludes your current terminal "/dev/tty"
-            ports = glob.glob('/dev/tty[A-Za-z]*')
-        elif sys.platform.startswith('darwin'):
-            ports = glob.glob('/dev/tty.*')
-        else:
-            raise EnvironmentError('Unsupported platform')
+        # if sys.platform.startswith('win'):
+        #     ports = ['COM%s' % (i + 1) for i in range(256)]
+        # elif (sys.platform.startswith('linux') or
+        #       sys.platform.startswith('cygwin')):
+        #     # this excludes your current terminal "/dev/tty"
+        #     ports = glob.glob('/dev/tty[A-Za-z]*')
+        # elif sys.platform.startswith('darwin'):
+        #     ports = glob.glob('/dev/tty.*')
+        # else:
+        #     raise EnvironmentError('Unsupported platform')
 
-        self.m_port_list = []
-        for port in ports:
-            try:
-                if self.robust:
-                    s = serial.Serial(port)
-                    s.close()
-                self.m_port_list.append(port)
-            except (OSError, serial.SerialException):
-                pass
+        # self.m_port_list = []
+        # for port in ports:
+        #     try:
+        #         if self.robust:
+        #             s = serial.Serial(port)
+        #             s.close()
+        #         self.m_port_list.append(port)
+        #     except (OSError, serial.SerialException):
+        #         pass
 
         return self.m_port_list
 
     # Compatible with serial.tools.list_ports.comports() only
-    # def PortInfo(self, _index):
-    #     foo = self.m_port_list[_index].device + ': ' + \
-    #         self.m_port_list[_index].description
-    #     if self.m_port_list[_index].manufacturer is not None:
-    #         foo += ' ' + self.m_port_list[_index].manufacturer
-    #     if self.m_port_list[_index].product is not None:
-    #         foo += ' ' + self.m_port_list[_index].product
-    #     return foo
+    def PortInfo(self, _index):
+        foo = self.m_port_list[_index].device + ': ' + \
+            self.m_port_list[_index].description
+        if self.m_port_list[_index].manufacturer is not None:
+            foo += ' ' + self.m_port_list[_index].manufacturer
+        if self.m_port_list[_index].product is not None:
+            foo += ' ' + self.m_port_list[_index].product
+        return foo
 
     def __str__(self):
         foo = ''
         for i in range(0, len(self.m_port_list)):
-            # foo += self.PortInfo(i) + '\n'
-            foo += self.m_port_list[i] + '\n'
+            foo += self.PortInfo(i) + '\n'
+            # foo += self.m_port_list[i] + '\n'
         return foo[0:-1]
 
 if __name__ == "__main__":
