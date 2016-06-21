@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-16 17:17:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-15 17:32:31
+# @Last Modified time: 2016-06-21 11:40:13
 
 import cmd
 import os
@@ -141,11 +141,21 @@ class CLI(cmd.Cmd):
                       '\t header [log_file_name_header]')
                 return
             self.m_app.m_log_data.m_file_header = arg[1]
+        elif arg[0] == "filename":
+            if (self.m_app.m_log_data.m_file_name is not None and
+                    self.m_app.m_log_data.m_active_log):
+                foo = os.path.join(self.m_app.m_log_data.m_file_path,
+                                   self.m_app.m_log_data.m_file_name)
+            else:
+                foo = os.path.join(self.m_app.m_log_data.m_file_path,
+                                   self.m_app.m_log_data.m_file_header) \
+                    + '_yyyymmdd_HHMMSS.csv'
+            print(foo)
         else:
             print('WARNING: Unknown command ' + line)
 
     def complete_log(self, text, line, begidx, endidx):
-        cmd_available = ['start', 'stop', 'header']
+        cmd_available = ['start', 'stop', 'header', 'filename']
         if not text:
             completions = cmd_available
         else:
@@ -155,7 +165,8 @@ class CLI(cmd.Cmd):
 
     def help_log(self):
         print('log [arg]\n\t<start> logging data\n\t<stop> logging data\n\t' +
-              '<header> change file name header')
+              '<header> change file name header' +
+              '\n\t<filename> return current filename')
 
     # Status
     def do_status(self, line):
