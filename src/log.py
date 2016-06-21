@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 13:58:13
+# @Last Modified time: 2016-06-21 15:15:02
 
 import os
 from threading import Thread
@@ -26,7 +26,7 @@ class LogData():
     m_buffer_size = None  # Size of buffer should be > m_max_bin_size
     # Bin to write (keep tracks of element to write)
     m_bin_size = 0          # Number of element in buffer to write in log file
-    m_max_bin_size = None   # Maximum size of bin, should < m_buffer_size
+    m_max_bin_size = None   # Maximum size of bin, should be < m_buffer_size
 
     # File infos
     m_file = None
@@ -34,7 +34,7 @@ class LogData():
     m_file_header = None
     m_file_name = None
     m_file_path = None
-    m_file_start = None
+    m_file_timestamp = None
 
     # Instruments
     m_instruments = None
@@ -46,19 +46,31 @@ class LogData():
     def __init__(self, _cfg, _instruments, _instruments_cfg=None):
         # Load cfg
         if 'frequency' in _cfg.keys():
-            # Takes about 0.01 s for the program to run
-            self.m_buffer_interval = 1 / _cfg['frequency'] - 0.01
+            # Set sleeping interval between buffer updates
+            self.m_buffer_interval = 1 / _cfg['frequency']
         else:
             print('Missing frequency in section log')
             exit()
         if 'interval_write' in _cfg.keys():
+            # time interval at which data will be written in file
             self.m_max_bin_size = _cfg['interval_write'] * _cfg['frequency']
-            self.m_buffer_size = self.m_max_bin_size + 1
         else:
             print('Missing interval_write in section log')
             exit()
+        if 'buffer_size' in _cfg.keys():
+            if self.m_max_bin_size <= _cfg['buffer_size']:
+               self.m_buffer_size = _cfg['buffer_size']
+            else:
+                print('buffer_size should be greater than interval_write')
+                exit()
+        else:
+            print('Missing buffer_size in section log')
+            print('\tbuffer_size = interval_write')
+            self.m_buffer_size = self.m_max_bin_size
         if 'length' in _cfg.keys():
-            self.m_file_length = _cfg['length'] * 60
+            # time length of file (_cfg['length'] is in minute)
+            # when time_length is exceeded a new file is started
+            self.m_file_length = _cfg['length'] * 60  # convert to seconds
         else:
             print('Missing length in section log')
             exit()
@@ -173,9 +185,9 @@ class LogData():
                 self.CreateFile()
                 # Reset Instrument Number of Packet Received
                 self.ResetInstrumentCount()
-            elif (gmtime(self.m_file_start).tm_mday !=
+            elif (gmtime(self.m_file_timestamp).tm_mday !=
                   gmtime(self.m_buffer['timestamp'].data[-1]).tm_mday or
-                  self.m_buffer['timestamp'].data[-1] - self.m_file_start >=
+                  self.m_buffer['timestamp'].data[-1] - self.m_file_timestamp >=
                   self.m_file_length):
                 # Current file expired (new day or exceed file_length)
                 # Write buffer in current file
@@ -200,10 +212,14 @@ class LogData():
                     self.m_instruments[instname].ReadVar(varname))
             else:
                 self.m_buffer[varname].extend(None)
-        # Increase bin size to write in log file
-        self.m_bin_size += 1
+        if self.m_active_log:
+            # Increase bin size to write in log file
+            self.m_bin_size += 1
 
     def WriteBuffer(self):
+        if __debug__:
+            print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
+                  'LogData:WriteBuffer start')
         # Write in log file
         n = self.m_bin_size
         for i in range(0, n):
@@ -213,12 +229,15 @@ class LogData():
                 ("%.3f" % self.m_buffer['timestamp'].get(n)[i])[-4:] +
                 ', ' + ', '.join(str(self.m_buffer[x].get(n)[i]) for x in self.m_varnames) + '\r')
         self.m_bin_size = 0
+        if __debug__:
+            print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
+                  'LogData:WriteBuffer stop')
 
     def CreateFile(self):
         # Create new log file
-        self.m_file_start = self.m_buffer['timestamp'].data[-1]
+        self.m_file_timestamp = self.m_buffer['timestamp'].data[-1]
         self.m_file_name = self.m_file_header + '_' + \
-            strftime('%Y%m%d_%H%M%S', gmtime(self.m_file_start)) + '.csv'
+            strftime('%Y%m%d_%H%M%S', gmtime(self.m_file_timestamp)) + '.csv'
         self.m_file = open(os.path.join(
             self.m_file_path, self.m_file_name), 'w')
         # Write variable names
@@ -227,6 +246,9 @@ class LogData():
         # Write variable units
         self.m_file.write(
             'HH:MM:SS.fff, ' + ', '.join(x for x in self.m_varunits) + '\r')
+        if __debug__:
+            print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
+                  'LogData:CreateFile ' + self.m_file_name)
 
     def ResetInstrumentCount(self):
         # reset m_n and m_nNoResponse of all instruments
@@ -237,7 +259,27 @@ class LogData():
         #     print('LogData:ResetInstrumentCount')
 
     def __str__(self):
-        return 'buffer_interval: ' + str(self.m_buffer_interval) + '\n'
+        return '[buffer]:\n' + \
+               '\tactive: ' + str(self.m_active_buffer) + '\n' + \
+               '\tintetrval: ' + str(self.m_buffer_interval) + '\n' + \
+               '\tsize: ' + str(self.m_buffer_size) + '\n' + \
+               '[bin]\n' + \
+               '\tsize: ' + str(self.m_bin_size) + '\n' + \
+               '\tmax_size: ' + str(self.m_max_bin_size) + '\n' + \
+               '[log]' + \
+               '\tactive: ' + str(self.m_active_log) + '\n' + \
+               '\theader: ' + self.m_file_header + '\n' + \
+               '\tname: ' + self.m_file_name + '\n' + \
+               '\tpath: ' + self.m_file_path + '\n' + \
+               '\ttimestamp: ' + str(self.m_file_timestamp) + '\n' + \
+               '\ttimestamp (GMT): ' + \
+               strftime('%Y/%m/%d %H:%M:%S', gmtime(self.m_file_timestamp)) + \
+               '\n' + \
+               '\tlength: ' + str(self.m_file_length) + '\n' + \
+               '[instruments]\n' + \
+               '\tinstrnames: ' + str(self.m_instnames) + '\n' + \
+               '\tvarnames: ' + str(self.m_varnames) + '\n' + \
+               '\tvarunits: ' + str(self.m_varunits)
 
     # def __del__(self):
     #     # Stop if necessary

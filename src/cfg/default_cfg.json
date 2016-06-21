@@ -8,6 +8,7 @@
   "log":{
     "frequency":1,
     "interval_write":60,
+    "buffer_size":120,
     "length":60,
     "header":"Inlinino",
     "path":"data/"
