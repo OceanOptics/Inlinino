@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 15:30:32
+# @Last Modified time: 2016-06-21 14:00:21
 
 # To check sensor is working correctly:
 # On OSX:
@@ -91,11 +91,11 @@ class WETLabs(Instrument):
         start_time = time()
         while(self.m_active):
             try:
-                self.UpdateCache()
-                self.m_n += 1
                 sleep(self.m_serial.timeout - (time() - start_time) %
                       self.m_serial.timeout)
-            except:
+                self.UpdateCache()
+                self.m_n += 1
+            except Exception as e:
                 print(self.m_name +
                       ': Unexpected error while updating cache.\n'
                       'Serial adaptor might be unplug.')
@@ -105,6 +105,7 @@ class WETLabs(Instrument):
                 except:
                     print(self.m_name +
                           ': Unexpected error while emptying cache')
+                print(e)
 
     def UpdateCache(self):
         # Update cache

@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 13:39:37
+# @Last Modified time: 2016-06-21 14:00:43
 
 from threading import Thread
 from time import sleep, time
@@ -94,16 +94,18 @@ class Simulino(Instrument):
         start_time = time()
         while(self.m_active):
             try:
+                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
                 self.UpdateCache()
                 self.m_n += 1
-                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
             except:
                 print(self.m_name + ': Unexpected error while updating cache.')
                 try:
                     self.EmptyCache()
                     self.m_nNoResponse += 1
-                except:
-                    print(self.m_name + ': Unexpected error while emptying cache')
+                except Exception as e:
+                    print(self.m_name +
+                          ': Unexpected error while emptying cache')
+                    print(e)
 
     def UpdateCache(self):
         # Update cache

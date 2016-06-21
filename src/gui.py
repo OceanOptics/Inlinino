@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 18:15:46
+# @Last Modified time: 2016-06-21 13:59:22
 
 import os
 import sys
@@ -648,8 +648,12 @@ class Worker(QtCore.QObject):
     def RefreshPing(self):
         start_time = time()
         while self.m_active:
-            self.refresh.emit()
-            sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
+            try:
+                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
+                self.refresh.emit()
+            except Exception as e:
+                print('Unexpected error while updating GUI')
+                print(e)
         self.finished.emit()
 
 
