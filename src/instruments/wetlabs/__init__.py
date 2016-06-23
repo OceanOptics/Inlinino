@@ -2,23 +2,15 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 14:31:58
+# @Last Modified time: 2016-06-23 17:31:47
 
 # To check sensor is working correctly:
 # On OSX:
 #   screen /dev/tty.usbserial-FTZ267A6A 19200
 #   close session with ctrl-A ctrl-\
-#
-# Column header in order:
-#   %m/%d/%y
-#   %H:%M:%S
-#   wv(nm)
-#   count
-#   wv(nm)
-#   count
-#   wv(nm)
-#   count
-#   checksum (528) ???
+# On Windows:
+#   Use TeraTerm baudrate 19200
+
 
 from serial import Serial
 from threading import Thread
@@ -39,6 +31,8 @@ class WETLabs(Instrument):
 
         # Do specific configuration
         self.m_connect_need_port = True
+        self.m_varname_header = None
+        self.m_lambda = []
 
         # Initialize serial communication
         self.m_serial = Serial()
@@ -47,6 +41,28 @@ class WETLabs(Instrument):
         self.m_serial.parity = 'N'  # None
         self.m_serial.stopbits = 1
         self.m_serial.timeout = 1   # 1 Hz
+
+        # Load cfg
+        if 'varname_header' in _cfg.keys():
+            self.m_varname_header = _cfg['varname_header']
+        else:
+            print(_name + ': Missing varname_header')
+        if 'lambda' in _cfg.keys():
+            self.m_lambda = _cfg['lambda']
+        else:
+            print(_name + ': Missing lambda')
+        if 'units' in _cfg.keys():
+            units = _cfg['units']
+        else:
+            print(_name + ': Missing units')
+            units = 'Unknown'
+
+        # Init cache in case log starts before instrument is connected
+        for l in self.m_lambda:
+            l_str = str(l)
+            self.m_cache[self.m_varname_header + l_str] = None
+            self.m_units[self.m_varname_header + l_str] = units
+            self.m_varnames.append(self.m_varname_header + l_str)
 
     def Connect(self, _port=None):
         if _port is None:
@@ -61,6 +77,8 @@ class WETLabs(Instrument):
             return None
 
         if self.m_serial.isOpen():
+            # Skip first data
+            self.m_serial.readline()
             # Create thread to update cache
             self.m_thread = Thread(target=self.RunUpdateCache, args=())
             self.m_thread.daemon = True

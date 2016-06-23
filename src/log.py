@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 16:07:08
+# @Last Modified time: 2016-06-23 16:43:14
 
 import os
 from threading import Thread
@@ -92,7 +92,8 @@ class LogData():
         if _instruments_cfg is None:
             for instname, inst in self.m_instruments.items():
                 for varname in inst.m_cache.keys():
-                    self.m_instnames[varname] = instname
+                    self.m_instnames[instname + '_' + varname] = instname
+                    self.m_varkeys.append(instr_key + '_' + varname)
                     self.m_varnames.append(varname)
                     self.m_varunits.append(inst.m_units[varname])
         else:
