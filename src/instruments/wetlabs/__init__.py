@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 14:00:21
+# @Last Modified time: 2016-06-23 14:31:58
 
 # To check sensor is working correctly:
 # On OSX:
@@ -22,7 +22,6 @@
 
 from serial import Serial
 from threading import Thread
-from time import sleep, time
 
 from instruments import Instrument
 
@@ -88,17 +87,14 @@ class WETLabs(Instrument):
         self.EmptyCache()
 
     def RunUpdateCache(self):
-        start_time = time()
         while(self.m_active):
             try:
-                sleep(self.m_serial.timeout - (time() - start_time) %
-                      self.m_serial.timeout)
                 self.UpdateCache()
-                self.m_n += 1
             except Exception as e:
                 print(self.m_name +
-                      ': Unexpected error while updating cache.\n'
-                      'Serial adaptor might be unplug.')
+                      ': Unexpected error while updating cache.\n' +
+                      'Suggestions:\n' +
+                      '\t-Serial adaptor might be unplug.')
                 try:
                     self.EmptyCache()
                     self.NoResponse()
@@ -112,16 +108,7 @@ class WETLabs(Instrument):
         #   To be implemented by subclass
         pass
 
-    def NoResponse(self, _msg=None):
-        # Set meassage
-        if _msg is None:
-            msg = _msg
-        else:
-            msg = 'No data after updating cache.\n' + \
-                'Suggestions:\n' + \
-                '\t- Serial cable might be unplug.\n' + \
-                '\t- Sensor power is off.\n'
-
+    def CommunicationError(self, _msg=''):
         # Set cache to None
         for key in self.m_cache.keys():
             self.m_cache[key] = None
@@ -132,7 +119,7 @@ class WETLabs(Instrument):
                 self.m_nNoResponse % 60 == self.m_maxNoResponse):
             print('%s did not respond %d times\n%s' % (self.m_name,
                                                        self.m_nNoResponse,
-                                                       msg))
+                                                       _msg))
 
 
 # Simple example logging the data

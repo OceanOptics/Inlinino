@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 14:11:13
+# @Last Modified time: 2016-06-23 16:16:46
 
 import os
 import sys
@@ -115,10 +115,11 @@ class GUI(QtGui.QMainWindow):
                     'yyyy/mm/dd')
         sd_data.addWidget(wdgt)
         self.m_var_display = {}
-        for i in range(len(self.m_app.m_log_data.m_varnames)):
+        for i in range(len(self.m_app.m_log_data.m_varkeys)):
+            varkey = self.m_app.m_log_data.m_varkeys[i]
             varname = self.m_app.m_log_data.m_varnames[i]
-            wdgt, self.m_var_display[varname], foo = self.QVarDisplay(varname,
-                self.m_app.m_log_data.m_buffer[varname].get(),
+            wdgt, self.m_var_display[varkey], foo = self.QVarDisplay(varname,
+                self.m_app.m_log_data.m_buffer[varkey].get(),
                 self.m_app.m_log_data.m_varunits[i])
             sd_data.addWidget(wdgt, (i + 1) // 3 , (i + 1) % 3)
         # Instrument Status
@@ -221,7 +222,7 @@ class GUI(QtGui.QMainWindow):
         self.m_pw = pg.PlotWidget()
         self.m_plot = self.m_pw.plotItem
         self.m_curves = []
-        n = len(self.m_app.m_log_data.m_varnames)
+        n = len(self.m_app.m_log_data.m_varkeys)
         for i in range(n):
             c = pg.PlotCurveItem(pen=(i,n))
             self.m_plot.addItem(c)
@@ -263,10 +264,10 @@ class GUI(QtGui.QMainWindow):
 
     # Set plot (pyQtGraph)
     def SetPlot(self):
-        for i in range(len(self.m_app.m_log_data.m_varnames)):
-            varname = self.m_app.m_log_data.m_varnames[i]
+        for i in range(len(self.m_app.m_log_data.m_varkeys)):
+            varkey = self.m_app.m_log_data.m_varkeys[i]
             # data = np.random.normal(size=100)
-            data = self.m_app.m_log_data.m_buffer[varname].get(100)
+            data = self.m_app.m_log_data.m_buffer[varkey].get(100)
             self.m_curves[i].setData(data)
 
     # Instrument Actions
@@ -322,7 +323,7 @@ class GUI(QtGui.QMainWindow):
         if self.m_app.m_instruments[_instr_key].m_connect_need_port:
             # Instrument need a port address to connect
             port, ok = QtGui.QInputDialog.getItem(self, 'Connect Instrument',
-                                              'Connecting ' + _instr_key + '\nSelect port', self.m_app.m_com.m_port_list)
+                                              'Connecting ' + _instr_key + '\nSelect port', self.m_app.m_com.GetPortList())
             if ok:
                 if self.m_app.m_instruments[_instr_key].Connect(port):
                     self.m_statusBar.setText(_instr_key + ' is connected to ' + port)
@@ -375,10 +376,10 @@ class GUI(QtGui.QMainWindow):
             self.m_date_display.setText(strftime('%Y/%m/%d', zulu))
             self.m_date_display.repaint()
         # Update variables
-        for varname in self.m_app.m_log_data.m_varnames:
-            self.m_var_display[varname].setText('%.4f' %
-                self.m_app.m_log_data.m_buffer[varname].get()[0])
-            self.m_var_display[varname].repaint()
+        for varkey in self.m_app.m_log_data.m_varkeys:
+            self.m_var_display[varkey].setText('%.4f' %
+                self.m_app.m_log_data.m_buffer[varkey].get()[0])
+            self.m_var_display[varkey].repaint()
 
     def SetInstrumentsStatus(self):
         for instr_key, instr_value in self.m_app.m_instruments.items():
@@ -432,6 +433,8 @@ class GUI(QtGui.QMainWindow):
             QtGui.QMessageBox.information(self, 'Start logging data',
                                               'Already logging data')
         self.SetEnableLogButtons()
+        # Wait that threads starts before updating file name
+        sleep(self.m_app.m_log_data.m_buffer_interval+0.001)
         self.SetLogFileVal()
 
     def ActLogStop(self):
@@ -443,6 +446,7 @@ class GUI(QtGui.QMainWindow):
                                               'Already stopped logging data')
         self.SetEnableLogButtons()
         self.SetLogFileVal()
+        self.UpdateThread() # turno off buffer thread if all instruments are off
 
     def ActLogHeader(self):
         header, ok = QtGui.QInputDialog.getText(self, 'Set log file name header',
@@ -466,7 +470,6 @@ class GUI(QtGui.QMainWindow):
             self.m_actLogStop.setEnabled(False)
 
     def SetLogFileVal(self):
-        # sleep(0.01), in order to read after it was updated
         if (self.m_app.m_log_data.m_file_name is not None and
                 self.m_app.m_log_data.m_active_log):
             foo = os.path.join(self.m_app.m_log_data.m_file_path,

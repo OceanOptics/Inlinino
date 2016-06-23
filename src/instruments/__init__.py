@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 11:24:27
+# @Last Modified time: 2016-06-23 11:37:07
 
 import sys
 import glob
@@ -114,6 +114,13 @@ class Communication():
         if self.m_port_list[_index].product is not None:
             foo += ' ' + self.m_port_list[_index].product
         return foo
+
+    def GetPortList(self):
+        l = []
+        for port in self.m_port_list:
+            l.append(port.device)
+        return l
+        # return self.m_port_list
 
     def __str__(self):
         foo = ''

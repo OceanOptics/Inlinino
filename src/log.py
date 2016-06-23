@@ -2,13 +2,12 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 15:15:02
+# @Last Modified time: 2016-06-23 16:07:08
 
 import os
 from threading import Thread
 from time import sleep, time, gmtime, strftime
 from collections import deque
-from time import sleep, time
 import numpy as np
 
 
@@ -39,7 +38,7 @@ class LogData():
     # Instruments
     m_instruments = None
     m_instnames = {}  # m_instnames.keys() -> list of all the variables
-    # m_instnames.values() -> instrument of the variable
+    m_varkeys = []
     m_varnames = []   # ordered list of the variables of all the instruments
     m_varunits = []
 
@@ -99,15 +98,16 @@ class LogData():
         else:
             for instr_key in _instruments_cfg.keys():
                 for varname in self.m_instruments[instr_key].m_varnames:
-                    self.m_instnames[varname] = instr_key
+                    self.m_instnames[instr_key + '_' + varname] = instr_key
+                    self.m_varkeys.append(instr_key + '_' + varname)
                     self.m_varnames.append(varname)
                     self.m_varunits.append(
                         self.m_instruments[instr_key].m_units[varname])
 
         # Initialize buffer
         self.m_buffer['timestamp'] = RingBuffer(self.m_buffer_size)
-        for name in self.m_instnames.keys():
-            self.m_buffer[name] = RingBuffer(self.m_buffer_size)
+        for varkey in self.m_varkeys:
+            self.m_buffer[varkey] = RingBuffer(self.m_buffer_size)
 
     def CountActiveInstruments(self):
         active_instr = 0
@@ -140,6 +140,9 @@ class LogData():
             print('Log file not initialized.')
 
     def StartThread(self):
+        if __debug__:
+            print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
+                  'LogData:StartThread')
         # Start thread
         self.m_thread = Thread(target=self.RunUpdate, args=())
         self.m_thread.daemon = True
@@ -148,6 +151,9 @@ class LogData():
         self.m_thread.start()
 
     def StopThread(self, _disp=True):
+        if __debug__:
+            print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
+                  'LogData:StopThread')
         # Stop thread
         if self.m_thread is not None:
             self.m_active_buffer = False
@@ -206,12 +212,16 @@ class LogData():
         # Time stamp
         self.m_buffer['timestamp'].extend(time())
         # Read data from active instruments
-        for varname, instname in self.m_instnames.items():
+        #for (varkey, instname, varname) in zip(self.m_instnames.items(), self.m_varnames):
+        for i in range(len(self.m_varkeys)):
+            varkey = self.m_varkeys[i]
+            varname = self.m_varnames[i]
+            instname = self.m_instnames[varkey]
             if self.m_instruments[instname].m_active:
-                self.m_buffer[varname].extend(
+                self.m_buffer[varkey].extend(
                     self.m_instruments[instname].ReadVar(varname))
             else:
-                self.m_buffer[varname].extend(None)
+                self.m_buffer[varkey].extend(None)
         if self.m_active_log:
             # Increase bin size to write in log file
             self.m_bin_size += 1
@@ -219,7 +229,7 @@ class LogData():
     def WriteBuffer(self):
         if __debug__:
             print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
-                  'LogData:WriteBuffer start')
+                  'LogData:WriteBuffer')
         # Write in log file
         n = self.m_bin_size
         for i in range(0, n):
@@ -227,11 +237,8 @@ class LogData():
                 strftime('%H:%M:%S', gmtime(self.m_buffer['timestamp'].get(n)[i])) +
                 # Display milliseconds
                 ("%.3f" % self.m_buffer['timestamp'].get(n)[i])[-4:] +
-                ', ' + ', '.join(str(self.m_buffer[x].get(n)[i]) for x in self.m_varnames) + '\r')
+                ', ' + ', '.join(str(self.m_buffer[x].get(n)[i]) for x in self.m_varkeys) + '\r')
         self.m_bin_size = 0
-        if __debug__:
-            print(strftime('%Y/%m/%d %H:%M:%S ', gmtime(time())) +
-                  'LogData:WriteBuffer stop')
 
     def CreateFile(self):
         # Create new log file
@@ -240,9 +247,9 @@ class LogData():
             strftime('%Y%m%d_%H%M%S', gmtime(self.m_file_timestamp)) + '.csv'
         self.m_file = open(os.path.join(
             self.m_file_path, self.m_file_name), 'w')
-        # Write variable names
+        # Write variable keys (could switch to variable names)
         self.m_file.write(
-            'time, ' + ', '.join(x for x in self.m_varnames) + '\r')
+            'time, ' + ', '.join(x for x in self.m_varkeys) + '\r')
         # Write variable units
         self.m_file.write(
             'HH:MM:SS.fff, ' + ', '.join(x for x in self.m_varunits) + '\r')
@@ -278,6 +285,7 @@ class LogData():
                '\tlength: ' + str(self.m_file_length) + '\n' + \
                '[instruments]\n' + \
                '\tinstrnames: ' + str(self.m_instnames) + '\n' + \
+               '\tvarkeys: ' + str(self.m_varnames) + '\n' + \
                '\tvarnames: ' + str(self.m_varnames) + '\n' + \
                '\tvarunits: ' + str(self.m_varunits)
 

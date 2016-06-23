@@ -2,22 +2,21 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 11:46:23
+# @Last Modified time: 2016-06-23 16:35:24
 
 
 from instruments.wetlabs import WETLabs
+from time import time, gmtime, strftime  # for debugging only
 
 
 class BB3(WETLabs):
-
-
 
     def __init__(self, _name, _cfg):
         WETLabs.__init__(self, _name, _cfg)
 
         # Init parameters
-        self.m_varname_header=None
-        self.m_lambda=[]
+        self.m_varname_header = None
+        self.m_lambda = []
 
         # Load cfg
         if 'varname_header' in _cfg.keys():
@@ -41,17 +40,27 @@ class BB3(WETLabs):
             self.m_units[self.m_varname_header + l_str] = units
             self.m_varnames.append(self.m_varname_header + l_str)
 
-
     def UpdateCache(self):
-        # read all line in buffer
-        data = self.m_serial.readlines()
+        # readline wait for \EOT or timeout and
+        data = self.m_serial.readline()
         if data:
-            # keep only most recent data
-            data = data[-1]
-            # There is data, update the cache
-            # print(data)
-            data = data.split('\t')
-            for i in range(2, 8, 2):
-                self.m_cache[self.m_varname_header + data[i]] = int(data[i + 1])
+            # data is a byte array
+            data = data.rsplit(b'\t', 7)
+            if len(data) == 8:
+                for i in range(1, 7, 2):
+                    self.m_cache[self.m_varname_header +
+                                 data[i].decode("UTF-8")] = int(data[i + 1])
+                self.m_n += 1
+            else:
+                # Incomplete data transmission
+                self.CommunicationError('Incomplete data transmission.\n' +
+                                        'This might happen on few first ' +
+                                        'bytes received.\nIf it keeps going ' +
+                                        'try disconnecting and reconnecting ' +
+                                        'the instrument.')
         else:
-            self.NoResponse()
+            # No data
+            self.CommunicationError('No data after updating cache.\n' +
+                                    'Suggestions:\n' +
+                                    '\t- Serial cable might be unplug.\n' +
+                                    '\t- Sensor power is off.\n')

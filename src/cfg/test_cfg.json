@@ -1,4 +1,10 @@
 {
+  "app_cfg":{
+    "verbosity":2,
+    "interface":"gui",
+    "theme":"inside",
+    "ui_update_frequency":1
+  },
   "instruments":{
     "SimulinoSin":{
       "module":"Simulino",
@@ -14,6 +20,18 @@
           "units":"No Units"
         }
       }
+    },
+    "BB3_349":{
+      "module":"WETLabs",
+      "name":"BB3",
+      "lambda":[470, 532, 660],
+      "varname_header":"beta"
+    },
+    "BB3_499":{
+      "module":"WETLabs",
+      "name":"BB3",
+      "lambda":[470, 532, 595],
+      "varname_header":"beta"
     }
   }
 }
