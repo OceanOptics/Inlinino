@@ -2,10 +2,10 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 11:37:07
+# @Last Modified time: 2016-06-24 15:05:12
 
-import sys
-import glob
+# import sys
+# import glob
 import serial.tools.list_ports
 
 
@@ -50,9 +50,11 @@ class Instrument(object):
             self.m_cache[key] = None
 
     def ReadCache(self):
+        # Return dictionnary with values in cache
         return self.m_cache
 
     def ReadVar(self, _key):
+        # Return value in cache corresponding to the key
         return self.m_cache[_key]
 
     def __str__(self):

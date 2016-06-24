@@ -1,0 +1,11 @@
+{
+  "instruments":{
+    "BB9_279":{
+      "module":"WETLabs",
+      "name":"BB9",
+      "lambda":[412, 440, 488, 510, 532, 595, 660, 676, 715],
+      "varname_header":"beta",
+      "units":"counts"
+    }
+  }
+}

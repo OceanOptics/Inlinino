@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 17:31:47
+# @Last Modified time: 2016-06-24 11:47:44
 
 # To check sensor is working correctly:
 # On OSX:
@@ -115,7 +115,7 @@ class WETLabs(Instrument):
                       '\t-Serial adaptor might be unplug.')
                 try:
                     self.EmptyCache()
-                    self.NoResponse()
+                    self.CommunicationError()
                 except:
                     print(self.m_name +
                           ': Unexpected error while emptying cache')

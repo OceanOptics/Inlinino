@@ -1,9 +1,11 @@
 {
   "log":{
     "frequency":1,
+    "interval_write":60,
+    "buffer_size":120,
     "length":60,
     "header":"Inlinino",
-    "path":"~/Desktop/NAAMES/"
+    "path":"data/"
   },
   "instruments":{
     "BB3":{
@@ -12,13 +14,15 @@
       "lambda":[470, 532, 660],
       "varname_header":"beta"
     },
-    "Arduino":{
+    "WSCD_859":{
+      "module":"Arduino",
+      "name":"ADS1015",
       "frequency":1,
+      "gain":23,
       "variables":{
-        "FDOM":{
-          "pin":"A0",
-          "range":[0, 5],
-          "units":"Volts"
+        "fdom":{
+          "pin":"DIF_A01",
+          "units":"counts"
         }
       }
     }

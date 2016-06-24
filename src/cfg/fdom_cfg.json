@@ -1,12 +1,14 @@
 {
   "instruments":{
-    "Arduino":{
+    "WSCD_859":{
+      "module":"Arduino",
+      "name":"ADS1015",
       "frequency":1,
+      "gain":23,
       "variables":{
-        "FDOM":{
-          "pin":"A0",
-          "range":[0, 5],
-          "units":"Volts"
+        "fdom":{
+          "pin":"DIF_A01",
+          "units":"counts"
         }
       }
     }

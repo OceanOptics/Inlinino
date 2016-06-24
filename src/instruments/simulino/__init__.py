@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 14:00:43
+# @Last Modified time: 2016-06-24 10:57:12
 
 from threading import Thread
 from time import sleep, time
@@ -111,15 +111,3 @@ class Simulino(Instrument):
         # Update cache
         #   To be implemented by subclass
         pass
-
-    def ReadCache(self):
-        # Return dictionnary with values in cache
-        return self.m_cache
-
-    def ReadVar(self, _key):
-        # Return value in cache corresponding to the key
-        return self.m_cache[_key]
-
-    # def __del__(self):
-    #     print('Simulino.__del__')
-    #     Instrument.__del__(self)
