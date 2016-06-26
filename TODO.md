@@ -13,7 +13,6 @@ Improvements:
   + update README.md
   + write INSTALL.md
   + choose license, need to be compatible with QT4  + check that log_data write every minute or so
-  + rewrite Arduino's class
   + GUI:Figure:
       + add Y grid, add time stamp on x axis
       + enable under sample (to handle big buffer)
