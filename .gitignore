@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 led / optimized / DLL files
+=======
+# Byte-compiled / optimized / DLL files
+>>>>>>> 3394e3f8b72eadddde14ed5f70149d845906cf09
 __pycache__/
 *.py[cod]
 *$py.class
@@ -49,10 +53,23 @@ coverage.xml
 *.mo
 *.pot
 
+<<<<<<< HEAD
+=======
+# Django stuff:
+*.log
+local_settings.py
+
+>>>>>>> 3394e3f8b72eadddde14ed5f70149d845906cf09
 # Flask stuff:
 instance/
 .webassets-cache
 
+<<<<<<< HEAD
+=======
+# Scrapy stuff:
+.scrapy
+
+>>>>>>> 3394e3f8b72eadddde14ed5f70149d845906cf09
 # Sphinx documentation
 docs/_build/
 
@@ -75,6 +92,7 @@ celerybeat-schedule
 venv/
 ENV/
 
+<<<<<<< HEAD
 # SublimeText project settings
 *.sublime-project
 *.sublime-workspace
@@ -91,3 +109,10 @@ utils/
 
 # OSX
 .DS_Store
+=======
+# Spyder project settings
+.spyderproject
+
+# Rope project settings
+.ropeproject
+>>>>>>> 3394e3f8b72eadddde14ed5f70149d845906cf09
