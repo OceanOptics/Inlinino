@@ -4,9 +4,8 @@ Inlinino
 _A simple data logger_
 
 ### Purpose of the project
-Inlinino is built to log data from sensors with analog or serial interface continuously during days. Few instruments from WETLabs are implemented to date: ECO-BB3, ECO-BB9, and WSCD. It can log data from analog port of an Arduino or an ADS-1X15 or any instrument for which a python API exist.
+Inlinino is built to log data from sensors with analog or serial interface continuously during days. Few instruments from WETLabs are implemented: ECO-BB3, ECO-BB9, and WSCD. It can also log data from analog ports of an Arduino, an ADS-1X15 or any instrument for which a python API is available.
 
-### Output
 The configuration of the software is done with json files and it outputs csv files hourly (by default) of data recorded. Post processing can be done through the software it-self or via post-processing with any data analysis tools such as Python, R or Matlab.
 
 ### Example of use
@@ -30,7 +29,7 @@ python -o src <path-to-cfg-file>
 ```
 By default the GUI interface is launched while starting
 Some configuration files are available in /src/cfg/*_cfg.json
-Note: on windows can use pythonw in order to mask the window command when starting the software. Option -o for python command optimize the code before running it and turn __debug__ variable to false which hide debugging information while running the code.
+Note: windows can use pythonw in order to mask the window command when starting the software. Option -o for python command optimize the code before running it and turn __debug__ variable to false which hide debugging statments while running the application.
 
 The application was developed by Nils Haëntjens <nils.haentjens+inlinino@maine.edu>.
 
