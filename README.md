@@ -6,7 +6,7 @@ _A simple data logger_
 ### Purpose of the project
 Inlinino is built to log data from sensors with analog or serial interface continuously during days. Few instruments from WETLabs are implemented: ECO-BB3, ECO-BB9, and WSCD. It can also log data from analog ports of an Arduino, an ADS-1X15 or any instrument for which a python API is available.
 
-The configuration of the software is done with json files and it outputs csv files hourly (by default) of data recorded. Post processing can be done through the software it-self or via post-processing with any data analysis tools such as Python, R or Matlab.
+The configuration of the software is done with json files and it outputs csv files hourly (by default) of data recorded. Post processing can be done through the software it-self or with any data analysis tools such as Python, R or Matlab.
 
 ### Example of use
 Inlinino is designed to log optical measurements during oceanographic cruises but can be used or adapt in any other field. This code was tested during the [NAAMES](http://naames.larc.nasa.gov) cruise running 26 days in a row and is currently logging data on the Research Vessel [Tara](http://oceans.taraexpeditions.org/). It’s compatible with Windows 7 (probably 8 and 10 but not tested), OSX and should be working on common Linux distribution (not tested).
@@ -31,6 +31,6 @@ By default the GUI interface is launched while starting
 Some configuration files are available in /src/cfg/*_cfg.json
 Note: windows can use pythonw in order to mask the window command when starting the software. Option -o for python command optimize the code before running it and turn __debug__ variable to false which hide debugging statments while running the application.
 
-The application was developed by Nils Haëntjens <nils.haentjens+inlinino@maine.edu>.
+The application was developed by [Nils Haëntjens](mailto:nils.haentjens+inlinino@maine.edu).
 
-This code could be modified to control instruments but similar project already does it very well: [Instrumentino](https://github.com/yoelk/instrumentino).
+This code could be modified to control instruments as well as but similar project already does it very well: [Instrumentino](https://github.com/yoelk/instrumentino).
