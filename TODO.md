@@ -10,9 +10,6 @@ Bugs:
 serial.serialutil.SerialException: read failed: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
 
 Improvements:
-  + update README.md
-  + write INSTALL.md
-  + choose license, need to be compatible with QT4  + check that log_data write every minute or so
   + GUI:Figure:
       + add Y grid, add time stamp on x axis
       + enable under sample (to handle big buffer)

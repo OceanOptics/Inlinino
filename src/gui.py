@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-27 11:10:18
+# @Last Modified time: 2016-06-28 10:36:38
 
 import os
 import sys
@@ -62,22 +62,26 @@ class GUI(QtGui.QMainWindow):
             'Disconnect an instrument from the application')
         actInstrClose.triggered.connect(self.ActInstrClose)
         actInstrList = QtGui.QAction(QtGui.QIcon('none'), '&List', self)
-        actInstrList.setShortcut('Ctrl+L')
+        # actInstrList.setShortcut('Ctrl+L')
         actInstrList.setStatusTip('List all instruments available')
         actInstrList.triggered.connect(self.ActInstrList)
 
         self.m_actLogStart = QtGui.QAction(QtGui.QIcon('none'), '&Start', self)
-        self.m_actLogStart.setShortcut('Ctrl+W')
+        self.m_actLogStart.setShortcut('Ctrl+L')
         self.m_actLogStart.setStatusTip('Start logging data')
         self.m_actLogStart.triggered.connect(self.ActLogStart)
         self.m_actLogStop = QtGui.QAction(QtGui.QIcon('none'), '&Stop', self)
-        self.m_actLogStop.setShortcut('Ctrl+E')
+        self.m_actLogStop.setShortcut('Ctrl+K')
         self.m_actLogStop.setStatusTip('Stop logging data')
         self.m_actLogStop.triggered.connect(self.ActLogStop)
         actLogHeader = QtGui.QAction(QtGui.QIcon('none'), '&File header', self)
-        actLogHeader.setShortcut('Ctrl+F')
+        actLogHeader.setShortcut('Ctrl+H')
         actLogHeader.setStatusTip('Change header of log file name')
         actLogHeader.triggered.connect(self.ActLogHeader)
+        actLogPath = QtGui.QAction(QtGui.QIcon('none'), '&File location', self)
+        actLogPath.setShortcut('Ctrl+J')
+        actLogPath.setStatusTip('Change location of log files')
+        actLogPath.triggered.connect(self.ActLogPath)
 
         actHelpHelp = QtGui.QAction(QtGui.QIcon('none'), '&Help', self)
         actHelpHelp.setStatusTip('Help')
@@ -102,6 +106,7 @@ class GUI(QtGui.QMainWindow):
         menuLog.addAction(self.m_actLogStart)
         menuLog.addAction(self.m_actLogStop)
         menuLog.addAction(actLogHeader)
+        menuLog.addAction(actLogPath)
         menuHelp.addAction(actHelpHelp)
         menuHelp.addAction(actHelpSupport)
         menuHelp.addAction(actHelpCredits)
@@ -458,6 +463,17 @@ class GUI(QtGui.QMainWindow):
             self.m_statusBar.setText('Set log file header to ' + header)
         self.SetLogFileVal()
 
+    def ActLogPath(self):
+        path = QtGui.QFileDialog.getExistingDirectory(self,
+                'Select directory', self.m_app.m_log_data.m_file_path)
+
+        if path == '':
+            print('Cancel')
+        else:
+            self.m_app.m_log_data.m_file_path = path
+            self.m_statusBar.setText('Set log directory to ' + path)
+        self.SetLogFileVal()
+
     # Set log display
     def SetEnableLogButtons(self):
         if self.m_app.m_log_data.m_active_log:
@@ -500,12 +516,14 @@ class GUI(QtGui.QMainWindow):
         msg.setText("Inlinino Help")
         msg.setInformativeText('Inlinino is a simple data logger.\n' +
                                'To start logging data:\n' +
-                               '   1. connect an instrument (Instrument>Connect)\n' +
+                               '   1. connect an instrument (Instrument>' +
+                               'Connect)\n' +
                                '   2. start the logger (Log>Start)\n' +
                                'To stop logging data:\n' +
                                '   + stop the logger (Log>Stop)\n' +
-                               '   + exit application (will stop logging to)\n' +
-                               'More details at: github.com/OceanOptics/Inlinino/wiki')
+                               '   + exit application (will stop logging to)' +
+                               '\nMore details at: github.com/OceanOptics/' +
+                               'Inlinino')
         msg.setWindowTitle('Help')
         msg.exec_()
 
@@ -513,7 +531,8 @@ class GUI(QtGui.QMainWindow):
         msg = QtGui.QMessageBox()
         msg.setIcon(QtGui.QMessageBox.Question)
         msg.setText('Inlinino Support')
-        msg.setInformativeText('Send questions, bug reports, fixes, enhancements, t-shirts, ' +
+        msg.setInformativeText('Send questions, bug reports, fixes, ' +
+                               'enhancements, t-shirts, ' +
                                'money, lobsters & beers to Nils\n' +
                                '<nils.haentjens+inlinino@maine.edu>')
         msg.setWindowTitle('Support')
@@ -523,7 +542,9 @@ class GUI(QtGui.QMainWindow):
         msg = QtGui.QMessageBox()
         msg.setIcon(QtGui.QMessageBox.Information)
         msg.setText('Inlinino Credits')
-        msg.setInformativeText('Developped by Nils Haëntjens (University of Maine)\nUsing pySerial, pyQt, and pyQtGraph\n')
+        msg.setInformativeText('Developped by Nils Haëntjens (University of ' +
+                               'Maine)\nGNU GENERAL PUBLIC LICENSE\nVersion ' +
+                               '3, 29 June 2007')
         msg.setWindowTitle('Credits')
         msg.exec_()
 
