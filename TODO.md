@@ -3,7 +3,6 @@ TODO
 
 Bugs:
   + Warning: no data on start refreshing figure too early
-  + Update buffer only if new data in instruments otherwise skip update
   + OSX write bin does not save in case of unexpected closure of the computer
   + in WETLabs:Connect: handle this exception (when try multiple acces to port)
       File "/Users/nils/anaconda/envs/Inlinino/lib/python3.4/site-packages/pyserial-3.1.1-py3.4.egg/serial/serialposix.py", line 475, in read

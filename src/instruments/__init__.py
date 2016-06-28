@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-24 15:05:12
+# @Last Modified time: 2016-06-28 10:55:09
 
 # import sys
 # import glob
@@ -20,6 +20,7 @@ class Instrument(object):
         self.m_cache = {}
         self.m_units = {}
         self.m_varnames = []
+        self.m_cacheIsNew = {}
         self.m_active = False
         self.m_connect_need_port = None
         self.m_thread = None
@@ -50,12 +51,17 @@ class Instrument(object):
             self.m_cache[key] = None
 
     def ReadCache(self):
-        # Return dictionnary with values in cache
+        # Return dictionary with values in cache
         return self.m_cache
 
     def ReadVar(self, _key):
-        # Return value in cache corresponding to the key
-        return self.m_cache[_key]
+        # Return value in cache corresponding to the key only if the value was
+        # updated since last read
+        if self.m_cacheIsNew[_key]:
+            self.m_cacheIsNew[_key] = False
+            return self.m_cache[_key]
+        else:
+            return None
 
     def __str__(self):
         if self.m_active:

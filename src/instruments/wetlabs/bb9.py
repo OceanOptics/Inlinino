@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 17:30:12
+# @Last Modified time: 2016-06-28 10:50:44
 
 
 from instruments.wetlabs import WETLabs
@@ -52,8 +52,9 @@ class BB9(WETLabs):
             data = data.rsplit(b'\t', 19)
             if len(data) == 20:
                 for i in range(1, 19, 2):
-                    self.m_cache[self.m_varname_header +
-                                 data[i].decode("UTF-8")] = int(data[i + 1])
+                    varname = self.m_varname_header + data[i].decode("UTF-8")
+                    self.m_cache[varname] = int(data[i + 1])
+                    self.m_cacheIsNew[varname] = True
                 self.m_n += 1
             else:
                 # Incomplete data transmission

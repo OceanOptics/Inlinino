@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-24 10:57:12
+# @Last Modified time: 2016-06-28 10:46:38
 
 from threading import Thread
 from time import sleep, time
@@ -37,6 +37,7 @@ class Simulino(Instrument):
             if any(_cfg['variables']):
                 for var, val in _cfg['variables'].items():
                     self.m_cache[var] = None
+                    self.m_cacheIsNew[var] = False
                     if 'seed' in val.keys():
                         self.m_seed[var] = val['seed']
                     else:

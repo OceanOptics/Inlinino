@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-24 11:47:44
+# @Last Modified time: 2016-06-28 10:45:50
 
 # To check sensor is working correctly:
 # On OSX:
@@ -61,6 +61,7 @@ class WETLabs(Instrument):
         for l in self.m_lambda:
             l_str = str(l)
             self.m_cache[self.m_varname_header + l_str] = None
+            self.m_cacheIsNew[self.m_varname_header + l_str] = False
             self.m_units[self.m_varname_header + l_str] = units
             self.m_varnames.append(self.m_varname_header + l_str)
 

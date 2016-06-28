@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-24 16:42:20
+# @Last Modified time: 2016-06-28 10:48:36
 
 
 from time import sleep
@@ -49,6 +49,7 @@ class Arduino(Instrument):
             if any(_cfg['variables']):
                 for var, val in _cfg['variables'].items():
                     self.m_cache[var] = None
+                    self.m_cacheIsNew[var] = False
                     if 'pin' in val.keys():
                         if val['pin'] in self.m_pin_list:
                             self.m_pin2var[val['pin']] = var
@@ -156,8 +157,8 @@ class Arduino(Instrument):
             data = data[0:-2].split(b'\t')
             if len(data) == self.m_n_pins:
                 for i in range(0, self.m_n_pins):
-                    self.m_cache[self.m_pin2var[self.m_pins[i]]] = \
-                        int(data[i])
+                    self.m_cache[self.m_pin2var[self.m_pins[i]]] = int(data[i])
+                    self.m_cacheIsNew[self.m_pin2var[self.m_pins[i]]] = True
                 self.m_n += 1
             else:
                 # Incomplete data transmission

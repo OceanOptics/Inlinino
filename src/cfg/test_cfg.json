@@ -27,20 +27,8 @@
       "frequency":1,
       "gain":23,
       "variables":{
-        "a0":{
-          "pin":"SIN_A0",
-          "units":"counts"
-        },
-        "a1":{
-          "pin":"SIN_A1",
-          "units":"counts"
-        },
-        "a2":{
-          "pin":"SIN_A2",
-          "units":"counts"
-        },
-        "a3":{
-          "pin":"SIN_A3",
+        "FDOM":{
+          "pin":"DIF_A01",
           "units":"counts"
         }
       }

@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:20:53
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 12:09:49
+# @Last Modified time: 2016-06-28 10:49:17
 
 from instruments.simulino import Simulino
 from math import sin
@@ -30,4 +30,5 @@ class Sinus(Simulino):
         for var in self.m_cache.keys():
             self.m_cache[var] = sin(self.m_x[var]) + self.m_rnd[var].gauss(
                 self.m_mu[var], self.m_sigma[var])
+            self.m_cacheIsNew[var] = True
             self.m_x[var] += self.m_step[var]

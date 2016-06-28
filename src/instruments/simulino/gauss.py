@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:20:53
 # @Last Modified by:   nils
-# @Last Modified time: 2016-05-24 22:34:38
+# @Last Modified time: 2016-06-28 10:49:05
 
 from time import sleep
 
@@ -18,6 +18,7 @@ class Gauss(Simulino):
         for var in self.m_cache.keys():
             self.m_cache[var] = self.m_rnd[var].gauss(
                 self.m_mu[var], self.m_sigma[var])
+            self.m_cacheIsNew[var] = True
 
     # def __del__(self):
     #     print('Gauss.__del__')
