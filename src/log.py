@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 16:43:14
+# @Last Modified time: 2016-06-27 11:12:13
 
 import os
 from threading import Thread
@@ -87,7 +87,11 @@ class LogData():
         self.m_instruments = _instruments
         # Create directory where to log data
         if not os.path.exists(self.m_file_path):
-            os.makedirs(self.m_file_path)
+            try:
+                os.makedirs(self.m_file_path)
+            except Exception as e:
+                print('LogData: Unable to make directory ' + self.m_file_path)
+                print(e)
         # Create list of variables to log
         if _instruments_cfg is None:
             for instname, inst in self.m_instruments.items():

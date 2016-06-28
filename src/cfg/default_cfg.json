@@ -11,7 +11,7 @@
     "buffer_size":120,
     "length":60,
     "header":"Inlinino",
-    "path":"data/"
+    "path":"data"
   },
   "instruments":{}
 }

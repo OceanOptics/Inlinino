@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-23 16:16:46
+# @Last Modified time: 2016-06-27 11:10:18
 
 import os
 import sys
@@ -121,7 +121,7 @@ class GUI(QtGui.QMainWindow):
             wdgt, self.m_var_display[varkey], foo = self.QVarDisplay(varname,
                 self.m_app.m_log_data.m_buffer[varkey].get(),
                 self.m_app.m_log_data.m_varunits[i])
-            sd_data.addWidget(wdgt, (i + 1) // 3 , (i + 1) % 3)
+            sd_data.addWidget(wdgt, (i + 1) // 3, (i + 1) % 3)
         # Instrument Status
         sd_instr_status = QtGui.QVBoxLayout()
         self.m_instr_status = {}
@@ -228,7 +228,7 @@ class GUI(QtGui.QMainWindow):
             self.m_plot.addItem(c)
             self.m_curves.append(c)
         self.m_plot.setLabel('bottom', 'Time', units='s')
-        self.m_plot.setLabel('left', 'Signal', units='Volts')
+        self.m_plot.setLabel('left', 'Signal', units='Counts')
         self.m_plot.setYRange(0, 5)
         self.m_plot.setXRange(0, 100)
         self.m_plot.setLimits(minYRange=0, maxYRange=4500) # In version 0.9.9
@@ -264,11 +264,13 @@ class GUI(QtGui.QMainWindow):
 
     # Set plot (pyQtGraph)
     def SetPlot(self):
+        # Update position with time
         for i in range(len(self.m_app.m_log_data.m_varkeys)):
             varkey = self.m_app.m_log_data.m_varkeys[i]
             # data = np.random.normal(size=100)
             data = self.m_app.m_log_data.m_buffer[varkey].get(100)
             self.m_curves[i].setData(data)
+            # self.m_curves[i].setPos(self.m_app.m_log_data.m_buffer['timestamp'], 0)
 
     # Instrument Actions
     def ActInstrConnect(self, line, _instr_key=None):
