@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:36:38
+# @Last Modified time: 2016-06-28 11:34:55
 
 import os
 import sys
@@ -158,8 +158,10 @@ class GUI(QtGui.QMainWindow):
         self.m_sd_log_fname_val.setWordWrap(True);
         self.m_sd_start_btn = QtGui.QPushButton('Start')
         self.m_sd_stop_btn = QtGui.QPushButton('Stop')
-        QtCore.QObject.connect(self.m_sd_start_btn, QtCore.SIGNAL('clicked()'), self.ActLogStart)
-        QtCore.QObject.connect(self.m_sd_stop_btn, QtCore.SIGNAL('clicked()'), self.ActLogStop)
+        QtCore.QObject.connect(self.m_sd_start_btn, QtCore.SIGNAL('clicked()'),
+                               self.ActLogStart)
+        QtCore.QObject.connect(self.m_sd_stop_btn, QtCore.SIGNAL('clicked()'),
+                               self.ActLogStop)
         sd_log = QtGui.QVBoxLayout()
         sd_log.addWidget(sd_log_fname_lbl)
         sd_log.addWidget(self.m_sd_log_fname_val)
@@ -169,17 +171,22 @@ class GUI(QtGui.QMainWindow):
         sd_log.addLayout(sd_log_action)
         self.SetLogFileVal()
         self.SetEnableLogButtons()
+        # Graph actions
+        self.m_graph_freeze_cb = QtGui.QCheckBox("Freeze figure", self)
+        self.m_graph_freeze_cb.setStatusTip("Freeze only figure, " +
+                                            "log keep running in background")
         # Debug buttons
         if __debug__:
             dbg_info_lbl = QtGui.QLabel('DEBUG MODE')
             dbg_refresh_btn = QtGui.QPushButton('Refresh')
-            QtCore.QObject.connect(dbg_refresh_btn, QtCore.SIGNAL('clicked()'), self.RefreshAll)
+            QtCore.QObject.connect(dbg_refresh_btn, QtCore.SIGNAL('clicked()'),
+                                   self.RefreshAll)
             dbg_layout = QtGui.QVBoxLayout()
             dbg_layout.addWidget(dbg_info_lbl)
             dbg_layout.addWidget(dbg_refresh_btn)
         # Custom status bar at the bottom of the widget
         self.m_statusBar = QtGui.QLabel('Inlinino is ready.')
-        self.m_statusBar.setWordWrap(True);
+        self.m_statusBar.setWordWrap(True)
         # Set sidebar widgets in dock
         self.dockWidgetContent = QtGui.QWidget()
         self.sidebar = QtGui.QVBoxLayout(self.dockWidgetContent)
@@ -188,6 +195,8 @@ class GUI(QtGui.QMainWindow):
         self.sidebar.addLayout(sd_instr_status)
         self.sidebar.addWidget(self.HLine())
         self.sidebar.addLayout(sd_log)
+        self.sidebar.addWidget(self.HLine())
+        self.sidebar.addWidget(self.m_graph_freeze_cb)
         if __debug__:
             self.sidebar.addWidget(self.HLine())
             self.sidebar.addLayout(dbg_layout)
@@ -507,7 +516,8 @@ class GUI(QtGui.QMainWindow):
         self.SetInstrumentsPackets()
         self.SetInstrumentsStatus()
         self.SetLogFileVal()
-        self.SetPlot()
+        if not self.m_graph_freeze_cb.isChecked():
+            self.SetPlot()
 
     # Action Help
     def ActHelpHelp(self):
