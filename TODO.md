@@ -10,13 +10,10 @@ serial.serialutil.SerialException: read failed: device reports readiness to read
 
 Improvements:
   + GUI:Figure:
-      + add Y grid, add time stamp on x axis
       + enable under sample (to handle big buffer)
-      + add checkbox freeze to free the figure
   + add a Process method in instrument to process data in real-time
       + do it in a low priority thread
   + add class status/event to display error|warning|info
-  +
 Major update:
   + Web User Interface with Flask
   + Easy installation with pyInstaller

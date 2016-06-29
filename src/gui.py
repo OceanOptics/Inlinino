@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 11:34:55
+# @Last Modified time: 2016-06-28 20:14:17
 
 import os
 import sys
@@ -233,20 +233,35 @@ class GUI(QtGui.QMainWindow):
         self.setFont(QtGui.QFont("Helvetica Neue Light"))
 
         # Set figure with pyqtgraph
-        self.m_pw = pg.PlotWidget()
+        axis = DateAxis(orientation='bottom')
+        if __debug__:
+            self.m_pw = pg.PlotWidget(axisItems={'bottom': axis})
+        else:
+            self.m_pw = pg.PlotWidget(axisItems={'bottom': axis},
+                                      enableMenu=False)
         self.m_plot = self.m_pw.plotItem
         self.m_curves = []
         n = len(self.m_app.m_log_data.m_varkeys)
         for i in range(n):
-            c = pg.PlotCurveItem(pen=(i,n))
+            # Init Curve Item
+            c = pg.PlotCurveItem(pen=(i, n))
+            # Change Color of Value Displayed
+            varkey = self.m_app.m_log_data.m_varkeys[i]
+            self.m_var_display[varkey].setStyleSheet(
+                'color: ' + c.opts['pen'].color().name())
+            # Add item to plot
             self.m_plot.addItem(c)
+            # Keep track of item
+            # might want to use self.m_plot.listDataItems() instead
             self.m_curves.append(c)
-        self.m_plot.setLabel('bottom', 'Time', units='s')
+        # self.m_plot.setLabel('bottom', 'Time' , units='s')
         self.m_plot.setLabel('left', 'Signal', units='Counts')
-        self.m_plot.setYRange(0, 5)
-        self.m_plot.setXRange(0, 100)
-        self.m_plot.setLimits(minYRange=0, maxYRange=4500) # In version 0.9.9
-        self.m_plot.setMouseEnabled(x=False,y=True)
+        # self.m_plot.setYRange(0, 5)
+        # self.m_plot.setXRange(0, 100)
+        self.m_plot.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
+        self.m_plot.setMouseEnabled(x=False, y=True)
+        self.m_plot.showGrid(x=False, y=True)
+        self.m_plot.enableAutoRange(x=True, y=True)
 
         # Set layout in main window
         widget = QtGui.QWidget()
@@ -278,13 +293,16 @@ class GUI(QtGui.QMainWindow):
 
     # Set plot (pyQtGraph)
     def SetPlot(self):
+        n = self.m_app.m_log_data.m_buffer_size
+        timestamp = self.m_app.m_log_data.m_buffer['timestamp'].get(n)
         # Update position with time
         for i in range(len(self.m_app.m_log_data.m_varkeys)):
             varkey = self.m_app.m_log_data.m_varkeys[i]
             # data = np.random.normal(size=100)
-            data = self.m_app.m_log_data.m_buffer[varkey].get(100)
-            self.m_curves[i].setData(data)
+            data = self.m_app.m_log_data.m_buffer[varkey].get(n)
+            self.m_curves[i].setData(timestamp, data)
             # self.m_curves[i].setPos(self.m_app.m_log_data.m_buffer['timestamp'], 0)
+        self.m_plot.enableAutoRange(x=True)  # Needed as soon as mouth is used
 
     # Instrument Actions
     def ActInstrConnect(self, line, _instr_key=None):
@@ -707,6 +725,47 @@ class Thread(QtCore.QThread):
     def run(self):
         QtCore.QThread.run(self)
 
+
+class DateAxis(pg.AxisItem):
+    def __init__(self, *args, **kwargs):
+        pg.AxisItem.__init__(self, *args, **kwargs)
+
+    def tickStrings(self, values, scale, spacing):
+        strns = []
+        if values:
+            rng = max(values) - min(values)
+            # if rng < 120:
+            #    return pg.AxisItem.tickStrings(self, values, scale, spacing)
+            if rng < 3600 * 24:
+                string = '%H:%M:%S'
+                label1 = '%b %d - '
+                label2 = '%d, %Y'
+            elif rng >= 3600 * 24 and rng < 3600 * 24 * 30:
+                string = '%d'
+                label1 = '%b - '
+                label2 = '%b,  %Y'
+            elif rng >= 3600 * 24 * 30 and rng < 3600 * 24 * 30 * 24:
+                string = '%b'
+                label1 = '%Y -'
+                label2 = ' %Y'
+            elif rng >= 3600 * 24 * 30 * 24:
+                string = '%Y'
+                label1 = ''
+                label2 = ''
+            for x in values:
+                try:
+                    strns.append(strftime(string, gmtime(x)))
+                except ValueError:  # Windows can't handle dates before 1970
+                    strns.append('')
+            # try:
+            #     label = strftime(label1, gmtime(min(values))) + \
+            #             strftime(label2, gmtime(max(values)))
+            # except ValueError:
+            #     label = ''
+            # self.setLabel(text=label)
+            return strns
+        else:
+            return []
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
