@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:39:21
+# @Last Modified time: 2016-06-29 16:59:05
 
 import os
 from threading import Thread
@@ -170,6 +170,7 @@ class LogData():
                 sleep(self.m_buffer_interval - (time() - start_time) %
                       self.m_buffer_interval)
                 self.Update()
+                start_time = time()
             except Exception as e:
                 print('Unexpected error while updating or writting data')
                 print(e)

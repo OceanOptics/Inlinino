@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 16:47:57
+# @Last Modified time: 2016-06-29 16:59:31
 
 from time import sleep, time
 from random import Random
@@ -94,9 +94,10 @@ class Simulino(Instrument):
         start_time = time()
         while(self.m_active):
             try:
+                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
                 self.UpdateCache()
                 self.m_n += 1
-                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
+                start_time = time()
             except:
                 print(self.m_name + ': Unexpected error while updating cache.')
                 sleep(self.m_timeout)

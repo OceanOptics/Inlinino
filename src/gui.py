@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 20:14:17
+# @Last Modified time: 2016-06-29 16:58:49
 
 import os
 import sys
@@ -709,6 +709,7 @@ class Worker(QtCore.QObject):
             try:
                 sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
                 self.refresh.emit()
+                start_time = time()
             except Exception as e:
                 print('Unexpected error while updating GUI')
                 print(e)

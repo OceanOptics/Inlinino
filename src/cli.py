@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-16 17:17:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-21 11:40:13
+# @Last Modified time: 2016-06-29 11:25:11
 
 import cmd
 import os
@@ -175,39 +175,39 @@ class CLI(cmd.Cmd):
     def help_status(self):
         print('status\n\tDisplay some parameters and state of instruments')
 
-    # Plot
-    def do_plot(self, line):
-        arg = line.split()
-        narg = len(arg)
-        if narg == 0 or narg > 2:
-            print('WARNING: Command plot take 1 argument ' +
-                  '(start or stop).')
-        elif arg[0] == "start":
-            self.m_app.m_plot.Start()
-        elif arg[0] == "stop":
-            self.m_app.m_plot.Stop()
-        elif arg[0] == "header":
-            if narg != 2:
-                print('WARNING: ' + arg[0] + ' takes 1 argument\n' +
-                      '\t header [log_file_name_header]')
-                return
-            self.m_app.m_log_data.m_file_header = arg[1]
-        else:
-            print('WARNING: Unknown command ' + line)
+    # Plot (Use matplotlib)
+    # def do_plot(self, line):
+    #     arg = line.split()
+    #     narg = len(arg)
+    #     if narg == 0 or narg > 2:
+    #         print('WARNING: Command plot take 1 argument ' +
+    #               '(start or stop).')
+    #     elif arg[0] == "start":
+    #         self.m_app.m_plot.Start()
+    #     elif arg[0] == "stop":
+    #         self.m_app.m_plot.Stop()
+    #     elif arg[0] == "header":
+    #         if narg != 2:
+    #             print('WARNING: ' + arg[0] + ' takes 1 argument\n' +
+    #                   '\t header [log_file_name_header]')
+    #             return
+    #         self.m_app.m_log_data.m_file_header = arg[1]
+    #     else:
+    #         print('WARNING: Unknown command ' + line)
 
-    def complete_plot(self, text, line, begidx, endidx):
-        cmd_available = ['start', 'stop']
-        if not text:
-            completions = cmd_available
-        else:
-            completions = [f for f in cmd_available
-                           if f.startswith(text)]
-        return completions
+    # def complete_plot(self, text, line, begidx, endidx):
+    #     cmd_available = ['start', 'stop']
+    #     if not text:
+    #         completions = cmd_available
+    #     else:
+    #         completions = [f for f in cmd_available
+    #                        if f.startswith(text)]
+    #     return completions
 
-    def help_plot(self):
-        print('log [arg]\n\t<start> plotting data\n\t<stop> plotting data' +
-              '\n\tThis function has not been tested yet.' +
-              '\n\tBased on matplotlib')
+    # def help_plot(self):
+    #     print('log [arg]\n\t<start> plotting data\n\t<stop> plotting data' +
+    #           '\n\tThis function has not been tested yet.' +
+    #           '\n\tBased on matplotlib')
 
     # Exit
     def do_exit(self, line):

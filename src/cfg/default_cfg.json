@@ -2,7 +2,7 @@
   "app_cfg":{
     "verbosity":2,
     "interface":"gui",
-    "theme":"inside",
+    "theme":"outside",
     "ui_update_frequency":1
   },
   "log":{

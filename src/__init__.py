@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:33
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-20 16:06:53
+# @Last Modified time: 2016-06-29 11:25:54
 
 import os
 import importlib
@@ -23,7 +23,6 @@ class Inlinino():
     m_instruments = {}
     m_log_data = None
     m_com = None
-    m_plot = None
 
     def __init__(self, _cfg_filename):
         # Load configuration
@@ -85,10 +84,10 @@ class Inlinino():
             gui_app.deleteLater()  # Needed for QThread
             sys.exit(foo)
         elif self.m_cfg.m_app['interface'] == 'cli':
-            # Initialize plots (with matplotlibs)
-            module = importlib.import_module('plot')
-            Plot = getattr(module, 'Plot')
-            self.m_plot = Plot(self.m_log_data)
+            # Initialize plots (with matplotlib)
+            # module = importlib.import_module('plot')
+            # Plot = getattr(module, 'Plot')
+            # self.m_plot = Plot(self.m_log_data)
             # Load Command Line Interface
             module = importlib.import_module('cli')
             CLI = getattr(module, 'CLI')
