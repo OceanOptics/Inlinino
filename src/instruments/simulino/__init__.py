@@ -2,12 +2,11 @@
 # @Author: nils
 # @Date:   2016-05-15 14:19:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:46:38
+# @Last Modified time: 2016-06-28 16:47:57
 
-from threading import Thread
 from time import sleep, time
 from random import Random
-
+from threading import Thread
 from instruments import Instrument
 
 
@@ -95,11 +94,12 @@ class Simulino(Instrument):
         start_time = time()
         while(self.m_active):
             try:
-                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
                 self.UpdateCache()
                 self.m_n += 1
+                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
             except:
                 print(self.m_name + ': Unexpected error while updating cache.')
+                sleep(self.m_timeout)
                 try:
                     self.EmptyCache()
                     self.m_nNoResponse += 1

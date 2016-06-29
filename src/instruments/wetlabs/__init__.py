@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:45:50
+# @Last Modified time: 2016-06-28 16:47:40
 
 # To check sensor is working correctly:
 # On OSX:
@@ -11,10 +11,9 @@
 # On Windows:
 #   Use TeraTerm baudrate 19200
 
-
+from time import sleep
 from serial import Serial
 from threading import Thread
-
 from instruments import Instrument
 
 
@@ -114,6 +113,7 @@ class WETLabs(Instrument):
                       ': Unexpected error while updating cache.\n' +
                       'Suggestions:\n' +
                       '\t-Serial adaptor might be unplug.')
+                sleep(self.m_serial.timeout)
                 try:
                     self.EmptyCache()
                     self.CommunicationError()

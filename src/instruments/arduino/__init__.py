@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:48:36
+# @Last Modified time: 2016-06-28 16:45:40
 
 
 from time import sleep
@@ -141,6 +141,7 @@ class Arduino(Instrument):
                       ': Unexpected error while updating cache.\n' +
                       'Suggestions:\n' +
                       '\t-Arduino board might be unplug.')
+                sleep(self.m_serial.timeout)
                 try:
                     self.EmptyCache()
                     self.CommunicationError()
