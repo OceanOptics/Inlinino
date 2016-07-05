@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 13:05:55
+# @Last Modified time: 2016-07-05 14:32:11
 
 
 from time import sleep
@@ -144,24 +144,6 @@ class Arduino(Instrument):
         # Empty cache
         self.EmptyCache()
 
-    def RunUpdateCache(self):
-        while(self.m_active):
-            try:
-                self.UpdateCache()
-            except Exception as e:
-                print(self.m_name +
-                      ': Unexpected error while updating cache.\n' +
-                      'Suggestions:\n' +
-                      '\t-Arduino board might be unplug.')
-                sleep(self.m_serial.timeout)
-                try:
-                    self.EmptyCache()
-                    self.CommunicationError()
-                except:
-                    print(self.m_name +
-                          ': Unexpected error while emptying cache')
-                print(e)
-
     def UpdateCache(self):
         # readline wait for \EOT or timeout and
         data = self.m_serial.readline()
@@ -188,16 +170,3 @@ class Arduino(Instrument):
                                     'Suggestions:\n' +
                                     '\t- Wiring issue.\n' +
                                     '\t- Sensor power is off.\n')
-
-    def CommunicationError(self, _msg=''):
-        # Set cache to None
-        for key in self.m_cache.keys():
-            self.m_cache[key] = None
-
-        # Error message if necessary
-        self.m_nNoResponse += 1
-        if (self.m_nNoResponse >= self.m_maxNoResponse and
-                self.m_nNoResponse % 60 == self.m_maxNoResponse):
-            print('%s did not respond %d times\n%s' % (self.m_name,
-                                                       self.m_nNoResponse,
-                                                       _msg))

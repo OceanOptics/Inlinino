@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:50:46
+# @Last Modified time: 2016-07-05 16:13:21
 #
 # Column header in order:
 #   %m/%d/%y
@@ -16,10 +16,10 @@
 #   checksum (528) ???
 
 from instruments.wetlabs import WETLabs
-from time import time, gmtime, strftime  # for debugging only
+# from time import time, gmtime, strftime  # for debugging only
 
 
-class BB3(WETLabs):
+class Triplet(WETLabs):
 
     def __init__(self, _name, _cfg):
         WETLabs.__init__(self, _name, _cfg)
@@ -32,9 +32,19 @@ class BB3(WETLabs):
             data = data.rsplit(b'\t', 7)
             if len(data) == 8:
                 for i in range(1, 7, 2):
-                    varname = self.m_varname_header + data[i].decode("UTF-8")
-                    self.m_cache[varname] = int(data[i + 1])
-                    self.m_cacheIsNew[varname] = True
+                    varname = self.m_varnames[int((i - 1) / 2)]
+                    l = int(data[i])
+                    if l in self.m_lambda:
+                        self.m_cache[varname] = int(data[i + 1])
+                        self.m_cacheIsNew[varname] = True
+                    else:
+                        # Unknown variable
+                        self.CommunicationError('Unknown variable ' + varname +
+                                                '.\nThis might happen on few' +
+                                                ' first bytes received.\nIf ' +
+                                                'it keeps going  this might ' +
+                                                'be due to a wrong ' +
+                                                'configuration file.')
                 self.m_n += 1
             else:
                 # Incomplete data transmission

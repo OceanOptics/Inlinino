@@ -2,10 +2,11 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 10:55:09
+# @Last Modified time: 2016-07-05 14:26:21
 
 # import sys
 # import glob
+from time import sleep
 import serial.tools.list_ports
 
 
@@ -45,6 +46,42 @@ class Instrument(object):
         #   To be implemented by subclass
         #   it should switch state of member variable m_active to False
         pass
+
+    def RunUpdateCache(self):
+        while(self.m_active):
+            try:
+                self.UpdateCache()
+            except Exception as e:
+                print(self.m_name +
+                      ': Unexpected error while updating cache.\n' +
+                      'Suggestions:\n' +
+                      '\t-Arduino board might be unplug.')
+                sleep(self.m_serial.timeout)
+                try:
+                    self.EmptyCache()
+                    self.CommunicationError()
+                except:
+                    print(self.m_name +
+                          ': Unexpected error while emptying cache')
+                print(e)
+
+    def UpdateCache(self):
+        # Update cache
+        #   To be implemented by subclass
+        pass
+
+    def CommunicationError(self, _msg=''):
+        # Set cache to None
+        for key in self.m_cache.keys():
+            self.m_cache[key] = None
+
+        # Error message if necessary
+        self.m_nNoResponse += 1
+        if (self.m_nNoResponse >= self.m_maxNoResponse and
+                self.m_nNoResponse % 60 == self.m_maxNoResponse):
+            print('%s did not respond %d times\n%s' % (self.m_name,
+                                                       self.m_nNoResponse,
+                                                       _msg))
 
     def EmptyCache(self):
         for key in self.m_cache.keys():

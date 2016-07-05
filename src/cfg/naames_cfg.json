@@ -8,11 +8,12 @@
     "path":"data/"
   },
   "instruments":{
-    "BB3":{
+    "BB3_349":{
       "module":"WETLabs",
-      "name":"BB3",
+      "name":"Triplet",
       "lambda":[470, 532, 660],
-      "varname_header":"beta"
+      "varname_header":"beta",
+      "units":"counts"
     },
     "WSCD_859":{
       "module":"Arduino",

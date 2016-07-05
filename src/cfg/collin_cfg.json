@@ -1,17 +1,17 @@
 {
   "instruments":{
-    "BB3_349":{
+    "3X1M_005":{
       "module":"WETLabs",
       "name":"Triplet",
-      "lambda":[470, 532, 660],
-      "varname_header":"beta",
+      "lambda":[440, 470, 532],
+      "varname_header":"ex",
       "units":"counts"
     },
-    "BB3_499":{
+    "BBFL2_200":{
       "module":"WETLabs",
       "name":"Triplet",
-      "lambda":[470, 532, 595],
-      "varname_header":"beta",
+      "lambda":[660, 695, 460],
+      "varname_header":["beta", "chl", "cdom"],
       "units":"counts"
     },
     "BB3_XXX":{
@@ -20,6 +20,12 @@
       "lambda":[440, 550, 660],
       "varname_header":"beta",
       "units":"counts"
+    },
+    "TSG":{
+      "module":"SBE",
+      "name":"TSG",
+      "variables":["T", "C", "S"],
+      "units":["deg_C", "S/m", "no units"]
     }
   }
 }

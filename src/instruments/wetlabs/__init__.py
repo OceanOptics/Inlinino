@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 16:47:40
+# @Last Modified time: 2016-07-05 16:12:11
 
 # To check sensor is working correctly:
 # On OSX:
@@ -30,7 +30,6 @@ class WETLabs(Instrument):
 
         # Do specific configuration
         self.m_connect_need_port = True
-        self.m_varname_header = None
         self.m_lambda = []
 
         # Initialize serial communication
@@ -42,27 +41,49 @@ class WETLabs(Instrument):
         self.m_serial.timeout = 1   # 1 Hz
 
         # Load cfg
-        if 'varname_header' in _cfg.keys():
-            self.m_varname_header = _cfg['varname_header']
-        else:
-            print(_name + ': Missing varname_header')
         if 'lambda' in _cfg.keys():
             self.m_lambda = _cfg['lambda']
         else:
             print(_name + ': Missing lambda')
+        if 'varname_header' in _cfg.keys():
+            if isinstance(_cfg['varname_header'], str):
+                varname_header = [_cfg['varname_header']
+                                  for i in range(len(self.m_lambda))]
+            elif isinstance(_cfg['varname_header'], list):
+                varname_header = _cfg['varname_header']
+            else:
+                print(_name + ':Incompatible instance type for varname_header')
+                exit()
+        else:
+            print(_name + ': Missing varname_header')
+            varname_header = ['' for i in range(len(self.m_lambda))]
         if 'units' in _cfg.keys():
-            units = _cfg['units']
+            if isinstance(_cfg['units'], str):
+                units = [_cfg['units'] for i in range(len(self.m_lambda))]
+            elif isinstance(_cfg['units'], list):
+                units = _cfg['units']
+            else:
+                print(_name + ': Incompatible instance type for units')
+                exit()
         else:
             print(_name + ': Missing units')
-            units = 'Unknown'
+            units = ['Unknown' for i in range(len(self.m_lambda))]
+
+        # Check size of arrays
+        if len(self.m_lambda) != len(units) or \
+                len(self.m_lambda) != len(varname_header):
+            print(_name + ': arrays units, varname_header and lambda ' +
+                  'have different size')
+            print(self.m_lambda, units, varname_header)
+            exit()
 
         # Init cache in case log starts before instrument is connected
         for l in self.m_lambda:
-            l_str = str(l)
-            self.m_cache[self.m_varname_header + l_str] = None
-            self.m_cacheIsNew[self.m_varname_header + l_str] = False
-            self.m_units[self.m_varname_header + l_str] = units
-            self.m_varnames.append(self.m_varname_header + l_str)
+            varname = varname_header.pop(0) + str(l)
+            self.m_cache[varname] = None
+            self.m_cacheIsNew[varname] = False
+            self.m_units[varname] = units.pop(0)
+            self.m_varnames.append(varname)
 
     def Connect(self, _port=None):
         if _port is None:
@@ -78,6 +99,8 @@ class WETLabs(Instrument):
 
         if self.m_serial.isOpen():
             # Skip first data
+            self.m_serial.readline()
+            sleep(self.m_serial.timeout)    # Wait for instrument to start
             self.m_serial.readline()
             # Create thread to update cache
             self.m_thread = Thread(target=self.RunUpdateCache, args=())
@@ -104,41 +127,10 @@ class WETLabs(Instrument):
         # Empty cache
         self.EmptyCache()
 
-    def RunUpdateCache(self):
-        while(self.m_active):
-            try:
-                self.UpdateCache()
-            except Exception as e:
-                print(self.m_name +
-                      ': Unexpected error while updating cache.\n' +
-                      'Suggestions:\n' +
-                      '\t-Serial adaptor might be unplug.')
-                sleep(self.m_serial.timeout)
-                try:
-                    self.EmptyCache()
-                    self.CommunicationError()
-                except:
-                    print(self.m_name +
-                          ': Unexpected error while emptying cache')
-                print(e)
-
     def UpdateCache(self):
         # Update cache
         #   To be implemented by subclass
         pass
-
-    def CommunicationError(self, _msg=''):
-        # Set cache to None
-        for key in self.m_cache.keys():
-            self.m_cache[key] = None
-
-        # Error message if necessary
-        self.m_nNoResponse += 1
-        if (self.m_nNoResponse >= self.m_maxNoResponse and
-                self.m_nNoResponse % 60 == self.m_maxNoResponse):
-            print('%s did not respond %d times\n%s' % (self.m_name,
-                                                       self.m_nNoResponse,
-                                                       _msg))
 
 
 # Simple example logging the data
