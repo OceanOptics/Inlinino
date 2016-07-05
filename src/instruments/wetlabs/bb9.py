@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 16:14:41
+# @Last Modified time: 2016-07-05 16:41:22
 
 
 from instruments.wetlabs import WETLabs
@@ -52,7 +52,7 @@ class BB9(WETLabs):
             data = data.rsplit(b'\t', 19)
             if len(data) == 20:
                 for i in range(1, 19, 2):
-                    varname = self.m_varnames[int((i - 1) / 2)]
+                    varname = self.m_varnames[(i - 1) // 2]
                     self.m_cache[varname] = int(data[i + 1])
                     self.m_cacheIsNew[varname] = True
                 self.m_n += 1

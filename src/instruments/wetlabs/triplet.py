@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 16:13:21
+# @Last Modified time: 2016-07-05 16:39:37
 #
 # Column header in order:
 #   %m/%d/%y
@@ -32,7 +32,7 @@ class Triplet(WETLabs):
             data = data.rsplit(b'\t', 7)
             if len(data) == 8:
                 for i in range(1, 7, 2):
-                    varname = self.m_varnames[int((i - 1) / 2)]
+                    varname = self.m_varnames[(i - 1) // 2]
                     l = int(data[i])
                     if l in self.m_lambda:
                         self.m_cache[varname] = int(data[i + 1])
