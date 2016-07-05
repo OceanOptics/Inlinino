@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-28 16:45:40
+# @Last Modified time: 2016-07-05 13:05:55
 
 
 from time import sleep
@@ -85,6 +85,8 @@ class Arduino(Instrument):
             return None
 
         try:
+            if self.m_serial.isOpen():
+                self.m_serial.close()
             self.m_serial.port = _port
             self.m_serial.open()
         except:
@@ -93,17 +95,27 @@ class Arduino(Instrument):
 
         # Send configuration to Arduino
         if self.m_serial.isOpen():
+            header_buffer = []
             # Skip first data
-            self.m_serial.readline()        # First empty line
+            header_buffer.append(self.m_serial.readline())
             sleep(self.m_serial.timeout)    # Wait for instrument to start
-            self.m_serial.readline()        # Inlinino version - board version
-            self.m_serial.readline()        # Waiting for host configuration...
-            foo = self.m_serial.readline()  # configuration type
-            if not self.SetConfiguration(foo):  # Try to set configuration
+            # Skip header
+            header_buffer.append(self.m_serial.readline())
+            while header_buffer[-1] is not b'' and len(header_buffer) < 6:
+                header_buffer.append(self.m_serial.readline())
+                # Set configuration of controller
+            if not self.SetConfiguration(header_buffer[-2]):
                 # Fail to set configuration
                 print(self.m_name + ' fail to send configuration')
-                print('\t' + self.m_serial.readline())
-                print('\t' + self.m_serial.readline())
+                if __debug__:
+                    print('Last communication with Arduino:')
+                    for l in header_buffer:
+                        print('\t' + str(l))
+                    print('\t' + str(self.m_serial.readline()))
+                    print('\t' + str(self.m_serial.readline()))
+                    print('Possible cause:')
+                    print('\tunexpected software on Arduino Controller')
+                    print('\tlocal configuration not matching controller')
                 self.m_serial.close()
                 return None
 

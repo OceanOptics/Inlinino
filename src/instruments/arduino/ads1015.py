@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-24 16:26:26
+# @Last Modified time: 2016-07-05 12:30:09
 
 
 from instruments.arduino import Arduino
@@ -34,9 +34,9 @@ class ADS1015(Arduino):
         for k in self.m_units.keys():
             self.m_units[k] = gain_str + 'x ' + self.m_units[k]
 
-    def SetConfiguration(self, _check=None):
+    def SetConfiguration(self, _check=b''):
         # Set configuration of Arduino board
-        if _check is None or _check == b'sample_rate<int>\tgain<int>\r\n':
+        if _check is b'' or _check == b'sample_rate<int>\tgain<int>\r\n':
             self.m_serial.write(bytes(str(self.m_frequency) + '/t' +
                                       str(self.m_gain), 'UTF-8'))
             return True
