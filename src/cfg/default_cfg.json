@@ -3,7 +3,8 @@
     "verbosity":2,
     "interface":"gui",
     "theme":"outside",
-    "ui_update_frequency":1
+    "ui_update_frequency":1,
+    "ui_disp_pos_shift":1
   },
   "log":{
     "frequency":1,

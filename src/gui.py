@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-29 16:58:49
+# @Last Modified time: 2016-07-05 16:50:55
 
 import os
 import sys
@@ -41,6 +41,12 @@ class GUI(QtGui.QMainWindow):
                 if self.m_app.m_cfg.m_v > 0:
                     print('app_cfg:ui_update_frequency is missing')
                 return False
+            if 'ui_disp_pos_shift' not in self.m_app.m_cfg.m_app.keys():
+                if self.m_app.m_cfg.m_v > 0:
+                    print('app_cfg:ui_disp_pos_shift is missing')
+                return False
+            else:
+                pos_shift = self.m_app.m_cfg.m_app['ui_disp_pos_shift']
 
         # Set window position/size
         self.resize(800, 600)
@@ -126,7 +132,7 @@ class GUI(QtGui.QMainWindow):
             wdgt, self.m_var_display[varkey], foo = self.QVarDisplay(varname,
                 self.m_app.m_log_data.m_buffer[varkey].get(),
                 self.m_app.m_log_data.m_varunits[i])
-            sd_data.addWidget(wdgt, (i + 1) // 3, (i + 1) % 3)
+            sd_data.addWidget(wdgt, (i + pos_shift) // 3, (i + pos_shift) % 3)
         # Instrument Status
         sd_instr_status = QtGui.QVBoxLayout()
         self.m_instr_status = {}
