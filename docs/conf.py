@@ -54,7 +54,7 @@ master_doc = 'index'
 # General information about the project.
 project = u'Inlinino'
 copyright = u'2016, Inlinino'
-author = u'Nils'
+author = u'Nils Ha\"entjens'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -139,7 +139,7 @@ html_theme = 'default'
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-#html_favicon = None
+html_favicon = None
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -179,7 +179,7 @@ html_static_path = ['_static']
 #html_show_sourcelink = True
 
 # If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
-#html_show_sphinx = True
+html_show_sphinx = False
 
 # If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
 #html_show_copyright = True
@@ -230,7 +230,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'Inlinino.tex', u'Inlinino Documentation',
-     u'Nils', 'manual'),
+     u'Nils Ha\"entjens', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
