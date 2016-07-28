@@ -1,11 +1,17 @@
+.. _gui:
+
 ========================
 Graphical User Interface
 ========================
 
+The purpose of this section is to go through the main functionnality of the graphical user interface also known as GUI.
+
+The GUI is the default interface of Inlinino, if for some reason no windows are openning when you launch inlinino check that the :ref:`configuration <cfg-application>` is set to use the gui interface, or that there is no errors in your :ref:`configuration files <cfg-common-errors>`.
+
 Instruments
 ===========
 
-This section explains how to connect, disconnect and list the instruments available in Inlinino running with the graphical user interface (GUI). In order to operate the instruments through the command line interface (CLI) please refer to the CLI section.
+This section explains how to connect, disconnect and list the instruments available in Inlinino running with the graphical user interface (GUI).
 
 .. contents:: Table of Contents
 
@@ -172,6 +178,8 @@ Once the logging stops, the ``[Stop]`` button will be unclickable and the ``[Sta
     + on Windows: <Ctrl> + <K>
     + on OSX: <Cmd> + <K>
 
+.. _gui-header:
+
 Set Header
 ----------
 The prefix of the filename in which data is logged can be changed. The default value being the one set in the configuration file.
@@ -189,6 +197,8 @@ Set the appropriate prefix for the filename, use only alphanumeric characters [a
 
 .. Note::
   If the modification is done while data is logging, it will be taken into account when a new log file is created.
+
+.. _gui-location:
 
 Set Location
 ------------
@@ -215,7 +225,7 @@ Set the folder in which you would like to record the data and click on ``[Choose
 
 Advance configuration
 ---------------------
-Parameters included in the list below can be modified in the configuration section.
+Parameters included in the list below can be modified in the :ref:`cfg-log` section.
   + frequency: Frequency at which data is logged (in Hertz)
   + interval_write: Interval at which data is written on the hard drive (in seconds), this is useful in case of power failure, only the last few minutes would be lost and not the entire file.
   + length: Length of log files (in minutes), time after which a new log file is created.

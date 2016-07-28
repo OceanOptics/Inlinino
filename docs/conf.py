@@ -54,7 +54,7 @@ master_doc = 'index'
 # General information about the project.
 project = u'Inlinino'
 copyright = u'2016, Inlinino'
-author = u'Nils Ha\"entjens'
+author = u'Nils Haentjens'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -230,7 +230,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'Inlinino.tex', u'Inlinino Documentation',
-     u'Nils Ha\"entjens', 'manual'),
+     u'Nils Haentjens', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

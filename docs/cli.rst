@@ -1,3 +1,5 @@
+.. _cli:
+
 ======================
 Command Line Interface
 ======================
@@ -11,7 +13,7 @@ Once the Inlinino is started with a command ``python -O src`` it will display a 
   >>
 
 .. hint::
-  Help can be found at anytime by typing ``help`` followed by entering to have a list of the command available. To get help on a specific command write ``help <command>`` replacing <command> with the name of the command you need some explanations.::
+  Help can be found at anytime. Typing ``help`` will print a list of the command available. To get help on a specific command write ``help <command>`` replacing <command> with the name of the command you need some explanations.::
 
     >>help
 
@@ -96,6 +98,8 @@ The set of command starting with ``log`` allow to save data from instruments.
     >>log stop
     Stop logging data.
     >>
+
+.. _cli-header:
 
 ``log header <filename_prefix>``
   Change the log files prefix by the one specified in ``<filename_prefix>``. You can check the modification with the command ``log filename``. ::
