@@ -4,7 +4,7 @@ Quick Start
 
 This document will show you how to get up and running with Inlinino. You will have inlinino installed in 10 minutes and start logging data in 15 !
 
-If you are already using python 3.x, go ahead those installation instruction.
+If you are already using python 3.x, go ahead to those :ref:`setup instructions <install>`.
 
 .. _easy-install:
 

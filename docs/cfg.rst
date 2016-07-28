@@ -406,4 +406,4 @@ Inlinino is very sensitive, it will not like any typo in the configuration files
 Application does not start
   Start inlinino in debug mode and look at the error messages displayed, it will tell you what part of the configuration file it does not understand.
 
-  If the error message is not helpfull, there is probably missing or extra: `{}`, `""`, or `,`.
+  If the error message is not helpfull, there is probably missing or extra: ``{}``, ``""``, or ``,``.
