@@ -19,6 +19,8 @@ The configurations files contains 3 sections:
 
 The two first are generally setup in default_cfg.json and are less susceptible to be ajusted. The instruments_ section is often the only section in <user_cfg.json>, in case any parameter from default_cfg.json needs to be modified in <user_cfg.json>, the entire section need to copied otherwise parameters will be missing and error will showup when starting Inlinino.
 
+.. contents:: Table of Contents
+
 .. _cfg-application:
 
 Application

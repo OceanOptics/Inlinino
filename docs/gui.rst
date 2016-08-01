@@ -8,14 +8,14 @@ The purpose of this section is to go through the main functionnality of the grap
 
 The GUI is the default interface of Inlinino, if for some reason no windows are openning when you launch inlinino check that the :ref:`configuration <cfg-application>` is set to use the gui interface, or that there is no errors in your :ref:`configuration files <cfg-common-errors>`.
 
+.. contents:: Table of Contents
+
 .. _gui-instruments:
 
 Instruments
 ===========
 
 This section explains how to connect, disconnect and list the instruments available in Inlinino running with the graphical user interface (GUI).
-
-.. contents:: Table of Contents
 
 Connect
 -------

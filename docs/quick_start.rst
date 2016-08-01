@@ -8,6 +8,8 @@ This document will show you how to get up and running with Inlinino. You will ha
 
 If you are already using python 3.x, go ahead to those `setup instructions <https://github.com/OceanOptics/Inlinino/blob/master/INSTALL.md>`__.
 
+.. contents:: Table of Contents
+
 .. _easy-install:
 
 Easy installation
