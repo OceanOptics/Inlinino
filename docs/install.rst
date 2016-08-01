@@ -4,4 +4,6 @@
 Install
 =======
 
-Documentation coming soon, if you can't wait look at the `instructions <https://github.com/OceanOptics/Inlinino/blob/master/INSTALL.md>`__ for developpers.
+The easiest way to install Inlinino is to follow the procedure descibed in the :ref:`quick-start` section of this documentation.
+
+For more advanced deployment instructions are available directly on the `GitHub repository <https://github.com/OceanOptics/Inlinino/blob/master/INSTALL.md>`__ of the project.

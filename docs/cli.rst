@@ -4,9 +4,9 @@
 Command Line Interface
 ======================
 
-The command line interface of Inlinino is can be very handy when logging data on limited resources such as Raspberry Pi or when running on a server.
+The command line interface of Inlinino can be very handy when logging data on limited resources such as Raspberry Pi or when running on a server.
 
-Once the Inlinino is started with a command ``python -O src`` it will display a header and wait for a command.::
+Start Inlinino (command ``python -O src`` in a Terminal) it will display a header and wait for a command. ::
 
   Inlinino 2.0 alpha (May 16, 2016)
   Type "help", "support", or "credits" for more information.
@@ -38,8 +38,6 @@ Once the Inlinino is started with a command ``python -O src`` it will display a 
     /Users/nils/Documents/UMaine/Lab/Inline/inlinino
 
     >>
-
-.. contents:: Table of Contents
 
 Instrument
 ==========

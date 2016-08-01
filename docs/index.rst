@@ -14,6 +14,7 @@ There are two interfaces available to date: a friendly `Graphical User Interface
 The software is written in python 3+, on top of pySerial and numpy. The GUI is based on PyQt. The software was tested on both Windows 7 and OSX.
 
 .. image:: screenshots/mw_global.png
+  :scale: 50 %
 
 Index
 ^^^^^

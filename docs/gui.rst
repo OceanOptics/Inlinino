@@ -8,6 +8,8 @@ The purpose of this section is to go through the main functionnality of the grap
 
 The GUI is the default interface of Inlinino, if for some reason no windows are openning when you launch inlinino check that the :ref:`configuration <cfg-application>` is set to use the gui interface, or that there is no errors in your :ref:`configuration files <cfg-common-errors>`.
 
+.. _gui-instruments:
+
 Instruments
 ===========
 
@@ -113,6 +115,8 @@ Instruments are added/removed through the configuration file. Please look at the
 
 .. note::
   Instruments need to be added/removed before starting an instance of Inlinino. The list of instruments available cannot be modified once the instance of Inlinino is started.
+
+.. _gui-logger:
 
 Logger
 ======
