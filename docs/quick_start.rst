@@ -8,8 +8,6 @@ This document will show you how to get up and running with Inlinino. You will ha
 
 If you are already using python 3.x, go ahead to those :ref:`setup instructions <install>`.
 
-.. section-numbering::
-
 .. _easy-install:
 
 Easy installation
