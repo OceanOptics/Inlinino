@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-16 17:17:09
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-29 11:25:11
+# @Last Modified time: 2016-07-27 17:04:09
 
 import cmd
 import os
@@ -117,7 +117,7 @@ class CLI(cmd.Cmd):
               '\tclose connection with instrument\n\t' +
               '<list> [ports]\n\t' +
               '\tlist all instruments or ports\n\t'
-              '<read> [|instrument_name]\n\t' +
+              '<read> [instrument_name]\n\t' +
               '\tread instrument cache\n\t' +
               '\tif [instrument_name] is not specified,\n\t' +
               '\t\tread cache of all instruments')
@@ -165,7 +165,7 @@ class CLI(cmd.Cmd):
 
     def help_log(self):
         print('log [arg]\n\t<start> logging data\n\t<stop> logging data\n\t' +
-              '<header> change file name header' +
+              '<header> [log_file_name_header] change file name header' +
               '\n\t<filename> return current filename')
 
     # Status
