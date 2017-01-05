@@ -1,0 +1,10 @@
+{
+  "instruments":{
+    "PAR":{
+      "module":"Satlantic",
+      "name":"PAR",
+      "variables":["Var1", "Var2", "Var3"],
+      "units":["unknow", "unknow", "unknow"]
+    }
+  }
+}
