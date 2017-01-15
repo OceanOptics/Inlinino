@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 14:26:21
+# @Last Modified time: 2017-01-15 17:53:25
 
 # import sys
 # import glob
@@ -55,7 +55,8 @@ class Instrument(object):
                 print(self.m_name +
                       ': Unexpected error while updating cache.\n' +
                       'Suggestions:\n' +
-                      '\t-Arduino board might be unplug.')
+                      '\t-Arduino board might be unplug\n' +
+                      '\t-No data sent by the device\n')
                 sleep(self.m_serial.timeout)
                 try:
                     self.EmptyCache()
