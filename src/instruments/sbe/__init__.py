@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 14:38:04
+# @Last Modified time: 2017-01-16 09:48:24
 
 from time import sleep
 from serial import Serial
@@ -21,7 +21,6 @@ class SBE(Instrument):
         # Do specific configuration
         self.m_connect_need_port = True
         self.m_varnames = None
-        self.m_lambda = []
 
         # Initialize serial communication
         self.m_serial = Serial()

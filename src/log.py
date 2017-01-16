@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:54:14
 # @Last Modified by:   nils
-# @Last Modified time: 2016-06-29 16:59:05
+# @Last Modified time: 2017-01-16 15:23:16
 
 import os
 from threading import Thread
@@ -41,6 +41,8 @@ class LogData():
     m_varkeys = []
     m_varnames = []   # ordered list of the variables of all the instruments
     m_varunits = []
+    m_vartypes = []
+    m_vardisplayed = []
 
     def __init__(self, _cfg, _instruments, _instruments_cfg=None):
         # Load cfg
@@ -87,25 +89,45 @@ class LogData():
         self.m_instruments = _instruments
         # Create list of variables to log
         if _instruments_cfg is None:
-            for instname, inst in self.m_instruments.items():
-                for varname in inst.m_cache.keys():
-                    self.m_instnames[instname + '_' + varname] = instname
-                    self.m_varkeys.append(instr_key + '_' + varname)
-                    self.m_varnames.append(varname)
-                    self.m_varunits.append(inst.m_units[varname])
-        else:
-            for instr_key in _instruments_cfg.keys():
-                for varname in self.m_instruments[instr_key].m_varnames:
+            # Instrument configuration not given, order of variables is random
+            for instr_key, instr_val in self.m_instruments.items():
+                for varname in instr_val.m_cache.keys():
                     self.m_instnames[instr_key + '_' + varname] = instr_key
                     self.m_varkeys.append(instr_key + '_' + varname)
                     self.m_varnames.append(varname)
-                    self.m_varunits.append(
-                        self.m_instruments[instr_key].m_units[varname])
+                    self.m_varunits.append(instr_val.m_units[varname])
+                    if (hasattr(instr_val, 'm_vartype') and
+                            instr_val.m_vartype[varname] == 'array'):
+                        self.m_vartypes.append(object)
+                    else:
+                        self.m_vartypes.append(None)
+                    if hasattr(instr_val, 'm_vardisplayed'):
+                        self.m_vardisplayed.append(instr_val.m_vardisplayed[varname])
+                    else:
+                        self.m_vardisplayed.append(True)
+        else:
+            # Instrument configuration given, variables are in order
+            for instr_key in _instruments_cfg.keys():
+                for varname in self.m_instruments[instr_key].m_varnames:
+                    instr_val = self.m_instruments[instr_key]
+                    self.m_instnames[instr_key + '_' + varname] = instr_key
+                    self.m_varkeys.append(instr_key + '_' + varname)
+                    self.m_varnames.append(varname)
+                    self.m_varunits.append(instr_val.m_units[varname])
+                    if (hasattr(instr_val, 'm_vartype') and
+                            instr_val.m_vartype[varname] == 'array'):
+                        self.m_vartypes.append(object)
+                    else:
+                        self.m_vartypes.append(None)
+                    if hasattr(instr_val, 'm_vardisplayed'):
+                        self.m_vardisplayed.append(instr_val.m_vardisplayed[varname])
+                    else:
+                        self.m_vardisplayed.append(True)
 
         # Initialize buffer
         self.m_buffer['timestamp'] = RingBuffer(self.m_buffer_size)
-        for varkey in self.m_varkeys:
-            self.m_buffer[varkey] = RingBuffer(self.m_buffer_size)
+        for varkey, vartype in zip(self.m_varkeys, self.m_vartypes):
+            self.m_buffer[varkey] = RingBuffer(self.m_buffer_size, vartype)
 
     def CountActiveInstruments(self):
         active_instr = 0
@@ -304,7 +326,7 @@ class LogData():
 #     # Ring buffer based on deque for every kind of data
 #     def __init__(self, _length):
 #         # initialize buffer with None values
-#         self.data = deque([None] * length, length)
+#         self.data = deque([None] * _length, _length)
 
 #     def extend(self, _x):
 #         # Add x at the end of the buffer
@@ -323,11 +345,16 @@ class RingBuffer():
     # Ring buffer based on numpy.roll for np.array
     # Same concept as FIFO except that the size of the numpy array does not
     # vary
-    def __init__(self, _length):
+    def __init__(self, _length, _dtype=None):
         # initialize buffer with NaN values
         # length correspond to the size of the buffer
-        self.data = np.empty(_length)  # , dtype='f')
-        self.data[:] = np.NAN
+        if _dtype is None:
+            self.data = np.empty(_length)  # np.dtype = float64
+            self.data[:] = np.NAN
+        else:
+            # type needs to be compatible with np.NaN
+            self.data = np.empty(_length, dtype=_dtype)
+            self.data[:] = None
 
     def extend(self, _x):
         # Add np.array at the end of the buffer
@@ -343,3 +370,6 @@ class RingBuffer():
     def getleft(self, _n=1):
         # return the oldest n element(s) in buffer
         return self.data[0:_n]
+
+    def __str__(self):
+        return str(self.data)

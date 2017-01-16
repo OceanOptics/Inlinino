@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 16:22:19
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 16:12:11
+# @Last Modified time: 2017-01-16 09:34:41
 
 # To check sensor is working correctly:
 # On OSX:
@@ -45,6 +45,7 @@ class WETLabs(Instrument):
             self.m_lambda = _cfg['lambda']
         else:
             print(_name + ': Missing lambda')
+            exit()
         if 'varname_header' in _cfg.keys():
             if isinstance(_cfg['varname_header'], str):
                 varname_header = [_cfg['varname_header']
@@ -55,7 +56,8 @@ class WETLabs(Instrument):
                 print(_name + ':Incompatible instance type for varname_header')
                 exit()
         else:
-            print(_name + ': Missing varname_header')
+            if __debug__:
+                print(_name + ': Missing varname_header')
             varname_header = ['' for i in range(len(self.m_lambda))]
         if 'units' in _cfg.keys():
             if isinstance(_cfg['units'], str):

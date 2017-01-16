@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-14 16:55:47
 # @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 16:50:55
+# @Last Modified time: 2017-01-16 15:35:52
 
 import os
 import sys
@@ -126,13 +126,16 @@ class GUI(QtGui.QMainWindow):
                     'yyyy/mm/dd')
         sd_data.addWidget(wdgt)
         self.m_var_display = {}
-        for i in range(len(self.m_app.m_log_data.m_varkeys)):
-            varkey = self.m_app.m_log_data.m_varkeys[i]
-            varname = self.m_app.m_log_data.m_varnames[i]
-            wdgt, self.m_var_display[varkey], foo = self.QVarDisplay(varname,
-                self.m_app.m_log_data.m_buffer[varkey].get(),
-                self.m_app.m_log_data.m_varunits[i])
-            sd_data.addWidget(wdgt, (i + pos_shift) // 3, (i + pos_shift) % 3)
+        i = 0
+        for varkey, vardisplayed, varname, varunits in zip(self.m_app.m_log_data.m_varkeys,
+                                        self.m_app.m_log_data.m_vardisplayed,
+                                        self.m_app.m_log_data.m_varnames,
+                                        self.m_app.m_log_data.m_varunits):
+            if vardisplayed:
+                wdgt, self.m_var_display[varkey], foo = self.QVarDisplay(varname,
+                    self.m_app.m_log_data.m_buffer[varkey].get(), varunits)
+                sd_data.addWidget(wdgt, (i + pos_shift) // 3, (i + pos_shift) % 3)
+                i += 1
         # Instrument Status
         sd_instr_status = QtGui.QVBoxLayout()
         self.m_instr_status = {}
@@ -247,19 +250,25 @@ class GUI(QtGui.QMainWindow):
                                       enableMenu=False)
         self.m_plot = self.m_pw.plotItem
         self.m_curves = []
-        n = len(self.m_app.m_log_data.m_varkeys)
-        for i in range(n):
-            # Init Curve Item
-            c = pg.PlotCurveItem(pen=(i, n))
-            # Change Color of Value Displayed
-            varkey = self.m_app.m_log_data.m_varkeys[i]
-            self.m_var_display[varkey].setStyleSheet(
-                'color: ' + c.opts['pen'].color().name())
-            # Add item to plot
-            self.m_plot.addItem(c)
-            # Keep track of item
-            # might want to use self.m_plot.listDataItems() instead
-            self.m_curves.append(c)
+        # n = len(self.m_app.m_log_data.m_varkeys)
+        # for i in range(n):
+        n = sum(self.m_app.m_log_data.m_vardisplayed)
+        i = 0
+        for varkey, vardisplayed in zip(self.m_app.m_log_data.m_varkeys,
+                                        self.m_app.m_log_data.m_vardisplayed):
+            if vardisplayed:
+                # Init Curve Item
+                c = pg.PlotCurveItem(pen=(i, n))
+                # Change Color of Value Displayed
+                self.m_var_display[varkey].setStyleSheet(
+                    'color: ' + c.opts['pen'].color().name())
+                # Add item to plot
+                self.m_plot.addItem(c)
+                # Keep track of item
+                # might want to use self.m_plot.listDataItems() instead
+                self.m_curves.append(c)
+                # Increment to change color
+                i += 1
         # self.m_plot.setLabel('bottom', 'Time' , units='s')
         self.m_plot.setLabel('left', 'Signal', units='Counts')
         # self.m_plot.setYRange(0, 5)
@@ -302,11 +311,13 @@ class GUI(QtGui.QMainWindow):
         n = self.m_app.m_log_data.m_buffer_size
         timestamp = self.m_app.m_log_data.m_buffer['timestamp'].get(n)
         # Update position with time
-        for i in range(len(self.m_app.m_log_data.m_varkeys)):
-            varkey = self.m_app.m_log_data.m_varkeys[i]
-            # data = np.random.normal(size=100)
-            data = self.m_app.m_log_data.m_buffer[varkey].get(n)
-            self.m_curves[i].setData(timestamp, data)
+        i = 0
+        for varkey, vardisplayed in zip(self.m_app.m_log_data.m_varkeys,
+                                        self.m_app.m_log_data.m_vardisplayed):
+            if vardisplayed:
+                data = self.m_app.m_log_data.m_buffer[varkey].get(n)
+                self.m_curves[i].setData(timestamp, data)
+                i += 1
             # self.m_curves[i].setPos(self.m_app.m_log_data.m_buffer['timestamp'], 0)
         self.m_plot.enableAutoRange(x=True)  # Needed as soon as mouth is used
 
@@ -416,10 +427,18 @@ class GUI(QtGui.QMainWindow):
             self.m_date_display.setText(strftime('%Y/%m/%d', zulu))
             self.m_date_display.repaint()
         # Update variables
-        for varkey in self.m_app.m_log_data.m_varkeys:
-            self.m_var_display[varkey].setText('%.4f' %
-                self.m_app.m_log_data.m_buffer[varkey].get()[0])
-            self.m_var_display[varkey].repaint()
+        for varkey, vardisplayed in zip(self.m_app.m_log_data.m_varkeys,
+                          self.m_app.m_log_data.m_vardisplayed):
+            if vardisplayed:
+                # Update only variables to display
+                foo = self.m_app.m_log_data.m_buffer[varkey].get()[0]
+                if foo is not None and type(foo) is not str:
+                    # Update variable if type is number, not None or string
+                    if foo < 100000:
+                        self.m_var_display[varkey].setText(str(foo))
+                    else:
+                        self.m_var_display[varkey].setText('%.2E' % foo)
+                    self.m_var_display[varkey].repaint()
 
     def SetInstrumentsStatus(self):
         for instr_key, instr_value in self.m_app.m_instruments.items():

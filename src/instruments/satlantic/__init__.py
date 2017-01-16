@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-04-08 19:00:56
 # @Last Modified by:   nils
-# @Last Modified time: 2017-01-05 14:29:38
+# @Last Modified time: 2017-01-16 10:16:46
 
 from time import sleep
 from serial import Serial
@@ -21,7 +21,6 @@ class Satlantic(Instrument):
         # Do specific configuration
         self.m_connect_need_port = True
         self.m_varnames = None
-        self.m_lambda = []
 
         # Initialize serial communication
         self.m_serial = Serial()
