@@ -2,7 +2,7 @@
 # @Author: nils
 # @Date:   2016-05-15 12:11:42
 # @Last Modified by:   nils
-# @Last Modified time: 2017-01-15 17:53:25
+# @Last Modified time: 2017-04-03 14:17:10
 
 # import sys
 # import glob
@@ -55,8 +55,8 @@ class Instrument(object):
                 print(self.m_name +
                       ': Unexpected error while updating cache.\n' +
                       'Suggestions:\n' +
-                      '\t-Arduino board might be unplug\n' +
-                      '\t-No data sent by the device\n')
+                      '\t-Instrument might be unplug\n' +
+                      '\t-No data sent by the instrument\n')
                 sleep(self.m_serial.timeout)
                 try:
                     self.EmptyCache()
@@ -174,6 +174,7 @@ class Communication():
             foo += self.PortInfo(i) + '\n'
             # foo += self.m_port_list[i] + '\n'
         return foo[0:-1]
+
 
 if __name__ == "__main__":
     com = Communication()
