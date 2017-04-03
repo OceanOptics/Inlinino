@@ -1,0 +1,11 @@
+{
+  "instruments":{
+    "BBRT_142r":{
+      "module":"WETLabs",
+      "name":"BBRT",
+      "lambda":[650],
+      "varname_header":"beta",
+      "units":"counts"
+    }
+  }
+}

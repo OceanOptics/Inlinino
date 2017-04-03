@@ -13,8 +13,8 @@
 
    author: Nils Haentjens < nils.haentjens+inlinino@maine.edu
    created: June 23, 2016
-   updated: July 5, 2016
-   version: 0.2.0
+   updated: April 3, 2017
+   version: 0.2.1
 
 */
 
@@ -30,7 +30,8 @@
 //#define BB3_XXX
 //#define BB3_TARA
 //#define TSG
-#define UBAT_0010
+//#define UBAT_0010
+#define BBRT_142R
 
 /* ------------------------------------------------
     Select set of value
@@ -205,6 +206,21 @@ void loop() {
 //    Serial.println("UBAT0010,00132,1.48E7,8.731E+08,1203,11.893,652,0.630,43,1.11,13,10,10,10,26,164,48,25,19,22,22,20,14,17,81,123,79,45,26,19,17,17,15,13,20,45,67,75,95,105,90,70,56,49,40,54,78,86,93,93,78,65,57,58,91,75,53,44,32,23,21,21,21,24,30,59,92,93,84,80");
 //  }
   i = (i + 1) % 4;
+#elif defined(BBRT_142R)
+  if ( i == 0 ) {
+    Serial.println("99/99/99\t99:99:99\t667\t95\t541");
+  } else if ( i == 1 ) {
+    Serial.println("99/99/99\t99:99:99\t667\t95\t540");
+  } else if ( i == 2 ) {
+    Serial.println("99/99/99\t99:99:99\t667\t96\t540");
+  } else if ( i == 3 ) {
+    Serial.println("99/99/99\t99:99:99\t668\t3489\t541");
+  } else if ( i == 4 ) {
+    Serial.println("99/99/99\t99:99:99\t668\t1892\t540");
+  } else if ( i == 5 ) {
+    Serial.println("99/99/99\t99:99:99\t668\t4119\t541");
+  }
+  i = (i + 1) % 6;
 #endif
   // All instruments run at 1 Hz
   delay(1000);
