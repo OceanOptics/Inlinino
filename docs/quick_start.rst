@@ -20,8 +20,8 @@ Download
 ^^^^^^^^
 Download the setup file for your operating system:
 
-  + `Windows 32-bits <http://misclab.umeoce.maine.edu/software/Inlinino/Inlinino_setup_win32.exe>`__
-  + `Windows 64-bits <http://misclab.umeoce.maine.edu/software/Inlinino/Inlinino_setup_win64.exe>`__
+  + `Windows 32-bits <ftp://misclab.umeoce.maine.edu/software/Inlinino/Inlinino_setup_win32.exe>`__
+  + `Windows 64-bits <ftp://misclab.umeoce.maine.edu/software/Inlinino/Inlinino_setup_win64.exe>`__
 
 If you are logging data from analog instruments and therefor use an Arduino make sure the appropriate driver are installed. Instructions are available on `Arduino's website <https://www.arduino.cc/en/Guide/Windows>`__.
 
