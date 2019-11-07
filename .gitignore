@@ -104,3 +104,12 @@ utils/
 
 # Rope project settings
 .ropeproject
+
+# Ignore research/developpement script
+dev/
+
+# Ignore output data
+*.csv
+
+# Local configuration
+/Inlinino_cfg.py
