@@ -40,7 +40,7 @@ class Arduino(Instrument):
         # Load cfg
         if 'frequency' in _cfg.keys():
             self.m_frequency = _cfg['frequency']
-            self.m_serial.timeout = 1 / _cfg['frequency']  # seconds
+            self.m_serial.timeout = 1 / _cfg['frequency'] * 2 # seconds (must be greater than running frequency of the instrument)
             self.m_serial.write_timeout = self.m_serial.timeout
         else:
             print(_name + ' missing frequency')
@@ -98,12 +98,12 @@ class Arduino(Instrument):
             header_buffer = []
             # Skip first data
             header_buffer.append(self.m_serial.readline())
-            sleep(self.m_serial.timeout)    # Wait for instrument to start
+            # sleep(self.m_serial.timeout)    # Wait for instrument to start
             # Skip header
             header_buffer.append(self.m_serial.readline())
             while header_buffer[-1] is not b'' and len(header_buffer) < 6:
                 header_buffer.append(self.m_serial.readline())
-                # Set configuration of controller
+            # Set configuration of controller
             if not self.SetConfiguration(header_buffer[-2]):
                 # Fail to set configuration
                 print(self.m_name + ' fail to send configuration')

@@ -8,10 +8,10 @@
     "path":"data/"
   },
   "instruments":{
-    "BB3_349":{
+    "BBRT_142r":{
       "module":"WETLabs",
-      "name":"Triplet",
-      "lambda":[470, 532, 660],
+      "name":"BBRT",
+      "lambda":[650],
       "varname_header":"beta",
       "units":"counts"
     },
@@ -19,10 +19,10 @@
       "module":"Arduino",
       "name":"ADS1015",
       "frequency":1,
-      "gain":23,
+      "gain":1,
       "variables":{
         "fdom":{
-          "pin":"DIF_A01",
+          "pin":"SIN_A2",
           "units":"counts"
         }
       }

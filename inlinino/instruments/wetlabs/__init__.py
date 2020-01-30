@@ -38,7 +38,7 @@ class WETLabs(Instrument):
         self.m_serial.bytesize = 8
         self.m_serial.parity = 'N'  # None
         self.m_serial.stopbits = 1
-        self.m_serial.timeout = 1   # 1 Hz
+        self.m_serial.timeout = 2   # Instrument run at 1 Hz so let him a chance to speak (> 1)
 
         # Load cfg
         if 'lambda' in _cfg.keys():
@@ -102,7 +102,7 @@ class WETLabs(Instrument):
         if self.m_serial.isOpen():
             # Skip first data
             self.m_serial.readline()
-            sleep(self.m_serial.timeout)    # Wait for instrument to start
+            # sleep(self.m_serial.timeout)    # Wait for instrument to start
             self.m_serial.readline()
             # Create thread to update cache
             self.m_thread = Thread(target=self.RunUpdateCache, args=())
@@ -118,7 +118,8 @@ class WETLabs(Instrument):
         if self.m_thread is not None:
             self.m_active = False
             if self.m_thread.isAlive():
-                self.m_thread.join(self.m_serial.timeout * 1.1)
+                # self.m_thread.join(self.m_serial.timeout * 1.1)
+                self.m_thread.join(self.m_serial.timeout)
             else:
                 print(self.m_name + ' thread already close.')
         # Close serial connection

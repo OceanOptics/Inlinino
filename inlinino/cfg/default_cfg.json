@@ -2,7 +2,7 @@
   "app_cfg":{
     "verbosity":2,
     "interface":"gui",
-    "theme":"outside",
+    "theme":"inside",
     "ui_update_frequency":1,
     "ui_disp_pos_shift":1
   },

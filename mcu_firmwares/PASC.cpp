@@ -1,5 +1,5 @@
 /*
- * INLININO is a library to read data from analog to digital converter ADC
+ * PASC is a firmware to read data from analog to digital converter ADC
  *    and print it in the serial monitor.
  * It supports the ADC pins from: 
  *    Arduino Uno (10 bit)
@@ -8,7 +8,7 @@
  *    ADS1015 Differential (12-bit)
  *    ADS1015 Single ended (12-bit)
  *    
- * The libraries Wire and Adafruit_ADS1015.h need to be installed
+ * The libraries Wire and Adafruit_ADS1015.h are required
  * 
  * author: Nils Haentjens < nils.haentjens+inlinino@maine.edu
  * created: June 21, 2016

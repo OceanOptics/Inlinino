@@ -434,10 +434,16 @@ class GUI(QtGui.QMainWindow):
                 foo = self.m_app.m_log_data.m_buffer[varkey].get()[0]
                 if foo is not None and type(foo) is not str:
                     # Update variable if type is number, not None or string
-                    if foo < 100000:
-                        self.m_var_display[varkey].setText(str(foo))
-                    else:
-                        self.m_var_display[varkey].setText('%.2E' % foo)
+                    if isinstance(foo, int):
+                        if foo < 100000:
+                            self.m_var_display[varkey].setText(str(foo))
+                        else:
+                            self.m_var_display[varkey].setText('%.2E' % foo)
+                    elif isinstance(foo, float):
+                        if foo < 10000:
+                            self.m_var_display[varkey].setText('%.2f' % foo)
+                        else:
+                            self.m_var_display[varkey].setText('%.2E' % foo)
                     self.m_var_display[varkey].repaint()
 
     def SetInstrumentsStatus(self):

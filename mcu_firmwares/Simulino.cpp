@@ -31,7 +31,8 @@
 //#define BB3_TARA
 //#define TSG
 //#define UBAT_0010
-#define BBRT_142R
+// #define BBRT_142R
+#define FLBBCD2K_4701
 
 /* ------------------------------------------------
     Select set of value

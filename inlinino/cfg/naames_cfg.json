@@ -1,0 +1,31 @@
+{
+  "log":{
+    "frequency":1,
+    "interval_write":60,
+    "buffer_size":120,
+    "length":60,
+    "header":"Inlinino",
+    "path":"C:\\data\\2018_NAAMES04\\BB3349_WSCD859\\"
+  },
+  "instruments":{
+    "BB3_349":{
+      "module":"WETLabs",
+      "name":"Triplet",
+      "lambda":[470, 532, 660],
+      "varname_header":"beta",
+      "units":"counts"
+    },
+    "WSCD_859":{
+      "module":"Arduino",
+      "name":"ADS1015",
+      "frequency":1,
+      "gain":23,
+      "variables":{
+        "fdom":{
+          "pin":"DIF_A01",
+          "units":"counts"
+        }
+      }
+    }
+  }
+}
