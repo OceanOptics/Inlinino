@@ -45,14 +45,14 @@ The application is not compatible with PyQT 5. We are aware that the versions of
 _Known bugs_:
   + Versions of pySerial <3.1.1 are not working properly with Inlinino on macOS.
   + PyQtGraph 0.9.10 was patched as follow to fix a known bug:
-        - Replace line 171 of `pyqtgraph/graphicsItems/PlotItem/PlotItem.py` by:
- 
- 
+    + Replace line 171 of `pyqtgraph/graphicsItems/PlotItem/PlotItem.py` by:
+    ```
     # axis = axisItems.get(k, AxisItem(orientation=k, parent=self))
     if k in axisItems.keys():
         axis = axisItems[k]
     else:
         axis = AxisItem(orientation=k, parent=self) 
+    ```
 
 Inlinino can then be started with the following commands.
 
@@ -77,12 +77,16 @@ The code is organized in:
 
 ### PASC
 _Precision Analog to Serial Converter_
-The PASC is a data acquisition (DAQ) device required only to log data from instruments communicating through analog channels. PASC can be built with an Arduino Uno type microcontroller and a precision analog to digital converter such as the Texas Instrument ADS1015/1115. The wiring instructions are available on [Adafruit website](https://learn.adafruit.com/adafruit-4-channel-adc-breakouts/assembly-and-wiring). We used [Arduino IDE](https://www.arduino.cc/en/main/software) to upload the firmware to the microcontroller with the instructions below.
-  1. In ~/Documents/Arduino create a folder PASC/
-  2. Copy and rename mcu_firmware/PASC.cpp to ~/Documents/Arduino/PASC/PASC.ino
-  3. Load PASC.ino from Arduino Software (File > Open...)
-  4. Comment/uncomment appropriate lines in PASC.ino following instructions in comments
-  5. Compile and upload PASC to the microcontroller (button on the top left of Arduino IDE)
+
+The PASC is an optional data acquisition (DAQ) device. PASC is only required to log data from instruments communicating through analog channels. PASC can be built with an Arduino Uno type microcontroller and a precision analog to digital converter such as the Texas Instrument ADS1015 or ADS1115 [developpement boards](https://www.adafruit.com/product/1083). The wiring instructions to build your own are available at [Adafruit website](https://learn.adafruit.com/adafruit-4-channel-adc-breakouts/assembly-and-wiring).
+
+We uploaded the firmware to the microcontroller following these instructions.
+  1. Load mcu_firmwares/PASC.cpp in the [Arduino IDE[(<https://www.arduino.cc/en/main/software>):
+        1. In ~/Documents/Arduino create a folder PASC/
+        2. Copy and rename mcu_firmware/PASC.cpp to ~/Documents/Arduino/PASC/PASC.ino
+        3. Load PASC.ino from Arduino Software (File > Open...)
+  2. Comment/uncomment appropriate lines in PASC.ino following instructions in comments of the file.
+  3. Compile and upload PASC to the microcontroller (button on the top left of Arduino IDE).
 
 ### Questions and issues
 For any questions or issues regarding Inlinino please contact [me](mailto:nils.haentjens+inlinino@maine.edu).

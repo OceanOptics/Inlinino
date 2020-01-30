@@ -277,34 +277,7 @@ This section will help you to set the instruments that need to be logged by Inli
 
 Analog
 ^^^^^^
-In order to log data from an analog instrument you will need some additional hardware as you cannot plug them on most of the commercial computers.
-Inlinino is able to communicate with an Arduino which will read the analog signal and send it to the computer. Depending on the precision required by the instrument we recommend the following configurations:
-
-  + 10-bit signal: Arduino Uno
-  + 12-bit signal: Arduino Uno + ADS1015
-  + 16-bit signal: Arduino Uno + ADS1115
-
-The Analog to Digital Converter (ADC) ADS1X15 also embbed a gain amplifier in order to reduice noise in small signal. More details on those ADC are available in there `documentation <https://cdn-learn.adafruit.com/downloads/pdf/adafruit-4-channel-adc-breakouts.pdf>`__.
-
-.. note::
-  Make sure that the driver for the Arduino are installed on the computer you plan to use. Instructions are available on Arduino's website:
-
-    - `Windows <https://www.arduino.cc/en/Guide/Windows>`__
-    - `Mac OS X <https://www.arduino.cc/en/Guide/MacOSX>`__
-    - `Linux <https://www.arduino.cc/en/Guide/Linux>`__
-
-.. note::
-  Make sure the Arduino is flashed with the proper configuration of Inlinino for Arduino
-    1. Load arduino/inlinino.cpp in the Arduino Software:
-
-        1. in ~/Documents/Arduino create a folder Inlinino/
-        2. copy and rename controlino.cpp to ~/Documents/Arduino/Inlinino/Inlinino.ino
-        3. load Inlinino.ino from Arduino Software (File > Open...)
-
-    2. Comment/uncomment appropriate lines following instructions at the beginning of the Inlinino.ino file (within Arduino IDE).
-
-    3. Compile and upload Inlinino to the Arduino board (using the button on top left).
-
+In order to log data from instruments communicating through analog channels, a data acquisition (DAQ) device with a voltage range and resolution sufficient must be used. To date, only the :ref:`PASC <pasc>` data acquisition system is available with Inlinino.
 
 The parameters required for an analog instrument are:
 
@@ -401,10 +374,10 @@ The parameters required for an analog instrument are:
       + DIF_A23
 
     .. important:
-      The code flashed on the Arduino should match the option sent here.
+      The code uploaded on the Microcontroller should match the option sent here.
 
     .. note:
-      if an ADS-1X15 is plugged to the Arduino, Analog ports 4 and 5 of the Arduino cannot be use for analog readings.
+      if an ADS-1X15 is plugged to the Microcontroller, Analog ports 4 and 5 of the Microcontroller cannot be use for analog readings.
 
 Example of configuration for logging data of an analog fluorometer, the WSCD from WET Labs. The instrument output is 12 bit 0-5 Volts, as we are taking measurements in very clear water, signal should never go above 3 Volts. In order to match the resolution of the instrument, an ADS-1015 is used with a gain setting of 1x and a frequency of 1 Hz (as the instrument operates at 1 Hz). The <user_cfg.json> file look like: ::
 
@@ -422,9 +395,6 @@ Example of configuration for logging data of an analog fluorometer, the WSCD fro
       }
     }
   }
-
-.. note::
-  All Arduino models should be compatible with Inlinino but they have not been tested yet. If you encouter issues with a spcefic Arduino Model please contact us.
 
 Serial
 ^^^^^^

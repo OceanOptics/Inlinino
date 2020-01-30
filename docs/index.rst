@@ -26,3 +26,4 @@ Index
     Configuration<cfg>
     Graphical User Interface (GUI)<gui>
     Command Line Interface (CLI)<cli>
+    Precision Analog to Serial Converter (PASC)<pasc>
