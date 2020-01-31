@@ -1,17 +1,17 @@
-Inlinino V2
+Inlinino TB
 -----------
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python >3.4](https://img.shields.io/badge/Python->3.4-blue.svg)](https://www.python.org/downloads/)
 
-Inlinino V2 is a data logger designed for optical instruments mounted on research vessels continuously measuring the optical properties of the ocean while underway. The second version of Inlinino relies on ThingsBoard, an open-source platform for data collection and visualization, for storage of the data and real-time visualization. The data can now be visualized in real-time by any device with a compatible web browser, connected to the same network as the host of the application. The application is composed of two blocks: a python script receiving the measurements from the instruments, pre-processing the data, and transmitting it via MQTT to ThingsBoard; ThingsBoard stores the data and is used as an interface to control the instruments, visualize the data, and export the data. Inlinino V2 was successfully tested on a Raspberry Pi 3B+ (RPi) with a WetLabs ECO-BB3 and a Sea-Bird SBE19+. The WetLabs ACS sensor is also implemented, the raw data can be logged, however the visualization would overload the RPi, we recommend using a more powerful host if used.
+Inlinino TB is a data logger designed for optical instruments mounted on research vessels continuously measuring the optical properties of the ocean while underway. The second version of Inlinino relies on ThingsBoard, an open-source platform for data collection and visualization, for storage of the data and real-time visualization. The data can now be visualized in real-time by any device with a compatible web browser, connected to the same network as the host of the application. The application is composed of two blocks: a python script receiving the measurements from the instruments, pre-processing the data, and transmitting it via MQTT to ThingsBoard; ThingsBoard stores the data and is used as an interface to control the instruments, visualize the data, and export the data. Inlinino TB was successfully tested on a Raspberry Pi 3B+ (RPi) with a WetLabs ECO-BB3 and a Sea-Bird SBE19+. The WetLabs ACS sensor is also implemented, the raw data can be logged, however the visualization would overload the RPi, we recommend using a more powerful host if used.
 
 ![](docs/screenshots/Thingsboard_dashboard.png)
 
 ### Getting Started
-These instructions will get Inlinino V2 running on a RPi, they can be adjusted for other systems.
+These instructions will get Inlinino TB running on a RPi, they can be adjusted for other systems.
 
 #### Prerequisites
-We assume that a recent image of [Raspbian Buster Lite](https://www.raspberrypi.org/downloads/raspbian/) is installed on the RPi (instructions for [installing](https://www.raspberrypi.org/documentation/installation/installing-images/README.md), [configuring](https://www.raspberrypi.org/documentation/configuration/raspi-config.md), and [securing](https://www.raspberrypi.org/documentation/configuration/security.md) the RPi)). ThingsBoard (tested with v2.4.1) need to be installed following these [instructions](https://thingsboard.io/docs/user-guide/install/rpi/). Make sure to update the memory settings for slow machine on your RPi. We also recommend updating the max_cpu_time to 1 second.
+We assume that a recent image of [Raspbian Buster Lite](https://www.raspberrypi.org/downloads/raspbian/) is installed on the RPi (instructions for [installing](https://www.raspberrypi.org/documentation/installation/installing-images/README.md), [configuring](https://www.raspberrypi.org/documentation/configuration/raspi-config.md), and [securing](https://www.raspberrypi.org/documentation/configuration/security.md) the RPi)). ThingsBoard (tested with TB.4.1) need to be installed following these [instructions](https://thingsboard.io/docs/user-guide/install/rpi/). Make sure to update the memory settings for slow machine on your RPi. We also recommend updating the max_cpu_time to 1 second.
 
       sudo vim /etc/thingsboard/conf/thingsboard.yml
       # Replace (line ~406)
@@ -23,7 +23,7 @@ We assume that a recent image of [Raspbian Buster Lite](https://www.raspberrypi.
 Note that Thingsboard takes up to 2 minutes to start on a RPi.
 
 #### Provision Thingsboard
-For Inlinino V2 to work with Thingsboard we first need to setup devices on Thingsboard. Inlinino Core is the device that will communicate with the python script, it allows to start and stop data acquisition for every instrument as well as export the data. Each instrument is then added as a device in Thingsboard. Connect to the instance of Thingsboard installed as a tenant and follow the steps below:
+For Inlinino TB to work with Thingsboard we first need to setup devices on Thingsboard. Inlinino Core is the device that will communicate with the python script, it allows to start and stop data acquisition for every instrument as well as export the data. Each instrument is then added as a device in Thingsboard. Connect to the instance of Thingsboard installed as a tenant and follow the steps below:
 
 1. Add core device:
     1. Go to Devices > + (bottom left)
@@ -85,8 +85,8 @@ For each instrument to log and visualize data, steps 3 and 4 must be repeated. N
 
 An example of dashboard can be provisioned by importing the file `thingsboard_templates/underway_optics.json` into the Dashboard section of Thingsboard.
 
-#### Install Inlinino V2
-Download Inlinino V2 code.
+#### Install Inlinino TB
+Download Inlinino TB code.
  
     wget https://github.com/OceanOptics/Inlinino/archive/tb-app.zip
     unzip tb-app.zip
@@ -108,7 +108,7 @@ Update the configuration file with the tenant username, password, and device_id 
     cp default_cfg.py Inlinino_cfg.py
     vim Inlinino_cfg.py
 
-#### Start Inlinino V2
+#### Start Inlinino TB
 Inlinino can be started using python in the correct virtual environment.
 
     source activate Inlinino
