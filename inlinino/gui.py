@@ -8,7 +8,7 @@ import os
 import sys
 from time import sleep, gmtime, strftime, time
 from functools import partial
-from numpy import isnan as np_isnan
+import numpy as np
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 
@@ -152,11 +152,9 @@ class GUI(QtGui.QMainWindow):
                   self.m_instr_close_btn[instr_key] = self.QInstrDisplay(
                                instr_key, instr_val.m_active,
                                instr_val.m_n, instr_val.m_nNoResponse)
-            QtCore.QObject.connect(self.m_instr_connect_btn[instr_key],
-                                   QtCore.SIGNAL('clicked()'),
+            self.m_instr_connect_btn[instr_key].clicked.connect(
                                    partial(self.ActInstrConnect, line=False, _instr_key=instr_key))
-            QtCore.QObject.connect(self.m_instr_close_btn[instr_key],
-                                   QtCore.SIGNAL('clicked()'),
+            self.m_instr_close_btn[instr_key].clicked.connect(
                                    partial(self.ActInstrClose, line=False, _instr_key=instr_key))
             self.m_instr_close_btn[instr_key].hide()
             sd_instr_status.addWidget(wdgt)
@@ -167,10 +165,8 @@ class GUI(QtGui.QMainWindow):
         self.m_sd_log_fname_val.setWordWrap(True);
         self.m_sd_start_btn = QtGui.QPushButton('Start')
         self.m_sd_stop_btn = QtGui.QPushButton('Stop')
-        QtCore.QObject.connect(self.m_sd_start_btn, QtCore.SIGNAL('clicked()'),
-                               self.ActLogStart)
-        QtCore.QObject.connect(self.m_sd_stop_btn, QtCore.SIGNAL('clicked()'),
-                               self.ActLogStop)
+        self.m_sd_start_btn.clicked.connect(self.ActLogStart)
+        self.m_sd_stop_btn.clicked.connect(self.ActLogStop)
         sd_log = QtGui.QVBoxLayout()
         sd_log.addWidget(sd_log_fname_lbl)
         sd_log.addWidget(self.m_sd_log_fname_val)
@@ -188,8 +184,7 @@ class GUI(QtGui.QMainWindow):
         if __debug__:
             dbg_info_lbl = QtGui.QLabel('DEBUG MODE')
             dbg_refresh_btn = QtGui.QPushButton('Refresh')
-            QtCore.QObject.connect(dbg_refresh_btn, QtCore.SIGNAL('clicked()'),
-                                   self.RefreshAll)
+            dbg_refresh_btn.clicked.connect(self.RefreshAll)
             dbg_layout = QtGui.QVBoxLayout()
             dbg_layout.addWidget(dbg_info_lbl)
             dbg_layout.addWidget(dbg_refresh_btn)
@@ -316,7 +311,8 @@ class GUI(QtGui.QMainWindow):
                                         self.m_app.m_log_data.m_vardisplayed):
             if vardisplayed:
                 data = self.m_app.m_log_data.m_buffer[varkey].get(n)
-                self.m_curves[i].setData(timestamp, data)
+                sel = ~np.isnan(data)
+                self.m_curves[i].setData(timestamp[sel], data[sel], connect="finite")
                 i += 1
             # self.m_curves[i].setPos(self.m_app.m_log_data.m_buffer['timestamp'], 0)
         self.m_plot.enableAutoRange(x=True)  # Needed as soon as mouth is used
@@ -420,7 +416,7 @@ class GUI(QtGui.QMainWindow):
     def SetInstrumentsVar(self):
         # Update time and date
         t = self.m_app.m_log_data.m_buffer['timestamp'].get()[0]
-        if not np_isnan(t):
+        if not np.isnan(t):
             zulu = gmtime(t)
             self.m_time_display.setText(strftime('%H:%M:%S', zulu))
             self.m_time_display.repaint()

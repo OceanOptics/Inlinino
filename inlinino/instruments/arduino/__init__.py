@@ -101,7 +101,7 @@ class Arduino(Instrument):
             # sleep(self.m_serial.timeout)    # Wait for instrument to start
             # Skip header
             header_buffer.append(self.m_serial.readline())
-            while header_buffer[-1] is not b'' and len(header_buffer) < 6:
+            while header_buffer[-1] != b'' and len(header_buffer) < 6:
                 header_buffer.append(self.m_serial.readline())
             # Set configuration of controller
             if not self.SetConfiguration(header_buffer[-2]):

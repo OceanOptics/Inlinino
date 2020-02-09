@@ -36,11 +36,11 @@ We recommend setting Inlinino in a virtual environment (e.g. miniconda). To set 
     python setup.py
 
 Inlinino was tested with the following version of the python packages.
-  + Python      3.4.4
-  + numpy       1.9.3
-  + pySerial    3.1.1
-  + PyQt        4.11.4
-  + PyQtGraph   0.9.10
+  + python-3.8.1
+  + numpy-1.18.1
+  + pyqt5-5.14.1  & PyQt5-sip-12.7.1 
+  + pyqtgraph-0.10.0
+  + pyserial-3.4
 
 The application is not compatible with PyQT 5. We are aware that the versions of these packages are not the most recent. You might have to install the packages manually starting with PyQT 4.11.4.
 

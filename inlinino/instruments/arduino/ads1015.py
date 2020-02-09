@@ -36,7 +36,7 @@ class ADS1015(Arduino):
 
     def SetConfiguration(self, _check=b''):
         # Set configuration of Arduino board
-        if _check is b'' or _check == b'sample_rate<int>\tgain<int>\r\n':
+        if _check == b'' or _check == b'sample_rate<int>\tgain<int>\r\n':
             self.m_serial.write(bytes(str(self.m_frequency) + '/t' +
                                       str(self.m_gain), 'UTF-8'))
             return True
