@@ -7,10 +7,9 @@
 import os
 import importlib
 import sys
-
-from cfg import Cfg
-from instruments import Communication
-from log import LogData
+import numpy as np
+from inlinino.cfg import Cfg
+from inlinino.instruments import Instrument
 
 
 class Inlinino():
@@ -20,12 +19,13 @@ class Inlinino():
 
     # Set variables
     m_cfg = None
-    m_instruments = {}
+    m_instruments = {}  # TODO Replace by list
     m_log_data = None
     m_com = None
 
     def __init__(self, _cfg_filename):
         # Load configuration
+        # TODO update to configparser
         self.m_cfg = Cfg()
         self.m_cfg.Load(_cfg_filename)
         if not self.m_cfg.Check():
@@ -36,32 +36,20 @@ class Inlinino():
         # Initialize instruments
         if any(self.m_cfg.m_instruments):
             for name, cfg in self.m_cfg.m_instruments.items():
-                if 'module' in cfg.keys() and 'name' in cfg.keys():
-                    module = importlib.import_module('instruments.' +
-                                                     cfg['module'].lower() +
-                                                     '.' + cfg['name'].lower())
-                    class_ = getattr(module, cfg['name'])
-                    self.m_instruments[name] = class_(name, cfg)
-                else:
-                    if self.m_cfg.m_v > 0:
-                        print('Need to specify module and name of' +
-                              ' instrument ' + name)
-                    exit()
+                # DEPRECATED
+                # if 'module' in cfg.keys() and 'name' in cfg.keys():
+                #     module = importlib.import_module('instruments.' +
+                #                                      cfg['module'].lower() +
+                #                                      '.' + cfg['name'].lower())
+                #     class_ = getattr(module, cfg['name'])
+                #     self.m_instruments[name] = class_(name, cfg)
+
+                # Initialize instruments through generic serial parser
+                self.m_instruments[name] = Instrument(name, cfg)
         else:
             if self.m_cfg.m_v > 0:
                 print('No Instrument, exit')
             exit()
-
-        # Initiliaze com ports
-        self.m_com = Communication()
-
-        # Initialize data logger
-        self.m_log_data = LogData(
-            self.m_cfg.m_log, self.m_instruments, self.m_cfg.m_instruments)
-
-        # Self-t   est
-        # self.m_log_data.Start()
-        # self.m_log_data.Stop()
 
         # Load interface
         if 'interface' not in self.m_cfg.m_app.keys():
@@ -79,11 +67,14 @@ class Inlinino():
             gui_app = QtGui.QApplication(sys.argv)
             # init GUI
             self.m_gui = GUI(self)
+            for k in self.m_instruments.keys():
+                self.m_instruments[k].ui = self.m_gui
             # start GUI
             foo = gui_app.exec_()
             gui_app.deleteLater()  # Needed for QThread
             sys.exit(foo)
         elif self.m_cfg.m_app['interface'] == 'cli':
+            print('UNTESTED !!!')
             # Initialize plots (with matplotlib)
             # module = importlib.import_module('plot')
             # Plot = getattr(module, 'Plot')
@@ -113,7 +104,7 @@ class Inlinino():
         # Close connection with instruments still active
         if self.m_instruments is not None:
             for name, inst in self.m_instruments.items():
-                if inst.m_active:
+                if inst.alive:
                     if self.m_cfg.m_v > 1:
                         print('Closing connection with ' + name)
                     inst.Close()
@@ -126,17 +117,9 @@ class Inlinino():
                 print('Stop buffer thread.')
                 self.m_log_data.StopThread()
 
-    def ListInstruments(self):
-        print('WARNING: function deprecated\n' +
-              'Prefer: list(self.m_app.m_instruments.keys())')
-        ls = []
-        for key, value in self.m_instruments.items():
-            ls.append(value.m_name)
-        return ls
-
     def __str__(self):
         foo = str(self.m_cfg) + '\n[Instruments]\n'
-        for inst, inst in self.m_instruments.items():
+        for inst in self.m_instruments.values():
             foo += '\t' + str(inst) + '\n'
         return foo
 
@@ -147,12 +130,43 @@ class Inlinino():
         self.Close()
 
 
+class RingBuffer():
+    # Ring buffer based on numpy.roll for np.array
+    # Same concept as FIFO except that the size of the numpy array does not vary
+    def __init__(self, _length, _dtype=None):
+        # initialize buffer with NaN values
+        # length correspond to the size of the buffer
+        if _dtype is None:
+            self.data = np.empty(_length)  # np.dtype = float64
+            self.data[:] = np.NAN
+        else:
+            # type needs to be compatible with np.NaN
+            self.data = np.empty(_length, dtype=_dtype)
+            self.data[:] = None
+
+    def extend(self, _x):
+        # Add np.array at the end of the buffer
+        x = np.array(_x, copy=False)  # dtype=None
+        step = x.size
+        self.data = np.roll(self.data, -step)
+        self.data[-step:] = x
+
+    def get(self, _n=1):
+        # return the most recent n element(s) in buffer
+        return self.data[-1 * _n:]
+
+    def getleft(self, _n=1):
+        # return the oldest n element(s) in buffer
+        return self.data[0:_n]
+
+    def __str__(self):
+        return str(self.data)
+
+
 # Test Inlinino App
 if __name__ == '__main__':
     if len(sys.argv) == 2:
         inlinino = Inlinino(sys.argv[1])
-    elif __debug__:
-        inlinino = Inlinino(os.path.join('cfg', 'test_cfg.json'))
     else:
-        inlinino = Inlinino(os.path.join('cfg', 'simulino_cfg.json'))
+        inlinino = Inlinino(os.path.join('cfg', 'test_cfg.json'))
     print(inlinino)

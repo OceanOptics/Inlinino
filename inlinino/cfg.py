@@ -17,7 +17,6 @@ class Cfg():
     m_v = 1
     m_path_app = None
     m_app = None
-    m_log = None
     m_instruments = None
 
     def __init__(self):
@@ -36,8 +35,6 @@ class Cfg():
                 self.m_app = d['app_cfg']
                 if 'verbosity' in self.m_app.keys():
                     self.m_v = self.m_app['verbosity']
-            if 'log' in d.keys():
-                self.m_log = d['log']
             if 'instruments' in d.keys():
                 self.m_instruments = d['instruments']
             return True
@@ -45,9 +42,7 @@ class Cfg():
 
     def Check(self):
         # Check that all the required parameters are defined
-        if (self.m_app is None or
-                self.m_log is None or
-                self.m_instruments is None):
+        if (self.m_app is None or self.m_instruments is None):
             if self.m_v > 0:
                 print('Missing elements in configuration file.')
             return False
@@ -62,6 +57,6 @@ class Cfg():
 # Test class Cfg
 if __name__ == '__main__':
     cfg = Cfg()
-    cfg.Load(os.path.join('cfg/simulino_cfg.json'))
+    cfg.Load(os.path.join('cfg_deprecated/simulino_cfg.json'))
     print(cfg)
     print('Pass check:', cfg.Check())

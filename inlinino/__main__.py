@@ -7,7 +7,7 @@
 import os
 import sys
 
-from __init__ import Inlinino
+from inlinino import Inlinino
 
 
 if len(sys.argv) == 2:

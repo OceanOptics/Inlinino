@@ -3,16 +3,8 @@
     "verbosity":2,
     "interface":"gui",
     "theme":"inside",
-    "ui_update_frequency":1,
-    "ui_disp_pos_shift":1
-  },
-  "log":{
-    "frequency":1,
-    "interval_write":60,
-    "buffer_size":120,
-    "length":60,
-    "header":"Inlinino",
-    "path":"data"
+    "ui_disp_pos_shift":3,
+    "gui_buffer_length": 120
   },
   "instruments":{}
 }
