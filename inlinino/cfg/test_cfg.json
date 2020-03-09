@@ -3,36 +3,30 @@
     "verbosity":2,
     "interface":"gui",
     "theme":"inside",
-    "ui_update_frequency":1,
-    "ui_disp_pos_shift":1
+    "ui_disp_pos_shift":3,
+    "gui_buffer_length": 120
   },
   "instruments":{
-    "SimulinoSin":{
-      "module":"Simulino",
-      "name":"Sinus",
-      "frequency":1,
-      "variables":{
-        "sin":{
-          "mu":0,
-          "sigma":0,
-          "seed":1,
-          "start":0,
-          "step":0.1,
-          "units":"No Units"
-        }
-      }
+    "BB3349":{
+      "variable_names": ["beta470", "beta532", "beta660"],
+      "variable_units": ["counts", "counts", "counts"],
+      "variable_columns": [3, 5, 7],
+      "variable_types": ["int", "int", "int"],
+      "variable_precision": ["%d", "%d", "%d"],
+      "log_raw": false,
+      "log_products": true,
+      "path": "data"
     },
-    "WSCD":{
-      "module":"Arduino",
-      "name":"ADS1015",
-      "frequency":1,
-      "gain":23,
-      "variables":{
-        "FDOM":{
-          "pin":"DIF_A01",
-          "units":"counts"
-        }
-      }
+    "TSG0XX":{
+      "variable_names": ["T", "C", "S"],
+      "variable_units": ["deg_C", "S/m", "no units"],
+      "variable_columns": [0, 1, 2],
+      "variable_types": ["float", "float", "float"],
+      "variable_precision": ["%.3f", "%.3f", "%.3f"],
+      "separator": ",",
+      "log_raw": true,
+      "log_products": true,
+      "path": "data"
     }
   }
 }
