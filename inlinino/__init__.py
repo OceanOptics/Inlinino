@@ -26,6 +26,7 @@ class Inlinino():
     def __init__(self, _cfg_filename):
         # Load configuration
         # TODO update to configparser
+        # TODO pop-up to ask configuration file to load
         self.m_cfg = Cfg()
         self.m_cfg.Load(_cfg_filename)
         if not self.m_cfg.Check():
@@ -36,16 +37,13 @@ class Inlinino():
         # Initialize instruments
         if any(self.m_cfg.m_instruments):
             for name, cfg in self.m_cfg.m_instruments.items():
-                # DEPRECATED
-                # if 'module' in cfg.keys() and 'name' in cfg.keys():
-                #     module = importlib.import_module('instruments.' +
-                #                                      cfg['module'].lower() +
-                #                                      '.' + cfg['name'].lower())
-                #     class_ = getattr(module, cfg['name'])
-                #     self.m_instruments[name] = class_(name, cfg)
-
-                # Initialize instruments through generic serial parser
-                self.m_instruments[name] = Instrument(name, cfg)
+                if 'module' in cfg.keys():
+                    # Initialize instruments through generic serial parser
+                    module = importlib.import_module('inlinino.instruments.' + cfg['module'].lower())
+                    self.m_instruments[name] = getattr(module, cfg['module'])(name, cfg)
+                else:
+                    # Initialize instruments through generic serial parser
+                    self.m_instruments[name] = Instrument(name, cfg)
         else:
             if self.m_cfg.m_v > 0:
                 print('No Instrument, exit')

@@ -310,6 +310,8 @@ class GUI(QtGui.QMainWindow):
     def InstrumentUpdate(self, instrument_key, data=None, timestamp=None):
         # Update Sidebar variables
         if data:
+            # Keep only variables to display in main GUI
+            data = [data[i] for i in self.m_app.m_instruments[instrument_key].variable_displayed]
             for var_index, var_val in enumerate(data):
                 if isinstance(var_val, int):
                     if var_val < 100000:

@@ -1,7 +1,7 @@
 import serial
 from threading import Thread
 from time import time
-from log import Log, LogText
+from inlinino.log import Log, LogText
 
 
 class Instrument:
@@ -35,7 +35,7 @@ class Instrument:
             cfg['variable_types'] = []
         if 'variable_names' not in cfg.keys():
             cfg['variable_names'] = []
-        if 'variable_columns' not in cfg.keys():
+        if 'variable_units' not in cfg.keys():
             cfg['variable_units'] = []
         if 'variable_displayed' not in cfg.keys():
             if 'variable_names' in cfg.keys():
@@ -54,7 +54,7 @@ class Instrument:
             raise ValueError("Variable columns and types must be the same length in the configuration.")
         if 'variable_precision' in cfg.keys():
             if cfg['variable_precision']:
-                if len(cfg['variable_precision']) != len(cfg['variable_columns']):
+                if len(cfg['variable_precision']) != len(cfg['variable_names']):
                     raise ValueError("Variable precision and columns must be the same length in the configuration.")
 
         # Serial
@@ -88,7 +88,7 @@ class Instrument:
         self.ui = ui
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
-        self.variable_displayed = [cfg['variable_names'].index(foo) for foo in cfg['variable_displayed']]
+        self.variable_displayed = [self.variable_names.index(foo) for foo in cfg['variable_displayed']]
         self.packet_received = 0
         self.packet_corrupted = 0
         self.packet_logged = 0
@@ -159,12 +159,12 @@ class Instrument:
                 self.handle_packet(packet)
             except IndexError:
                 self.packet_corrupted += 1
-                print(self.name + 'Incomplete packet or Incorrect variable column requested.')
+                print(self.name + ' Incomplete packet or Incorrect variable column requested.')
                 print(packet)
                 self.ui.InstrumentUpdate(self.name)
             except ValueError:
                 self.packet_corrupted += 1
-                print(self.name + 'Instrument or parser configuration incorrect.')
+                print(self.name + ' Instrument or parser configuration incorrect.')
                 print(packet)
                 self.ui.InstrumentUpdate(self.name)
             except Exception as e:

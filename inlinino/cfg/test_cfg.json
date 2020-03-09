@@ -27,6 +27,14 @@
       "log_raw": true,
       "log_products": true,
       "path": "data"
+    },
+    "ACS301": {
+      "module": "ACS",
+      "device_file": "cfg/acs301_20180129.dev",
+      "plot_spectrum": true,
+      "log_raw": true,
+      "log_products": true,
+      "path": "data"
     }
   }
 }
