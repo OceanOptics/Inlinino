@@ -1,22 +1,25 @@
 Inlinino
 ========
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.4](https://img.shields.io/badge/Python-3.4-blue.svg)](https://www.python.org/downloads/)
-[![Python 3.5](https://img.shields.io/badge/Python-3.5-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)](https://www.python.org/downloads/)
 [![Documentation Status](https://readthedocs.org/projects/inlinino/badge/?version=latest)](https://inlinino.readthedocs.io/en/latest/?badge=latest)
 
 
 _A modular software data logger for oceanography_
 
 
-Inlinino is an open-source software data logger which main purpose is to log scientific measurements during extended periods at sea. It also provides real-time visualization, which helps users troubleshoot instruments in the field and prevents collection of bad data. Inlinino is designed to interface with either serial (RS-232) or analog instruments. Analog instruments are supported through a compatible data acquisition system, to date, the only one compatible is PASC (presented below). Serial instruments supported:
+Inlinino is an open-source software data logger which main purpose is to log scientific measurements during extended periods at sea. It also provides real-time visualization, which helps users troubleshoot instruments in the field and prevents collection of bad data. Inlinino is designed to interface with either serial (RS-232) or analog instruments. Instruments supported:
   + SeaBird TSG
   + Satlantic PAR
-  + WETLabs ECO-Triples (e.g. ECO-BB3, ECO-FLBBCD, ECO-BBFL2, ECO-3X1M)
-  + WETLabs ECO-BB9
-  + WETLabs ECO-BBRT
+  + WETLabs ECO sensors:
+        + Triples (e.g. ECO-BB3, ECO-FLBBCD, ECO-BBFL2, ECO-3X1M)
+        + ECO-BB9, ECO-BBRT
+  + WETLabs ACS
+  + Sequoia LISST
+
+Instrument not supported anymore by current upgrade:
   + WETLabs UBAT
-  + WETLabs ACS: requires further testing before deployment (check branch acs-dev)
+  + Analog instruments were supported through a compatible data acquisition system. In the previous version of Inlinino it was the PASC (section below).
      
 The documentation of the project is available at [http://inlinino.readthedocs.io](http://inlinino.readthedocs.io/en/latest/).
 
@@ -25,9 +28,9 @@ Inlinino can be installed with a Windows installer ([instructions](https://inlin
 
 Download Inlinino code.
  
-    wget https://github.com/OceanOptics/Inlinino/archive/master.zip
-    unzip Inlinino-master.zip
-    cd Inlinino-master
+    wget https://github.com/OceanOptics/Inlinino/archive/v2.zip
+    unzip v2.zip
+    cd Inlinino-2
  
 We recommend setting Inlinino in a virtual environment (e.g. miniconda). To set up a new python virtual environment with conda and install Inlinino:
 
@@ -41,8 +44,8 @@ Inlinino was tested with the following version of the python packages.
   + pyqt5-5.14.1  & PyQt5-sip-12.7.1 
   + pyqtgraph-0.10.0
   + pyserial-3.4
+  + pyACS-0.0.1
 
-The application is not compatible with PyQT 5. We are aware that the versions of these packages are not the most recent. You might have to install the packages manually starting with PyQT 4.11.4.
 
 _Known bugs_:
   + Versions of pySerial <3.1.1 are not working properly with Inlinino on macOS.

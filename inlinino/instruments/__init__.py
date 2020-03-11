@@ -55,7 +55,7 @@ class Instrument:
         if 'variable_precision' in cfg.keys():
             if cfg['variable_precision']:
                 if len(cfg['variable_precision']) != len(cfg['variable_names']):
-                    raise ValueError("Variable precision and columns must be the same length in the configuration.")
+                    raise ValueError("Variable precision and names must be the same length in the configuration.")
 
         # Serial
         self._serial = serial.Serial()
@@ -130,6 +130,8 @@ class Instrument:
             self._serial.reset_output_buffer()
             if self._serial.in_waiting > 0:
                 self._serial.read(self._serial.in_waiting)
+            # Send init frame to instrument
+            self.init_serial()
         while self.alive and self._serial.is_open:
             try:
                 # read all that is there or wait for one byte (blocking)
@@ -143,6 +145,8 @@ class Instrument:
                     except Exception as e:
                         print(self.name)
                         print(e)
+                        # if __debug__:
+                        #     raise e
             except serial.SerialException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
@@ -162,17 +166,23 @@ class Instrument:
                 print(self.name + ' Incomplete packet or Incorrect variable column requested.')
                 print(packet)
                 self.ui.InstrumentUpdate(self.name)
+                # if __debug__:
+                #     raise
             except ValueError:
                 self.packet_corrupted += 1
                 print(self.name + ' Instrument or parser configuration incorrect.')
                 print(packet)
                 self.ui.InstrumentUpdate(self.name)
+                # if __debug__:
+                #     raise
             except Exception as e:
                 self.packet_corrupted += 1
                 print(self.name)
                 print(e)
                 print(packet)
                 self.ui.InstrumentUpdate(self.name)
+                # if __debug__:
+                #     raise e
 
     def handle_packet(self, packet):
         timestamp = time()
@@ -215,9 +225,10 @@ class Instrument:
         self._log_raw.path = path
         self._log_prod.path = path
 
+    def init_serial(self):
+        pass
+
     def write_to_serial(self):
-        # if self._serial.is_open:
-        #     self._serial.write(b'Hello' + self._terminator) # Pay attention to encoding
         pass
 
     def parse(self, packet):

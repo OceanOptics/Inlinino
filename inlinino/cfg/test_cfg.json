@@ -35,6 +35,15 @@
       "log_raw": true,
       "log_products": true,
       "path": "data"
+    },
+    "LISST1183": {
+      "module": "LISST",
+      "ini_file": "cfg/LISST1183_20180119_Lisst.ini",
+      "instrument_file": "cfg/LISST1183_20180119_InstrumentData.txt",
+      "plot_spectrum": true,
+      "log_raw": true,
+      "log_products": true,
+      "path": "data"
     }
   }
 }

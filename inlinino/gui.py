@@ -270,13 +270,14 @@ class GUI(QtGui.QMainWindow):
                 # Increment to change color
                 i += 1
         # self.m_plot.setLabel('bottom', 'Time' , units='s')
-        self.m_plot.setLabel('left', 'Signal', units='Counts')  # Update units depending on instrument
+        self.m_plot.setLabel('left', 'Signal')  # Update units depending on instrument  #, units='Counts'
         # self.m_plot.setYRange(0, 5)
         # self.m_plot.setXRange(0, 100)
         self.m_plot.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
         self.m_plot.setMouseEnabled(x=False, y=True)
         self.m_plot.showGrid(x=False, y=True)
         self.m_plot.enableAutoRange(x=True, y=True)
+        self.m_plot.getAxis('left').enableAutoSIPrefix(False)
 
         # Set layout in main window
         widget = QtGui.QWidget()

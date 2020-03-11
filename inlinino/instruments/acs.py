@@ -13,7 +13,7 @@ class ACS(Instrument):
         # ACS Parser
         if 'device_file' not in cfg.keys():
             if __debug__:
-                print(_name + ': Missing device file')
+                print(name + ': Missing device file')
             exit()
         self._parser = ACSParser(cfg['device_file'])
 
@@ -45,9 +45,6 @@ class ACS(Instrument):
         # ACS Specifics
         self.force_parsing = cfg['force_parsing']
 
-        # self.variable_types = ['int', 'array', 'array', 'float', 'float']
-        self.variable_precision = None  # TODO Implement precision for array
-
         # Init Graphic for real time spectrum visualization
         self.plot_spectrum = cfg['plot_spectrum']
         if self.plot_spectrum:
@@ -57,21 +54,25 @@ class ACS(Instrument):
             pg.setConfigOption('foreground', '#F8F8F2')
             self._pw = pg.plot(enableMenu=False)
             self._plot = self._pw.plotItem
+            self._plot.addLegend()
             # Init Curve Items
-            self._plot_curve_c = pg.PlotCurveItem(pen=(0, 2))
-            self._plot_curve_a = pg.PlotCurveItem(pen=(1, 2))
+            self._plot_curve_c = pg.PlotCurveItem(pen=(0, 2), name='c')
+            self._plot_curve_a = pg.PlotCurveItem(pen=(1, 2), name='a')
             # Add item to plot
             self._plot.addItem(self._plot_curve_c)
             self._plot.addItem(self._plot_curve_a)
             # Decoration
             self._plot.setLabel('bottom', 'Wavelength' , units='nm')
-            self._plot.setLabel('left', 'Signal', units='m^{-1}')
+            self._plot.setLabel('left', 'Signal', units='m<sup>-1</sup>')
             # self.m_plot.setYRange(0, 5)
-            # self.m_plot.setXRange(0, 100)
-            self._plot.setLimits(minYRange=0, maxYRange=5)
+            min_lambda = min(min(self._parser.lambda_c), min(self._parser.lambda_a))
+            max_lambda = max(max(self._parser.lambda_c), max(self._parser.lambda_a))
+            self._plot.setXRange(min_lambda, max_lambda)
+            self._plot.setLimits(minXRange=min_lambda, maxXRange=max_lambda)
             self._plot.setMouseEnabled(x=False, y=False)
             self._plot.showGrid(x=True, y=True)
             self._plot.enableAutoRange(x=True, y=True)
+            self._plot.getAxis('left').enableAutoSIPrefix(False)
 
     def parse(self, packet):
         try:

@@ -127,6 +127,7 @@ class LogText(Log):
         super().__init__(*args, **kwargs)
         self.variable_names = ['packet']
         self.variable_units = [self.ENCODING]
+        self.registration = ''
 
     def write(self, data, timestamp):
         """
@@ -137,4 +138,4 @@ class LogText(Log):
         """
         self._smart_open(timestamp)
         self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-                                  ', ' + data.decode(self.ENCODING, self.UNICODE_HANDLING) + self.terminator)
+                                  ', ' + self.registration + data.decode(self.ENCODING, self.UNICODE_HANDLING) + self.terminator)
