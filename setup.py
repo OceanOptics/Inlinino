@@ -1,11 +1,12 @@
 import setuptools
+from inlinino import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="Inlinino",
-    version="2.0.2",
+    version=__version__,
     author="Nils Haentjens",
     author_email="nils.haentjens@maine.edu",
     description="A modular software data logger for oceanography",
@@ -13,7 +14,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/OceanOptics/Inlinino",
     packages=setuptools.find_packages(),
-    install_requires=['pyserial>=3.4', 'numpy', 'pyqt ', 'pyqtgraph==0.10', 'pyACS'],
+    install_requires=['pyserial>=3.4', 'numpy'], # , 'pyACS', 'pyqt', 'pyqtgraph==0.10'
     python_requires='>=3.7',
     license='GPLv3',
     classifiers=[

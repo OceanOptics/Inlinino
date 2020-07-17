@@ -2,6 +2,8 @@ import serial
 from threading import Thread
 from time import time
 from inlinino.log import Log, LogText
+from inlinino import CFG
+import logging
 
 
 class Instrument:
@@ -9,62 +11,16 @@ class Instrument:
     Generic Interface for Serial Instruments
     '''
 
-    ENCODING = 'utf-8'
+    REQUIRED_CFG_FIELDS = ['model', 'serial_number', 'module', 'separator', 'terminator',
+                           'log_path', 'log_raw', 'log_products',
+                           'variable_columns', 'variable_types', 'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, name, cfg=None, ui=None):
-        self.name = name
-
-        # Set Default Config (TODO update to configparser)
-        if 'baudrate' not in cfg.keys():
-            cfg['baudrate'] = 19200
-        if 'bytesize' not in cfg.keys():
-            cfg['bytesize'] = 8
-        if 'parity' not in cfg.keys():
-            cfg['parity'] = 'N'
-        if 'stopbits' not in cfg.keys():
-            cfg['stopbits'] = 1
-        if 'timeout' not in cfg.keys():
-            cfg['timeout'] = 2
-        if 'separator' not in cfg.keys():
-            cfg['separator'] = '\t'
-        if 'terminator' not in cfg.keys():
-            cfg['terminator'] = '\r\n'
-        if 'variable_columns' not in cfg.keys():
-            cfg['variable_columns'] = []
-        if 'variable_types' not in cfg.keys():
-            cfg['variable_types'] = []
-        if 'variable_names' not in cfg.keys():
-            cfg['variable_names'] = []
-        if 'variable_units' not in cfg.keys():
-            cfg['variable_units'] = []
-        if 'variable_displayed' not in cfg.keys():
-            if 'variable_names' in cfg.keys():
-                cfg['variable_displayed'] = cfg['variable_names']
-            else:
-                cfg['variable_displayed'] = []
-        if 'filename_prefix' not in cfg.keys():
-            cfg['filename_prefix'] = self.name
-        if 'log_raw' not in cfg.keys():
-            cfg['log_raw'] = True
-        if 'log_products' not in cfg.keys():
-            cfg['log_products'] = True
-
-        # Check configuration
-        if len(cfg['variable_columns']) != len(cfg['variable_types']):
-            raise ValueError("Variable columns and types must be the same length in the configuration.")
-        if 'variable_precision' in cfg.keys():
-            if cfg['variable_precision']:
-                if len(cfg['variable_precision']) != len(cfg['variable_names']):
-                    raise ValueError("Variable precision and names must be the same length in the configuration.")
+    def __init__(self, cfg_id, signal=None):
+        self.__logger = logging.getLogger(self.__class__.__name__)
 
         # Serial
         self._serial = serial.Serial()
-        self._serial.baudrate = cfg['baudrate']
-        self._serial.bytesize = cfg['bytesize']
-        self._serial.parity = cfg['parity']
-        self._serial.stopbits = cfg['stopbits']
-        self._serial.timeout = cfg['timeout']
-        self._terminator = cfg['terminator'].encode(self.ENCODING)
+        self._terminator = None
         self._buffer = bytearray()
         self._max_buffer_length = 16384
 
@@ -73,53 +29,117 @@ class Instrument:
         self.alive = False  # Might be replaced by Thread.is_alive()
 
         # Logger
-        self._log_raw = LogText(cfg)
-        self._log_prod = Log(cfg)
+        self._log_raw = None
+        self._log_prod = None
         self._log_active = False
-        self.log_raw_enable = cfg['log_raw']
-        self.log_prod_enable = cfg['log_products']
+        self.log_raw_enabled = False
+        self.log_prod_enabled = False
 
         # Simple parser
-        self.separator = cfg['separator'].encode(self.ENCODING)
-        self.variable_columns = cfg['variable_columns']
-        self.variable_types = cfg['variable_types']
+        self.separator = None
+        self.variable_columns = None
+        self.variable_types = None
 
         # User Interface
-        self.ui = ui
+        self.signal = signal
+        self.name = ''
+        self.variable_names = None
+        self.variable_units = None
+        self.variable_displayed = None
+
+        # Load cfg
+        self.cfg_id = cfg_id
+        self.setup(CFG.instruments[self.cfg_id])
+
+    def setup(self, cfg):
+        self.__logger.debug('Setup')
+        if self.alive:
+            self.__logger.warning('Closing port before updating connection')
+            self.close()
+        # Check missing fields
+        for f in self.REQUIRED_CFG_FIELDS:
+            if f not in cfg.keys():
+                raise ValueError('Missing field %s' % f)
+        # Set optional parameters
+        if 'variable_displayed' not in cfg.keys():
+            if 'variable_names' in cfg.keys():
+                cfg['variable_displayed'] = cfg['variable_names']
+            else:
+                cfg['variable_displayed'] = []
+        # Check configuration
+        if len(cfg['variable_columns']) != len(cfg['variable_types']):
+            raise ValueError("Variable columns and types must be the same length in the configuration.")
+        if 'variable_precision' in cfg.keys():
+            if cfg['variable_precision']:
+                if len(cfg['variable_precision']) != len(cfg['variable_names']):
+                    raise ValueError("Variable precision and names must be the same length in the configuration.")
+        # Serial
+        self._terminator = cfg['terminator']
+        # Logger
+        log_cfg = {'path': cfg['log_path']}
+        if 'log_prefix' in cfg.keys():
+            log_cfg['filename_prefix'] = cfg['log_prefix'] + cfg['model'] + cfg['serial_number']
+        else:
+            log_cfg['filename_prefix'] = cfg['model'] + cfg['serial_number']
+        for k in ['length', 'variable_names', 'variable_units', 'variable_precision']:
+            if k in cfg.keys():
+                log_cfg[k] = cfg[k]
+        if not self._log_raw:
+            self.__logger.debug('Init loggers')
+            self._log_raw = LogText(log_cfg, self.signal.status_update)
+            self._log_prod = Log(log_cfg, self.signal.status_update)
+        else:
+            self.__logger.debug('Update loggers configuration')
+            self._log_raw.update_cfg(log_cfg)
+            self._log_prod.update_cfg(log_cfg)
+        self._log_active = False
+        self.log_raw_enabled = cfg['log_raw']
+        self.log_prod_enabled = cfg['log_products']
+        # Simple parser
+        self.separator = cfg['separator']
+        self.variable_columns = cfg['variable_columns']
+        self.variable_types = cfg['variable_types']
+        # User Interface
+        # self.manufacturer = cfg['manufacturer']
+        # self.model = cfg['model']
+        # self.serial_number = cfg['serial_number']
+        self.name = cfg['model'] + ' ' + cfg['serial_number']
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
         self.variable_displayed = [self.variable_names.index(foo) for foo in cfg['variable_displayed']]
-        self.packet_received = 0
-        self.packet_corrupted = 0
-        self.packet_logged = 0
-        self.require_port = True
 
-    def open(self, port=None):
+        self.signal.status_update.emit()
+
+    def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=2):
         if port is None:
             raise ValueError('The instrument requires a port.')
         if not self.alive:
-            # Reset Packet Counts
-            self.packet_received = 0
-            self.packet_corrupted = 0
-            self.packet_logged = 0
             # Open serial connection
             self._serial.port = port
+            self._serial.baudrate = baudrate
+            self._serial.bytesize = bytesize
+            self._serial.parity = parity
+            self._serial.stopbits = stopbits
+            self._serial.timeout = timeout
             self._serial.open()
             self.alive = True
             # Start reading/writing thread
             self._thread = Thread(name=self.name, target=self.run)
             self._thread.daemon = True
             self._thread.start()
+            # Signal to UI
+            self.signal.status_update.emit()
 
     def close(self, wait_thread_join=True):
         if self.alive:
             self.alive = False
+            self.signal.status_update.emit()
             if hasattr(self._serial, 'cancel_read'):
                 self._serial.cancel_read()
             if wait_thread_join:
-                self._thread.join(2)
+                self._thread.join(self._serial.timeout)
                 if self._thread.is_alive():
-                    print('Thread of instrument %s did not join.' % self.name)
+                    self.__logger.warning('Thread did not join.')
             self.log_stop()
             self._serial.close()
 
@@ -140,18 +160,14 @@ class Instrument:
                     try:
                         self.data_received(data)
                         if len(self._buffer) > self._max_buffer_length:
-                            print('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
+                            self.__logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
                             self._buffer = bytearray()
                     except Exception as e:
-                        print(self.name)
-                        print(e)
-                        # if __debug__:
-                        #     raise e
+                        self.__logger.warning(e)
             except serial.SerialException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
-                print(self.name)
-                print(e)
+                self.__logger.error(e)
                 break
         self.close(wait_thread_join=False)
 
@@ -162,68 +178,60 @@ class Instrument:
             try:
                 self.handle_packet(packet)
             except IndexError:
-                self.packet_corrupted += 1
-                print(self.name + ' Incomplete packet or Incorrect variable column requested.')
-                print(packet)
-                self.ui.InstrumentUpdate(self.name)
+                self.signal.packet_corrupted.emit()
+                self.__logger.warning('Incomplete packet or Incorrect variable column requested.')
+                self.__logger.debug(packet)
                 # if __debug__:
                 #     raise
             except ValueError:
-                self.packet_corrupted += 1
-                print(self.name + ' Instrument or parser configuration incorrect.')
-                print(packet)
-                self.ui.InstrumentUpdate(self.name)
+                self.signal.packet_corrupted.emit()
+                self.__logger.warning('Instrument or parser configuration incorrect.')
+                self.__logger.debug(packet)
                 # if __debug__:
                 #     raise
             except Exception as e:
-                self.packet_corrupted += 1
-                print(self.name)
-                print(e)
-                print(packet)
-                self.ui.InstrumentUpdate(self.name)
+                self.signal.packet_corrupted.emit()
+                self.__logger.warning(self.name)
+                self.__logger.warning(e)
+                self.__logger.debug(packet)
                 # if __debug__:
                 #     raise e
 
     def handle_packet(self, packet):
         timestamp = time()
-        self.packet_received += 1
+        self.signal.packet_received.emit()
         self.write_to_serial()
-        if self.log_raw_enable and self._log_active:
+        if self.log_raw_enabled and self._log_active:
             self._log_raw.write(packet, timestamp)
-            self.packet_logged += 1
+            self.signal.packet_logged.emit()
         data = self.parse(packet)
-        if self.ui:
-            self.ui.InstrumentUpdate(self.name, data, timestamp)
-        if self.log_prod_enable and self._log_active:
+        self.signal.new_data.emit(data, timestamp)
+        if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)
-            if not self.log_raw_enable:
-                self.packet_logged += 1
+            if not self.log_raw_enabled:
+                self.signal.packet_logged.emit()
 
     def log_start(self):
         self._log_active = True
+        self.signal.status_update.emit()
 
     def log_stop(self):
         self._log_active = False
+        self.signal.status_update.emit()
         self._log_raw.close()
         self._log_prod.close()
 
-    def log_status(self):
+    def log_active(self):
         return self._log_active
-
-    def log_set_filename_prefix(self, prefix):
-        if prefix:
-            self._log_raw.filename_prefix = prefix + '_' + self.name
-            self._log_prod.filename_prefix = prefix + '_' + self.name
-        else:
-            self._log_raw.filename_prefix = self.name
-            self._log_prod.filename_prefix = self.name
 
     def log_get_path(self):
         return self._log_raw.path
 
-    def log_set_path(self, path):
-        self._log_raw.path = path
-        self._log_prod.path = path
+    def log_get_filename(self):
+        if self.log_raw_enabled or not self.log_prod_enabled:
+            return self._log_raw.filename
+        else:
+            return self._log_prod.filename
 
     def init_serial(self):
         pass

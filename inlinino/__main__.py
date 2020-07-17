@@ -4,13 +4,17 @@
 # @Last Modified by:   nils
 # @Last Modified time: 2016-06-27 11:08:50
 
-import os
+import logging
 import sys
+from inlinino.gui import App
 
-from inlinino import Inlinino
+inlinino = App([])
 
-
+# Get instrument selected
 if len(sys.argv) == 2:
-    Inlinino(sys.argv[1])
+    try:
+        inlinino.start(int(sys.argv[1]))
+    except ValueError:
+        logging.critical('Invalid arguments.')
 else:
-    Inlinino(os.path.join(sys.path[0], 'cfg', 'simulino_cfg.json'))
+    inlinino.start()

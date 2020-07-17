@@ -1,16 +1,16 @@
 import os
 from time import gmtime, strftime
 from struct import pack
-
-# TODO Solve bug of data not written when app exited without stopping instruments
+import logging
+import atexit
 
 
 class Log:
-
     FILE_EXT = 'csv'
     FILE_MODE = 'w'
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, signal_new_file=None):
+        self.__logger = logging.getLogger(self.__class__.__name__)
         # Load Config
         if 'filename_prefix' not in cfg.keys():
             cfg['filename_prefix'] = 'Inlinino'
@@ -28,32 +28,47 @@ class Log:
         self._file = None
         self._file_timestamp = None
         # self.file_mode_binary = cfg['mode_binary']
-        self.file_length = cfg['length'] * 60 # seconds
+        self.file_length = cfg['length'] * 60  # seconds
         self.filename_prefix = cfg['filename_prefix']
+        self.filename = None
+        self.set_filename()
         self.path = cfg['path']
+        self.signal_new_file = signal_new_file
 
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
         self.variable_precision = cfg['variable_precision']
 
         self.terminator = '\r\n'
+        atexit.register(self.close)
+
+    def update_cfg(self, cfg):
+        self.__logger.debug('Update configuration')
+        for k in cfg.keys():
+            setattr(self, k, cfg[k])
+        self.set_filename()
+
+    def set_filename(self, timestamp=None):
+        if timestamp:
+            if not os.path.exists(self.path):
+                os.makedirs(self.path)
+            self.filename = self.filename_prefix + '_' + strftime('%Y%m%d_%H%M%S', gmtime(timestamp)) + \
+                            '.' + self.FILE_EXT
+            suffix = 0
+            while os.path.exists(os.path.join(self.path, self.filename)):
+                self.filename = self.filename_prefix + '_' + strftime('%Y%m%d_%H%M%S', gmtime(timestamp)) + \
+                                '_' + str(suffix) + '.' + self.FILE_EXT
+                suffix += 1
+        else:
+            self.filename = self.filename_prefix + '_<time>' + '.' + self.FILE_EXT
 
     def open(self, timestamp):
-        # Create directory
-        if not os.path.exists(self.path):
-            os.makedirs(self.path)
-        # Generate unique filename
-        filename = os.path.join(self.path, self.filename_prefix + '_' +
-                                strftime('%Y%m%d_%H%M%S', gmtime(timestamp)) + '.' + self.FILE_EXT)
-        suffix = 0
-        while os.path.exists(filename):
-            filename = os.path.join(self.path, self.filename_prefix + '_' +
-                                    strftime('%Y%m%d_%H%M%S', gmtime(timestamp)) + '_' + str(suffix) + self.FILE_EXT)
-            suffix += 1
+        self.set_filename(timestamp)
         # Create File
         # TODO add exception in case can't open file
         # TODO specify number of bytes in buffer depending on instrument
-        self._file = open(filename, self.FILE_MODE)
+        self._file = open(os.path.join(self.path, self.filename), self.FILE_MODE)
+        self.__logger.info('Open file %s' % self.filename)
         # Write header (only if has variable names)
         if self.variable_names:
             self._file.write(
@@ -62,7 +77,8 @@ class Log:
                 'HH:MM:SS.fff, ' + ', '.join(x for x in self.variable_units) + self.terminator)
         # Time file open
         self._file_timestamp = timestamp
-        # TODO Reset Instrument Number of Packet Received
+        if self.signal_new_file:
+            self.signal_new_file.emit()
 
     def _smart_open(self, timestamp):
         # Open file if necessary
@@ -93,6 +109,10 @@ class Log:
     def close(self):
         if self._file:
             self._file.close()
+            self.__logger.debug('Close file %s' % self.filename)
+            self.set_filename()
+            if self.signal_new_file:
+                self.signal_new_file.emit()
         self._file_timestamp = None
 
     def __del__(self):
@@ -100,7 +120,6 @@ class Log:
 
 
 class LogBinary(Log):
-
     FILE_EXT = 'bin'
     FILE_MODE = 'wb'
 
@@ -118,7 +137,6 @@ class LogBinary(Log):
 
 
 class LogText(Log):
-
     FILE_EXT = 'raw'
     ENCODING = 'utf-8'
     UNICODE_HANDLING = 'replace'
@@ -138,4 +156,4 @@ class LogText(Log):
         """
         self._smart_open(timestamp)
         self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-                                  ', ' + self.registration + data.decode(self.ENCODING, self.UNICODE_HANDLING) + self.terminator)
+                         ', ' + self.registration + data.decode(self.ENCODING, self.UNICODE_HANDLING) + self.terminator)
