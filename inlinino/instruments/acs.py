@@ -8,86 +8,90 @@ import pyqtgraph as pg
 class ACS(Instrument):
 
     REGISTRATION_BYTES = b'\xff\x00\xff\x00'
+    REQUIRED_CFG_FIELDS = ['device_file',
+                           'model', 'serial_number', 'module',
+                           'log_path', 'log_raw', 'log_products',
+                           'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, name, cfg=None, ui=None, *args, **kwargs):
-        # ACS Parser
+    def __init__(self, cfg_id, signal, *args, **kwargs):
+        # ACS Specific attributes
+        self._parser = None
+        self.force_parsing = False  # TODO Add force parsing to GUI setup window
+
+        # Init Graphic for real time spectrum visualization
+        # TODO Refactor code and move it to GUI
+        # Set night mode
+        pg.setConfigOption('background', '#F8F8F2')
+        pg.setConfigOption('foreground', '#26292C')
+        self._pw = pg.plot(enableMenu=False)
+        self._plot = self._pw.plotItem
+        self._plot.addLegend()
+        # Init Curve Items
+        self._plot_curve_c = pg.PlotCurveItem(pen=(0, 2), name='c')
+        self._plot_curve_a = pg.PlotCurveItem(pen=(1, 2), name='a')
+        # Add item to plot
+        self._plot.addItem(self._plot_curve_c)
+        self._plot.addItem(self._plot_curve_a)
+        # Decoration
+        self._plot.setLabel('bottom', 'Wavelength' , units='nm')
+        self._plot.setLabel('left', 'Signal', units='m<sup>-1</sup>')
+        # self.m_plot.setYRange(0, 5)
+        self._plot.setMouseEnabled(x=False, y=False)
+        self._plot.showGrid(x=True, y=True)
+        self._plot.enableAutoRange(x=True, y=True)
+        self._plot.getAxis('left').enableAutoSIPrefix(False)
+
+        super().__init__(cfg_id, signal, *args, **kwargs)
+
+    def setup(self, cfg):
+        # Set ACS specific attributes
         if 'device_file' not in cfg.keys():
-            if __debug__:
-                print(name + ': Missing device file')
-            exit()
+            raise ValueError('Missing field device file')
         self._parser = ACSParser(cfg['device_file'])
-
-        # Set/Check Configuration
-        if 'force_parsing' not in cfg.keys():
-            cfg['force_parsing'] = False
-        if 'plot_spectrum' not in cfg.keys():
-            cfg['plot_spectrum'] = True
+        if 'force_parsing' in cfg.keys():
+            self.force_parsing = cfg['force_parsing']
+        # Overload cfg with ACS specific parameters
         cfg['variable_names'] = ['timestamp', 'c', 'a', 'T_int', 'T_ext']
         cfg['variable_units'] = ['ms', '1/m', '1/m', 'deg_C', 'deg_C']
         cfg['variable_units'][1] = '1/m\tlambda=' + ' '.join('%s' % x for x in self._parser.lambda_c)
         cfg['variable_units'][2] = '1/m\tlambda=' + ' '.join('%s' % x for x in self._parser.lambda_a)
-        cfg['variable_displayed'] = ['T_int', 'T_ext']
         cfg['variable_precision'] = ['%d', '%s', '%s', '%.6f', '%.6f']
+        cfg['terminator'] = self.REGISTRATION_BYTES
+        # Set standard configuration and check cfg input
+        super().setup(cfg, LogBinary)
+        # Update Plot config
+        min_lambda = min(min(self._parser.lambda_c), min(self._parser.lambda_a))
+        max_lambda = max(max(self._parser.lambda_c), max(self._parser.lambda_a))
+        self._plot.setXRange(min_lambda, max_lambda)
+        self._plot.setLimits(minXRange=min_lambda, maxXRange=max_lambda)
 
-        super().__init__(name, cfg, ui, *args, **kwargs)
-
-        # Serial Specific to ACS
-        self._serial.baudrate = 115200
-        self._serial.bytesize = 8
-        self._serial.parity = 'N'  # None
-        self._serial.stopbits = 1
-        self._serial.timeout = 1  # Instrument run at 4 Hz so let him a chance to speak
-        self._terminator = self.REGISTRATION_BYTES
-
-        # Logger
-        self._log_raw = LogBinary(cfg)
-
-        # ACS Specifics
-        self.force_parsing = cfg['force_parsing']
-
-        # Init Graphic for real time spectrum visualization
-        self.plot_spectrum = cfg['plot_spectrum']
-        if self.plot_spectrum:
-            # Set night mode
-            # TODO get values from theme
-            pg.setConfigOption('background', '#26292C')
-            pg.setConfigOption('foreground', '#F8F8F2')
-            self._pw = pg.plot(enableMenu=False)
-            self._plot = self._pw.plotItem
-            self._plot.addLegend()
-            # Init Curve Items
-            self._plot_curve_c = pg.PlotCurveItem(pen=(0, 2), name='c')
-            self._plot_curve_a = pg.PlotCurveItem(pen=(1, 2), name='a')
-            # Add item to plot
-            self._plot.addItem(self._plot_curve_c)
-            self._plot.addItem(self._plot_curve_a)
-            # Decoration
-            self._plot.setLabel('bottom', 'Wavelength' , units='nm')
-            self._plot.setLabel('left', 'Signal', units='m<sup>-1</sup>')
-            # self.m_plot.setYRange(0, 5)
-            min_lambda = min(min(self._parser.lambda_c), min(self._parser.lambda_a))
-            max_lambda = max(max(self._parser.lambda_c), max(self._parser.lambda_a))
-            self._plot.setXRange(min_lambda, max_lambda)
-            self._plot.setLimits(minXRange=min_lambda, maxXRange=max_lambda)
-            self._plot.setMouseEnabled(x=False, y=False)
-            self._plot.showGrid(x=True, y=True)
-            self._plot.enableAutoRange(x=True, y=True)
-            self._plot.getAxis('left').enableAutoSIPrefix(False)
+    def open(self, port=None, baudrate=None, bytesize=8, parity='N', stopbits=1, timeout=1):
+        if baudrate is None:
+            # Get default baudrate from device file via parser
+            baudrate = self._parser.baudrate  # Default 115200
+        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
         try:
             raw_frame = self._parser.unpack_frame(self.REGISTRATION_BYTES + packet, self.force_parsing)
             c, a, T_int, T_ext = self._parser.calibrate_frame(raw_frame, get_auxiliaries=True)
-            # Update real-time plot
-            if self.plot_spectrum:
-                self._plot_curve_c.setData(self._parser.lambda_c, c)
-                self._plot_curve_a.setData(self._parser.lambda_a, a)
             return [raw_frame.time_stamp, c, a, T_int, T_ext]
         except FrameIncompleteError as e:
-            self.packet_corrupted += 1
-            print(e)
-            # self.CommunicationError(self.name + ' This might happen on first packet received.')
+            self.signal.packet_corrupted.emit()
+            self.__logger.warning(e)
+            self.__logger.warning('This might happen on first packet received.')
         except NumberWavelengthIncorrectError as e:
-            self.packet_corrupted += 1
-            print(e)
-            # self.CommunicationError(self.name + ' Likely due to invalid device file.')
+            self.signal.packet_corrupted.emit()
+            self.__logger.warning(e)
+            self.__logger.warning('Likely due to invalid device file.')
+
+    def handle_data(self, data, timestamp):
+        # Update plots
+        self.signal.new_data.emit([data[1][30], data[2][30]], timestamp)
+        self._plot_curve_c.setData(self._parser.lambda_c, data[1])
+        self._plot_curve_a.setData(self._parser.lambda_a, data[2])
+        # Log parsed data
+        if self.log_prod_enabled and self._log_active:
+            self._log_prod.write(data, timestamp)
+            if not self.log_raw_enabled:
+                self.signal.packet_logged.emit()

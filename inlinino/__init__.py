@@ -8,7 +8,7 @@ import logging
 import json
 import sys
 
-__version__ = '2.1'
+__version__ = '2.2'
 
 
 logging.basicConfig(level=logging.DEBUG)

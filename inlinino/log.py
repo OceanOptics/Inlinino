@@ -107,6 +107,7 @@ class Log:
                              ', ' + ', '.join(str(d) for d in data) + self.terminator)
 
     def close(self):
+        # TODO Fix bug when close file alraedy closed DEBUG:Log:Close file BB3349_<time>.csv
         if self._file:
             self._file.close()
             self.__logger.debug('Close file %s' % self.filename)
@@ -114,9 +115,6 @@ class Log:
             if self.signal_new_file:
                 self.signal_new_file.emit()
         self._file_timestamp = None
-
-    def __del__(self):
-        self.close()
 
 
 class LogBinary(Log):

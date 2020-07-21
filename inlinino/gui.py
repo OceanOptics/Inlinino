@@ -70,7 +70,7 @@ class MainWindow(QtGui.QMainWindow):
     BACKGROUND_COLOR = '#F8F8F2'
     FOREGROUND_COLOR = '#26292C'
     BUFFER_LENGTH = 240
-    MAX_PLOT_REFRESH_RATE = 20   # Hz
+    MAX_PLOT_REFRESH_RATE = 2   # Hz
 
     def __init__(self, instrument=None):
         super(MainWindow, self).__init__()
@@ -90,18 +90,6 @@ class MainWindow(QtGui.QMainWindow):
         self._buffer_data = []
         self.last_plot_refresh = time()
         self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': DateAxis(orientation='bottom')}, enableMenu=False)
-        # self.timeseries_plot = self.timeseries_widget.plotItem
-        # self.timeseries_curves = []
-        # n = sum([len(instr_val.variable_displayed) for instr_val in self.m_app.m_instruments.values()])
-        # for i in enumerate(self.???)
-        #         # Init Curve Item
-        #         c = pg.PlotCurveItem(pen=(i, n))  # TODO: Option to force color from configuration file
-        #         # Add item to plot
-        #         self._timeseries_plot.addItem(c)
-        #         # Keep track of item
-        #         # might want to use self.m_plot.listDataItems() instead
-        #         self._timeseries_curves.append(c)
-        # self.timeseries_widget.plotItem.setLabel('bottom', 'Time')
         self.timeseries_widget.plotItem.setLabel('left', 'Signal')  # Update units depending on instrument  #, units='Counts'
         self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
         self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
@@ -215,8 +203,11 @@ class MainWindow(QtGui.QMainWindow):
         self.le_filename.setText(self.instrument.log_get_filename())
         self.le_directory.setText(self.instrument.log_get_path())
         self.packets_received = 0
+        self.label_packets_received.setText(str(self.packets_received))
         self.packets_logged = 0
+        self.label_packets_logged.setText(str(self.packets_logged))
         self.packets_corrupted = 0
+        self.label_packets_corrupted.setText(str(self.packets_corrupted))
 
     def on_packet_received(self):
         self.packets_received += 1
@@ -224,7 +215,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def on_packet_logged(self):
         self.packets_logged += 1
-        if self.packets_received < self.packets_logged:
+        if self.packets_received < self.packets_logged < 2:  # Fix inconsistency when start logging
             self.packets_received = self.packets_logged
             self.label_packets_received.setText(str(self.packets_received))
         self.label_packets_logged.setText(str(self.packets_logged))

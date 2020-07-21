@@ -51,7 +51,7 @@ class Instrument:
         self.cfg_id = cfg_id
         self.setup(CFG.instruments[self.cfg_id])
 
-    def setup(self, cfg):
+    def setup(self, cfg, raw_logger=LogText):
         self.__logger.debug('Setup')
         if self.alive:
             self.__logger.warning('Closing port before updating connection')
@@ -60,19 +60,14 @@ class Instrument:
         for f in self.REQUIRED_CFG_FIELDS:
             if f not in cfg.keys():
                 raise ValueError('Missing field %s' % f)
-        # Set optional parameters
-        if 'variable_displayed' not in cfg.keys():
-            if 'variable_names' in cfg.keys():
-                cfg['variable_displayed'] = cfg['variable_names']
-            else:
-                cfg['variable_displayed'] = []
         # Check configuration
-        if len(cfg['variable_columns']) != len(cfg['variable_types']):
-            raise ValueError("Variable columns and types must be the same length in the configuration.")
-        if 'variable_precision' in cfg.keys():
-            if cfg['variable_precision']:
-                if len(cfg['variable_precision']) != len(cfg['variable_names']):
-                    raise ValueError("Variable precision and names must be the same length in the configuration.")
+        variable_keys = [v for v in cfg.keys() if 'variable_' in v]
+        if variable_keys:
+            # Check length
+            n = len(cfg['variable_names'])
+            for k in variable_keys:
+                if n != len(cfg[k]):
+                    raise ValueError('%s invalid length' % k)
         # Serial
         self._terminator = cfg['terminator']
         # Logger
@@ -86,7 +81,7 @@ class Instrument:
                 log_cfg[k] = cfg[k]
         if not self._log_raw:
             self.__logger.debug('Init loggers')
-            self._log_raw = LogText(log_cfg, self.signal.status_update)
+            self._log_raw = raw_logger(log_cfg, self.signal.status_update)
             self._log_prod = Log(log_cfg, self.signal.status_update)
         else:
             self.__logger.debug('Update loggers configuration')
@@ -96,9 +91,10 @@ class Instrument:
         self.log_raw_enabled = cfg['log_raw']
         self.log_prod_enabled = cfg['log_products']
         # Simple parser
-        self.separator = cfg['separator']
-        self.variable_columns = cfg['variable_columns']
-        self.variable_types = cfg['variable_types']
+        if 'separator' in cfg.keys():
+            self.separator = cfg['separator']
+            self.variable_columns = cfg['variable_columns']
+            self.variable_types = cfg['variable_types']
         # User Interface
         # self.manufacturer = cfg['manufacturer']
         # self.model = cfg['model']
@@ -106,8 +102,6 @@ class Instrument:
         self.name = cfg['model'] + ' ' + cfg['serial_number']
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
-        self.variable_displayed = [self.variable_names.index(foo) for foo in cfg['variable_displayed']]
-
         self.signal.status_update.emit()
 
     def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=2):
@@ -191,7 +185,6 @@ class Instrument:
                 #     raise
             except Exception as e:
                 self.signal.packet_corrupted.emit()
-                self.__logger.warning(self.name)
                 self.__logger.warning(e)
                 self.__logger.debug(packet)
                 # if __debug__:
@@ -205,6 +198,9 @@ class Instrument:
             self._log_raw.write(packet, timestamp)
             self.signal.packet_logged.emit()
         data = self.parse(packet)
+        self.handle_data(data, timestamp)
+
+    def handle_data(self, data, timestamp):
         self.signal.new_data.emit(data, timestamp)
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)
