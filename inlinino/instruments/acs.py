@@ -3,6 +3,7 @@ from inlinino.log import LogBinary
 from pyACS.acs import ACS as ACSParser
 from pyACS.acs import FrameIncompleteError, NumberWavelengthIncorrectError
 import pyqtgraph as pg
+from time import time
 
 
 class ACS(Instrument):
@@ -17,6 +18,7 @@ class ACS(Instrument):
         # ACS Specific attributes
         self._parser = None
         self.force_parsing = False  # TODO Add force parsing to GUI setup window
+        self._timestamp_flag_out_T_cal = 0
 
         # Init Graphic for real time spectrum visualization
         # TODO Refactor code and move it to GUI
@@ -36,7 +38,7 @@ class ACS(Instrument):
         self._plot.setLabel('bottom', 'Wavelength' , units='nm')
         self._plot.setLabel('left', 'Signal', units='m<sup>-1</sup>')
         # self.m_plot.setYRange(0, 5)
-        self._plot.setMouseEnabled(x=False, y=False)
+        self._plot.setMouseEnabled(x=False, y=True)
         self._plot.showGrid(x=True, y=True)
         self._plot.enableAutoRange(x=True, y=True)
         self._plot.getAxis('left').enableAutoSIPrefix(False)
@@ -51,11 +53,11 @@ class ACS(Instrument):
         if 'force_parsing' in cfg.keys():
             self.force_parsing = cfg['force_parsing']
         # Overload cfg with ACS specific parameters
-        cfg['variable_names'] = ['timestamp', 'c', 'a', 'T_int', 'T_ext']
-        cfg['variable_units'] = ['ms', '1/m', '1/m', 'deg_C', 'deg_C']
+        cfg['variable_names'] = ['timestamp', 'c', 'a', 'T_int', 'T_ext', 'flag_outside_calibration_range']
+        cfg['variable_units'] = ['ms', '1/m', '1/m', 'deg_C', 'deg_C', 'bool']
         cfg['variable_units'][1] = '1/m\tlambda=' + ' '.join('%s' % x for x in self._parser.lambda_c)
         cfg['variable_units'][2] = '1/m\tlambda=' + ' '.join('%s' % x for x in self._parser.lambda_a)
-        cfg['variable_precision'] = ['%d', '%s', '%s', '%.6f', '%.6f']
+        cfg['variable_precision'] = ['%d', '%s', '%s', '%.6f', '%.6f', '%s']
         cfg['terminator'] = self.REGISTRATION_BYTES
         # Set standard configuration and check cfg input
         super().setup(cfg, LogBinary)
@@ -74,22 +76,26 @@ class ACS(Instrument):
     def parse(self, packet):
         try:
             raw_frame = self._parser.unpack_frame(self.REGISTRATION_BYTES + packet, self.force_parsing)
-            c, a, T_int, T_ext = self._parser.calibrate_frame(raw_frame, get_auxiliaries=True)
-            return [raw_frame.time_stamp, c, a, T_int, T_ext]
+            c, a, T_int, T_ext, flag_out_T_cal = self._parser.calibrate_frame(raw_frame, get_auxiliaries=True)
+            return [raw_frame.time_stamp, c, a, T_int, T_ext, flag_out_T_cal]
         except FrameIncompleteError as e:
             self.signal.packet_corrupted.emit()
-            self.__logger.warning(e)
-            self.__logger.warning('This might happen on first packet received.')
+            self.logger.warning(e)
+            self.logger.warning('This might happen on first packet received.')
         except NumberWavelengthIncorrectError as e:
             self.signal.packet_corrupted.emit()
-            self.__logger.warning(e)
-            self.__logger.warning('Likely due to invalid device file.')
+            self.logger.warning(e)
+            self.logger.warning('Likely due to invalid device file.')
 
     def handle_data(self, data, timestamp):
         # Update plots
         self.signal.new_data.emit([data[1][30], data[2][30]], timestamp)
         self._plot_curve_c.setData(self._parser.lambda_c, data[1])
         self._plot_curve_a.setData(self._parser.lambda_a, data[2])
+        # Flag outside temperature calibration range
+        if data[5] and time() - self._timestamp_flag_out_T_cal > 120:
+            self._timestamp_flag_out_T_cal = time()
+            self.logger.warning('Internal temperature outside calibration range.')
         # Log parsed data
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)

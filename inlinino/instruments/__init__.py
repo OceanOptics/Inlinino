@@ -16,7 +16,7 @@ class Instrument:
                            'variable_columns', 'variable_types', 'variable_names', 'variable_units', 'variable_precision']
 
     def __init__(self, cfg_id, signal=None):
-        self.__logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
         # Serial
         self._serial = serial.Serial()
@@ -49,12 +49,12 @@ class Instrument:
 
         # Load cfg
         self.cfg_id = cfg_id
-        self.setup(CFG.instruments[self.cfg_id])
+        self.setup(CFG.instruments[self.cfg_id].copy())
 
     def setup(self, cfg, raw_logger=LogText):
-        self.__logger.debug('Setup')
+        self.logger.debug('Setup')
         if self.alive:
-            self.__logger.warning('Closing port before updating connection')
+            self.logger.warning('Closing port before updating connection')
             self.close()
         # Check missing fields
         for f in self.REQUIRED_CFG_FIELDS:
@@ -80,11 +80,11 @@ class Instrument:
             if k in cfg.keys():
                 log_cfg[k] = cfg[k]
         if not self._log_raw:
-            self.__logger.debug('Init loggers')
+            self.logger.debug('Init loggers')
             self._log_raw = raw_logger(log_cfg, self.signal.status_update)
             self._log_prod = Log(log_cfg, self.signal.status_update)
         else:
-            self.__logger.debug('Update loggers configuration')
+            self.logger.debug('Update loggers configuration')
             self._log_raw.update_cfg(log_cfg)
             self._log_prod.update_cfg(log_cfg)
         self._log_active = False
@@ -133,7 +133,7 @@ class Instrument:
             if wait_thread_join:
                 self._thread.join(self._serial.timeout)
                 if self._thread.is_alive():
-                    self.__logger.warning('Thread did not join.')
+                    self.logger.warning('Thread did not join.')
             self.log_stop()
             self._serial.close()
 
@@ -154,14 +154,14 @@ class Instrument:
                     try:
                         self.data_received(data)
                         if len(self._buffer) > self._max_buffer_length:
-                            self.__logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
+                            self.logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
                             self._buffer = bytearray()
                     except Exception as e:
-                        self.__logger.warning(e)
+                        self.logger.warning(e)
             except serial.SerialException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
-                self.__logger.error(e)
+                self.logger.error(e)
                 break
         self.close(wait_thread_join=False)
 
@@ -173,20 +173,20 @@ class Instrument:
                 self.handle_packet(packet)
             except IndexError:
                 self.signal.packet_corrupted.emit()
-                self.__logger.warning('Incomplete packet or Incorrect variable column requested.')
-                self.__logger.debug(packet)
+                self.logger.warning('Incomplete packet or Incorrect variable column requested.')
+                self.logger.debug(packet)
                 # if __debug__:
                 #     raise
             except ValueError:
                 self.signal.packet_corrupted.emit()
-                self.__logger.warning('Instrument or parser configuration incorrect.')
-                self.__logger.debug(packet)
+                self.logger.warning('Instrument or parser configuration incorrect.')
+                self.logger.debug(packet)
                 # if __debug__:
                 #     raise
             except Exception as e:
                 self.signal.packet_corrupted.emit()
-                self.__logger.warning(e)
-                self.__logger.debug(packet)
+                self.logger.warning(e)
+                self.logger.debug(packet)
                 # if __debug__:
                 #     raise e
 

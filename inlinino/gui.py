@@ -11,6 +11,7 @@ from inlinino.instruments import Instrument
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
 import numpy as np
+from math import floor
 
 logger = logging.getLogger('GUI')
 APP_ICON = 'resources/inlinino.ico'
@@ -21,63 +22,46 @@ class InstrumentSignals(QtCore.QObject):
     packet_received = QtCore.pyqtSignal()
     packet_corrupted = QtCore.pyqtSignal()
     packet_logged = QtCore.pyqtSignal()
-    new_data = QtCore.pyqtSignal(object, object)
+    new_data = QtCore.pyqtSignal(list, float)
 
 
-class DateAxis(pg.AxisItem):
-    def __init__(self, *args, **kwargs):
+def seconds_to_strmmss(seconds):
+    min = floor(seconds / 60)
+    sec = seconds % 60
+    return '%d:%02d' % (min, sec)
+
+
+class ReverseTimeAxisItem(pg.AxisItem):
+    def __init__(self, buffer_length, sample_rate, *args, **kwargs):
+        self.buffer_length = buffer_length
+        self.sample_rate = sample_rate
         pg.AxisItem.__init__(self, *args, **kwargs)
 
     def tickStrings(self, values, scale, spacing):
-        strns = []
-        if values:
-            rng = max(values) - min(values)
-            # if rng < 120:
-            #    return pg.AxisItem.tickStrings(self, values, scale, spacing)
-            if rng < 3600 * 24:
-                string = '%H:%M:%S'
-                label1 = '%b %d - '
-                label2 = '%d, %Y'
-            elif rng >= 3600 * 24 and rng < 3600 * 24 * 30:
-                string = '%d'
-                label1 = '%b - '
-                label2 = '%b,  %Y'
-            elif rng >= 3600 * 24 * 30 and rng < 3600 * 24 * 30 * 24:
-                string = '%b'
-                label1 = '%Y -'
-                label2 = ' %Y'
-            elif rng >= 3600 * 24 * 30 * 24:
-                string = '%Y'
-                label1 = ''
-                label2 = ''
-            for x in values:
-                try:
-                    strns.append(strftime(string, gmtime(x)))
-                except ValueError:  # Windows can't handle dates before 1970
-                    strns.append('')
-            # try:
-            #     label = strftime(label1, gmtime(min(values))) + \
-            #             strftime(label2, gmtime(max(values)))
-            # except ValueError:
-            #     label = ''
-            # self.setLabel(text=label)
-            return strns
-        else:
-            return []
+        return [seconds_to_strmmss((self.buffer_length - t) / self.sample_rate) for t in values]
+
+
+class ReverseAxisItem(pg.AxisItem):
+    def __init__(self, buffer_length, *args, **kwargs):
+        self.buffer_length = buffer_length
+        pg.AxisItem.__init__(self, *args, **kwargs)
+
+    def tickStrings(self, values, scale, spacing):
+        return [self.buffer_length - t for t in values]
 
 
 class MainWindow(QtGui.QMainWindow):
     BACKGROUND_COLOR = '#F8F8F2'
     FOREGROUND_COLOR = '#26292C'
     BUFFER_LENGTH = 240
-    MAX_PLOT_REFRESH_RATE = 2   # Hz
+    MAX_PLOT_REFRESH_RATE = 4   # Hz
 
     def __init__(self, instrument=None):
         super(MainWindow, self).__init__()
         uic.loadUi(os.path.join('resources', 'main.ui'), self)
         # Graphical Adjustments
         self.dock_widget.setTitleBarWidget(QtGui.QWidget(None))
-        self.label_app_version = 'v' + __version__
+        self.label_app_version.setText('Inlinino v' + __version__)
         # Set Colors
         palette = QtGui.QPalette()
         palette.setColor(palette.Window, QtGui.QColor(self.BACKGROUND_COLOR))  # Background
@@ -89,13 +73,18 @@ class MainWindow(QtGui.QMainWindow):
         self._buffer_timestamp = None
         self._buffer_data = []
         self.last_plot_refresh = time()
-        self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': DateAxis(orientation='bottom')}, enableMenu=False)
+        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()}, enableMenu=False)  # Date Axis available in newer versions of pqtgraph
+        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseTimeAxisItem(self.BUFFER_LENGTH, 1, orientation='bottom')}, enableMenu=False)  # Disable time on bottom axis
+        # self.timeseries_widget.plotItem.setLabel('bottom', 'Time since acquisition', units='mm:ss')
+        self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseAxisItem(self.BUFFER_LENGTH, orientation='bottom')}, enableMenu=False)
+        self.timeseries_widget.plotItem.setLabel('bottom', 'Samples', units='#')
+        self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
         self.timeseries_widget.plotItem.setLabel('left', 'Signal')  # Update units depending on instrument  #, units='Counts'
+        self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
         self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
         self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
         self.timeseries_widget.plotItem.showGrid(x=False, y=True)
         self.timeseries_widget.plotItem.enableAutoRange(x=True, y=True)
-        self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
         self.setCentralWidget(self.timeseries_widget)
         # Set instrument
         if instrument:
@@ -168,6 +157,7 @@ class MainWindow(QtGui.QMainWindow):
             logger.debug('Start logging')
             self.instrument.log_start()
 
+    @QtCore.pyqtSlot()
     def on_status_update(self):
         if self.instrument.alive:
             self.button_serial.setText('Close')
@@ -209,10 +199,12 @@ class MainWindow(QtGui.QMainWindow):
         self.packets_corrupted = 0
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
 
+    @QtCore.pyqtSlot()
     def on_packet_received(self):
         self.packets_received += 1
         self.label_packets_received.setText(str(self.packets_received))
 
+    @QtCore.pyqtSlot()
     def on_packet_logged(self):
         self.packets_logged += 1
         if self.packets_received < self.packets_logged < 2:  # Fix inconsistency when start logging
@@ -220,10 +212,12 @@ class MainWindow(QtGui.QMainWindow):
             self.label_packets_received.setText(str(self.packets_received))
         self.label_packets_logged.setText(str(self.packets_logged))
 
+    @QtCore.pyqtSlot()
     def on_packet_corrupted(self):
         self.packets_corrupted += 1
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
 
+    @QtCore.pyqtSlot(list, float)
     def on_new_data(self, data, timestamp):
         if self._buffer_timestamp is None:
             # Init buffers
@@ -232,20 +226,23 @@ class MainWindow(QtGui.QMainWindow):
             # Init curves
             for i in range(len(data)):
                 self.timeseries_widget.plotItem.addItem(pg.PlotCurveItem(pen=(i, len(data))))
-        else:
-            # Update buffers
-            self._buffer_timestamp.extend(timestamp)
-            for i in range(len(data)):
-                self._buffer_data[i].extend(data[i])
+        # Update buffers
+        self._buffer_timestamp.extend(timestamp)
+        for i in range(len(data)):
+            self._buffer_data[i].extend(data[i])
         # TODO Update real-time figure (depend on instrument type)
         # Update timeseries figure
         if time() - self.last_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
             return
-        timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)
+        # timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)  # Not used anymore
         for i in range(len(data)):
             y = self._buffer_data[i].get(self.BUFFER_LENGTH)
+            x = np.arange(len(y))
             sel = ~np.isnan(y)
-            self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
+            y[~sel] = np.interp(x[~sel], x[sel], y[sel])
+            self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
+            # TODO Put back X-Axis with time without high demand on cpu
+            # self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
         self.timeseries_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
         self.last_plot_refresh = time()
 
@@ -254,6 +251,7 @@ class MainWindow(QtGui.QMainWindow):
                                            "Are you sure to quit?", QtGui.QMessageBox.Yes |
                                            QtGui.QMessageBox.No, QtGui.QMessageBox.No)
         if reply == QtGui.QMessageBox.Yes:
+            QtGui.QApplication.instance().closeAllWindows()  # NEEDED IF OTHER WINDOWS OPEN BY SPECIFIC INSTRUMENTS
             event.accept()
         else:
             event.ignore()
@@ -330,6 +328,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
         self.button_save.setDefault(True)
         self.button_save.clicked.connect(self.act_save)
         self.button_box.addButton(self.button_save, QtGui.QDialogButtonBox.ActionRole)
+        self.button_box.rejected.connect(self.reject)
 
     def act_browse_log_directory(self):
         self.le_log_path.setText(QtGui.QFileDialog.getExistingDirectory(caption='Choose logging directory'))
@@ -514,3 +513,4 @@ class App(QtGui.QApplication):
         # Start Main Window
         self.main_window.show()
         sys.exit(self.exec_())
+
