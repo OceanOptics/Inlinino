@@ -22,7 +22,7 @@ class ACS(Instrument):
 
         # Init Graphic for real time spectrum visualization
         # TODO Refactor code and move it to GUI
-        # Set night mode
+        # Set Color mode
         pg.setConfigOption('background', '#F8F8F2')
         pg.setConfigOption('foreground', '#26292C')
         self._pw = pg.plot(enableMenu=False)

@@ -1,1 +1,111 @@
-{"instruments": [{"manufacturer": "WetLabs", "model": "BB3", "serial_number": "349", "module": "generic", "terminator": {"__bytes__": "ascii", "content": "\r\n"}, "separator": {"__bytes__": "ascii", "content": "\t"}, "variable_names": ["beta470", "beta532", "beta660"], "variable_units": ["counts", "counts", "counts"], "variable_columns": [3, 5, 7], "variable_types": ["int", "int", "int"], "variable_precision": ["%d", "%d", "%d"], "log_raw": false, "log_products": true, "log_path": "data", "variable_displayed": ["beta470", "beta532", "beta660"]}, {"manufacturer": "SeaBird", "model": "TSG", "serial_number": "0XX", "module": "generic", "terminator": {"__bytes__": "ascii", "content": "\r\n"}, "separator": ",", "variable_names": ["T", "C", "S"], "variable_units": ["deg_C", "S/m", "no units"], "variable_columns": [0, 1, 2], "variable_types": ["float", "float", "float"], "variable_precision": ["%.3f", "%.3f", "%.3f"], "log_raw": true, "log_products": true, "log_path": "data"}, {"manufacturer": "WetLabs", "model": "ACS", "serial_number": "301", "module": "acs", "device_file": "cfg/acs301_20180129.dev", "plot_spectrum": true, "log_raw": true, "log_products": true, "log_path": "data"}, {"manufacturer": "Sequoia", "model": "LISST", "serial_number": "1183", "module": "lisst", "ini_file": "cfg/LISST1183_20180119_Lisst.ini", "instrument_file": "cfg/LISST1183_20180119_InstrumentData.txt", "plot_spectrum": true, "log_raw": true, "log_products": true, "log_path": "data"}, {"module": "generic", "variable_names": ["c1", "c2", "c3"], "variable_units": ["c", "c", "c"], "variable_columns": [3, 5, 7], "variable_types": ["int", "int", "int"], "terminator": {"__bytes__": "ascii", "content": "\r\n"}, "separator": {"__bytes__": "ascii", "content": "\t"}, "log_raw": false, "log_products": true, "log_path": "data", "manufacturer": "WetLabs", "model": "VSF", "serial_number": "123"}, {"module": "acs", "device_file": "/Users/nils/Documents/Lab/Inlinino/inlinino_src/inlinino/cfg/acs301_20180129.dev", "log_path": "/Users/nils/Documents/Lab/Inlinino/inlinino_src/inlinino/data", "manufacturer": "WetLabs", "model": "ACS", "serial_number": "301"}, {"module": "lisst", "log_path": "/Users/nils/Documents/Lab/Inlinino/inlinino_src/inlinino/data", "ini_file": "/Users/nils/Documents/Lab/Inlinino/inlinino_src/inlinino/cfg/LISST1183_20180119_Lisst.ini", "device_file": "/Users/nils/Documents/Lab/Inlinino/inlinino_src/inlinino/cfg/LISST1183_20180119_InstrumentData.txt", "manufacturer": "Sequoia", "model": "LISST", "serial_number": "1183"}]}
+{
+  "instruments": [
+    {
+      "manufacturer": "WetLabs",
+      "model": "BB3",
+      "serial_number": "349",
+      "module": "generic",
+      "terminator": {
+        "__bytes__": "ascii",
+        "content": "\r\n"
+      },
+      "separator": {
+        "__bytes__": "ascii",
+        "content": "\t"
+      },
+      "variable_names": [
+        "beta470",
+        "beta532",
+        "beta660"
+      ],
+      "variable_units": [
+        "counts",
+        "counts",
+        "counts"
+      ],
+      "variable_columns": [
+        3,
+        5,
+        7
+      ],
+      "variable_types": [
+        "int",
+        "int",
+        "int"
+      ],
+      "variable_precision": [
+        "%d",
+        "%d",
+        "%d"
+      ],
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "variable_displayed": [
+        "beta470",
+        "beta532",
+        "beta660"
+      ]
+    },
+    {
+      "manufacturer": "SeaBird",
+      "model": "TSG",
+      "serial_number": "0XX",
+      "module": "generic",
+      "terminator": {
+        "__bytes__": "ascii",
+        "content": "\r\n"
+      },
+      "separator": ",",
+      "variable_names": [
+        "T",
+        "C",
+        "S"
+      ],
+      "variable_units": [
+        "deg_C",
+        "S/m",
+        "no units"
+      ],
+      "variable_columns": [
+        0,
+        1,
+        2
+      ],
+      "variable_types": [
+        "float",
+        "float",
+        "float"
+      ],
+      "variable_precision": [
+        "%.3f",
+        "%.3f",
+        "%.3f"
+      ],
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    },
+    {
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "301",
+      "module": "acs",
+      "device_file": "cfg/acs301_20180129.dev",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    },
+    {
+      "manufacturer": "Sequoia",
+      "model": "LISST",
+      "serial_number": "1183",
+      "module": "lisst",
+      "ini_file": "cfg/LISST1183_20180119_Lisst.ini",
+      "device_file": "cfg/LISST1183_20180119_InstrumentData.txt",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    }
+  ]
+}

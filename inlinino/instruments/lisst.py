@@ -7,79 +7,75 @@ from time import sleep
 
 class LISST(Instrument):
 
-    def __init__(self, name, cfg=None, ui=None, *args, **kwargs):
-        # ACS Parser
-        if 'ini_file' not in cfg.keys():
-            if __debug__:
-                print(name + ': Missing ini file (Lisst.ini)')
-            exit()
-        if 'instrument_file' not in cfg.keys():
-            if __debug__:
-                print(name + ': Missing instrument file (InstrumentData.txt)')
-            exit()
-        self._parser = LISSTParser(cfg['instrument_file'], cfg['ini_file'])
+    REQUIRED_CFG_FIELDS = ['ini_file', 'device_file',
+                           'model', 'serial_number', 'module',
+                           'log_path', 'log_raw', 'log_products',
+                           'variable_names', 'variable_units', 'variable_precision']
 
-        # Set/Check Configuration
-        if 'plot_spectrum' not in cfg.keys():
-            cfg['plot_spectrum'] = True
-        if 'plot_semilog_x' not in cfg.keys():
-            cfg['plot_semilog_x'] = True
+    def __init__(self, cfg_id, signal, *args, **kwargs):
+        self._parser = None
+
+        # Init Graphic for real time spectrum visualization
+        # TODO Refactor code and move it to GUI
+        # Set Color mode
+        pg.setConfigOption('background', '#F8F8F2')
+        pg.setConfigOption('foreground', '#26292C')
+        self._pw = pg.plot(enableMenu=False)
+        self._plot = self._pw.plotItem
+        self._plot.setLogMode(x=True)
+        # Init Curve Items
+        self._plot_curve = pg.PlotCurveItem(pen=(0, 1))
+        # Add item to plot
+        self._plot.addItem(self._plot_curve)
+        # Decoration
+        self._plot.setLabel('bottom', 'Angles', units='degrees')
+        self._plot.setLabel('left', 'Signal', units='counts')
+        self._plot.setMouseEnabled(x=False, y=True)
+        self._plot.showGrid(x=True, y=True)
+        self._plot.enableAutoRange(x=True, y=True)
+        self._plot.getAxis('left').enableAutoSIPrefix(False)
+        self._plot.getAxis('bottom').enableAutoSIPrefix(False)
+        super().__init__(cfg_id, signal, *args, **kwargs)
+
+    def setup(self, cfg):
+        # Set LISST specific attributes
+        if 'ini_file' not in cfg.keys():
+            raise ValueError('Missing ini file (Lisst.ini)')
+        if 'device_file' not in cfg.keys():
+            raise ValueError('Missing instrument file (InstrumentData.txt)')
+        self._parser = LISSTParser(cfg['device_file'], cfg['ini_file'])
+        # Overload cfg with LISST specific parameters
         cfg['variable_names'] = ['beta']
         cfg['variable_names'].extend(self._parser.aux_names)
         cfg['variable_units'] = ['counts\tangle=' + ' '.join('%.2f' % x for x in self._parser.angles)]
         cfg['variable_units'].extend(self._parser.aux_units)
-        cfg['variable_displayed'] = ['laser_power', 'laser_reference', 'depth', 'temperature']
         cfg['variable_precision'] = ['%s', '%.6f', '%.2f', '%.2f', '%.6f', '%.2f', '%.2f', "%.6f"]
-
-        super().__init__(name, cfg, ui, *args, **kwargs)
-
-        # Serial Specific to LISST
-        self._serial.baudrate = 9600
-        self._serial.bytesize = 8
-        self._serial.parity = 'N'  # None
-        self._serial.stopbits = 1
-        self._serial.timeout = 10  # Instrument average many points before sampling
-        self._terminator = b'L100x:>'
-
-        # Logger specific to LISST
+        cfg['terminator'] = b'L100x:>'
+        # Set standard configuration and check cfg input
+        super().setup(cfg)
+        # Update logger configuration
         self._log_raw.registration = self._terminator.decode(self._parser.ENCODING, self._parser.UNICODE_HANDLING)
-        self._log_raw.terminator = ''      # Remove terminator
+        self._log_raw.terminator = ''  # Remove terminator
         self._log_raw.variable_names = []  # Disable header in raw file
+        # Update plot with config
+        self._plot.setXRange(np.min(self._parser.angles), np.max(self._parser.angles))
+        self._plot.setLimits(minXRange=np.min(self._parser.angles), maxXRange=np.max(self._parser.angles))
 
-        # Init Graphic for real time spectrum visualization
-        self.plot_spectrum = cfg['plot_spectrum']
-        self.plot_semilog_x = cfg['plot_semilog_x']
-        if self.plot_spectrum:
-            # Set night mode
-            # TODO get values from theme
-            pg.setConfigOption('background', '#26292C')
-            pg.setConfigOption('foreground', '#F8F8F2')
-            self._pw = pg.plot(enableMenu=False)
-            self._plot = self._pw.plotItem
-            if self.plot_semilog_x:
-                self._plot.setLogMode(x=True)
-            # Init Curve Items
-            self._plot_curve = pg.PlotCurveItem(pen=(0, 1))
-            # Add item to plot
-            self._plot.addItem(self._plot_curve)
-            # Decoration
-            self._plot.setLabel('bottom', 'Angles' , units='degrees')
-            self._plot.setLabel('left', 'Signal', units='counts')
-            # self._plot.setYRange(0, 5)
-            self._plot.setXRange(np.min(self._parser.angles), np.max(self._parser.angles))
-            self._plot.setLimits(minXRange=np.min(self._parser.angles), maxXRange=np.max(self._parser.angles))
-            self._plot.setMouseEnabled(x=False, y=False)
-            self._plot.showGrid(x=True, y=True)
-            self._plot.enableAutoRange(x=True, y=True)
-            self._plot.getAxis('left').enableAutoSIPrefix(False)
-
+    def open(self, port=None, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=10):
+        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
         raw_beta, raw_aux = self._parser.unpack_packet(packet)
         aux = self._parser.calibrate_auxiliaries(raw_aux)
-        if self.plot_spectrum:
-            self._plot_curve.setData(self._parser.angles, raw_beta)
         return [raw_beta] + aux.tolist()
+
+    def handle_data(self, data, timestamp):
+        self.signal.new_data.emit([data[0][15], data[1], data[4], data[6]], timestamp)
+        self._plot_curve.setData(self._parser.angles, data[0])
+        if self.log_prod_enabled and self._log_active:
+            self._log_prod.write(data, timestamp)
+            if not self.log_raw_enabled:
+                self.signal.packet_logged.emit()
 
     def init_serial(self):
         # TODO Check if OM, BI, SB, SI commands are necessary
@@ -117,7 +113,7 @@ class LISSTParser:
             self.vcc = int(foo[3])  # Volume Conversion Constant
 
         if self.type not in ['b', 'c']:
-            raise ValueError('Invalid LISST Type ' + str(self.type))
+            raise ValueError('Unknown LISST Type ' + str(self.type))
 
         # Get angles
         rho = 200 ** (1 / 32)
@@ -126,10 +122,8 @@ class LISSTParser:
         elif self.type == 'c':
             dynamic_range_start = 0.05
         refractive_index_water = 1.33
-        foo = np.logspace(0, np.log10(200), 33) * dynamic_range_start / refractive_index_water
-        self.angles_lower_lim = foo[:32]
-        self.angles_upper_lim = foo[1:33]
-        self.angles = np.sqrt(self.angles_lower_lim * self.angles_upper_lim)
+        self.bin_edges = np.logspace(0, np.log10(200), 33) * dynamic_range_start / refractive_index_water
+        self.angles = np.sqrt(self.bin_edges[:32] * self.bin_edges[1:33])
 
         # Auxiliary calibration parameters
         ini = configparser.ConfigParser()
