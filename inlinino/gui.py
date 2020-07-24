@@ -6,15 +6,16 @@ import importlib
 from time import time, gmtime, strftime
 from serial.tools.list_ports import comports as list_serial_comports
 from serial import SerialException
-from inlinino import RingBuffer, CFG, __version__
+from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
 from inlinino.instruments import Instrument
+from inlinino.instruments.acs import ACS
+from inlinino.instruments.lisst import LISST
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
 import numpy as np
 from math import floor
 
 logger = logging.getLogger('GUI')
-APP_ICON = 'resources/inlinino.ico'
 
 
 class InstrumentSignals(QtCore.QObject):
@@ -58,7 +59,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def __init__(self, instrument=None):
         super(MainWindow, self).__init__()
-        uic.loadUi(os.path.join('resources', 'main.ui'), self)
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'main.ui'), self)
         # Graphical Adjustments
         self.dock_widget.setTitleBarWidget(QtGui.QWidget(None))
         self.label_app_version.setText('Inlinino v' + __version__)
@@ -131,7 +132,6 @@ class MainWindow(QtGui.QMainWindow):
             logger.debug('Disconnect instrument')
             self.instrument.close()
         else:
-            logger.debug('Connect instrument')
             # TODO Update Connect Modal
             ports_list = list_serial_comports()
             ports_list_name = [str(p.device) + ' - ' + str(p.product) for p in ports_list]
@@ -263,10 +263,9 @@ class DialogStartUp(QtGui.QDialog):
 
     def __init__(self):
         super(DialogStartUp, self).__init__()
-        uic.loadUi(os.path.join('resources', 'startup.ui'), self)
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'startup.ui'), self)
         instruments_to_load = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"] for i in CFG.instruments]
-        self.instruments_to_setup = [i[:-3] for i in os.listdir('instruments/') if i[-3:] == '.py']
-        self.instruments_to_setup[self.instruments_to_setup.index('__init__')] = 'generic'
+        self.instruments_to_setup = [i[6:-3] for i in os.listdir(PATH_TO_RESOURCES) if i[-3:] == '.ui' and i[:6] == 'setup_']
         self.combo_box_instrument_to_load.addItems(instruments_to_load)
         self.combo_box_instrument_to_setup.addItems(self.instruments_to_setup)
         self.button_load.clicked.connect(self.act_load_instrument)
@@ -293,13 +292,13 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.create = True
             self.cfg_index = -1
             self.cfg = {'module': template}
-            uic.loadUi(os.path.join('resources', 'setup_' + template + '.ui'), self)
+            uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + template + '.ui'), self)
         elif isinstance(template, int):
             # Load from preconfigured instrument
             self.create = False
             self.cfg_index = template
             self.cfg = CFG.instruments[template]
-            uic.loadUi(os.path.join('resources', 'setup_' + self.cfg['module'] + '.ui'), self)
+            uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + self.cfg['module'] + '.ui'), self)
             # Populate fields
             for k, v in self.cfg.items():
                 if hasattr(self, 'le_' + k):
@@ -437,7 +436,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg['model'] = 'UnknownMeterType'
                 self.cfg['serial_number'] = str(int(foo[-6:], 16))
             except:
-                logger.warning('Unable to parse acs device file.')
+                self.notification('Unable to parse acs device file.')
                 return
         elif self.cfg['module'] == 'lisst':
             self.cfg['manufacturer'] = 'Sequoia'
@@ -445,14 +444,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
             try:
                 self.cfg['serial_number'] = str(LISSTParser(self.cfg['device_file'], self.cfg['ini_file']).serial_number)
             except:
-                logger.warning('Unable to parse lisst device and/or ini file.')
+                self.notification('Unable to parse lisst device and/or ini file.')
                 return
         # Update global instrument cfg
         if self.create:
             CFG.instruments.append(self.cfg)
             self.cfg_index = -1
         else:
-            CFG.instruments[self.cfg_index] = self.cfg
+            CFG.instruments[self.cfg_index] = self.cfg.copy()
         CFG.write()
         self.accept()
 
@@ -472,7 +471,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
 class App(QtGui.QApplication):
     def __init__(self, *args):
         QtGui.QApplication.__init__(self, *args)
-        self.splash_screen = QtGui.QSplashScreen(QtGui.QPixmap(APP_ICON))
+        self.splash_screen = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
         self.splash_screen.show()
         self.main_window = MainWindow()
         self.startup_dialog = DialogStartUp()
@@ -505,10 +504,13 @@ class App(QtGui.QApplication):
         logger.debug('Loading instrument ' + instrument_name)
         if instrument_module_name == 'generic':
             self.main_window.init_instrument(Instrument(instrument_index, InstrumentSignals()))
+        elif instrument_module_name == 'acs':
+            self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
+        elif instrument_module_name == 'lisst':
+            self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
         else:
-            module = importlib.import_module('inlinino.instruments.' + instrument_module_name)
-            self.main_window.init_instrument(
-                getattr(module, instrument_module_name.upper())(instrument_index, InstrumentSignals()))
+            logger.critical('Instrument module not supported')
+            raise ValueError('Instrument module not supported')
 
         # Start Main Window
         self.main_window.show()

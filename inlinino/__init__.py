@@ -5,14 +5,52 @@
 # @Last Modified time: 2016-07-05 16:28:37
 import numpy as np
 import logging
+from logging.handlers import RotatingFileHandler
+from time import strftime, gmtime
 import json
 import sys
+import os
+import traceback
 
-__version__ = '2.2'
 
+__version__ = '2.3'
 
+# Setup Logger
 logging.basicConfig(level=logging.DEBUG)
-# TODO Add logging to a file
+logging.getLogger('PyQt5').setLevel(logging.WARNING)
+root_logger = logging.getLogger()   # Get root logger
+
+
+# Catch errors in log
+def except_hook(exc_type, exc_value, exc_tb):
+    tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    root_logger.error(tb)
+
+
+sys.excepthook = except_hook
+
+
+# Setup Path
+if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+    root_logger.debug('Running in bundled mode')
+    package_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
+    os.chdir(package_dir)
+else:
+    root_logger.debug('Running from source')
+    package_dir = os.path.dirname(__file__)
+PATH_TO_RESOURCES = os.path.join(package_dir, 'resources')
+PATH_TO_CFG_FILE = os.path.join(package_dir, 'inlinino_cfg.json')
+
+# Logging in file
+path_to_log = os.path.join(package_dir, 'logs')
+if not os.path.isdir(path_to_log):
+    root_logger.debug('Create log directory: %s' % path_to_log)
+    os.mkdir(path_to_log)
+log_filename = os.path.join(path_to_log, 'inlinino_' + strftime('%Y%m%d_%H%M%S', gmtime()) + '.log')
+ch_file = RotatingFileHandler(log_filename, maxBytes=1048576 * 5, backupCount=9)
+formater_file = logging.Formatter("%(asctime)s %(levelname)-8.8s [%(name)s]  %(message)s")
+ch_file.setFormatter(formater_file)
+root_logger.addHandler(ch_file)
 
 
 class BytesEncoder(json.JSONEncoder):
@@ -32,13 +70,12 @@ def as_bytes(dct):
 
 
 class Cfg:
-    FILENAME = 'inlinino_cfg.json'
     KEYS_NOT_SAVED = ['log_prefix']
 
     def __init__(self):
-        self.__logger = logging.getLogger('cfg')
-        with open(self.FILENAME) as file:
-            logging
+        self.__logger = logging.getLogger('CFG')
+        with open(PATH_TO_CFG_FILE) as file:
+            self.__logger.debug('Reading configuration.')
             cfg = json.load(file, object_hook=as_bytes)
         if 'instruments' not in cfg.keys():
             self.__logger.critical('Unable to load instruments from configuration file.')
@@ -55,7 +92,7 @@ class Cfg:
                 if k in foo.keys():
                     del foo[k]
             cfg['instruments'].append(foo)
-        with open(self.FILENAME, 'w') as file:
+        with open(PATH_TO_CFG_FILE, 'w') as file:
             json.dump(cfg, file, cls=BytesEncoder)
 
 
