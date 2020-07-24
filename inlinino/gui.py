@@ -334,7 +334,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_browse_device_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose device file', filter='Device File (*.dev, *.txt)')
+            caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
 
     def act_browse_ini_file(self):
@@ -438,6 +438,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             except:
                 self.notification('Unable to parse acs device file.')
                 return
+            if 'log_raw' not in self.cfg.keys():
+                self.cfg['log_raw'] = True
+            if 'log_products' not in self.cfg.keys():
+                self.cfg['log_products'] = True
         elif self.cfg['module'] == 'lisst':
             self.cfg['manufacturer'] = 'Sequoia'
             self.cfg['model'] = 'LISST'
@@ -446,6 +450,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             except:
                 self.notification('Unable to parse lisst device and/or ini file.')
                 return
+            if 'log_raw' not in self.cfg.keys():
+                self.cfg['log_raw'] = True
+            if 'log_products' not in self.cfg.keys():
+                self.cfg['log_products'] = True
         # Update global instrument cfg
         if self.create:
             CFG.instruments.append(self.cfg)
