@@ -7,10 +7,12 @@ if platform.system() == 'Windows':
     # Windows
     OS_OPERATOR = ';'
     ICON_EXT = 'ico'
+    DIST_PATH = 'dist_windows'
 elif platform.system() == 'Darwin':
     # macOS
     OS_OPERATOR = ':'
     ICON_EXT = 'icns'
+    DIST_PATH = 'dist_darwin'
     # TODO add version number in plist of spec file (CFBundleVersion)
     # https://pyinstaller.readthedocs.io/en/stable/spec-files.html?highlight=info_plist
     # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html#//apple_ref/doc/uid/20001431-102364
@@ -18,6 +20,7 @@ else:
     # Linux
     OS_OPERATOR = ':'
     ICON_EXT = 'ico'
+    DIST_PATH = 'dist_linux'
 
 PyInstaller.__main__.run([
     '--name=Inlinino-v%s' % __version__,
@@ -28,6 +31,7 @@ PyInstaller.__main__.run([
     '--add-data=%s%scfg' % (os.path.join('inlinino', 'cfg', '*'), OS_OPERATOR),
     '--icon=%s' % os.path.join('inlinino', 'resources', 'inlinino.%s' % ICON_EXT),
     '--osx-bundle-identifier=com.umaine.sms.inlinino',
+    '--distpath=%s' % DIST_PATH,
     '--clean',
     '--noconfirm',
     '--windowed',

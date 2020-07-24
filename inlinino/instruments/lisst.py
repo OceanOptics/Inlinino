@@ -73,6 +73,8 @@ class LISST(Instrument):
         self.signal.new_data.emit([data[0][15], data[1], data[4], data[6]], timestamp)
         self._plot_curve.setData(self._parser.angles, data[0])
         if self.log_prod_enabled and self._log_active:
+            # np arrays must be pre-formated to be written
+            data[0] = np.array2string(data[0], max_line_width=np.inf)
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()

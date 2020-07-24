@@ -4,7 +4,7 @@ from pyACS.acs import ACS as ACSParser
 from pyACS.acs import FrameIncompleteError, NumberWavelengthIncorrectError
 import pyqtgraph as pg
 from time import time
-
+import numpy as np
 
 class ACS(Instrument):
 
@@ -98,6 +98,9 @@ class ACS(Instrument):
             self.logger.warning('Internal temperature outside calibration range.')
         # Log parsed data
         if self.log_prod_enabled and self._log_active:
+            # np arrays must be pre-formated to be written
+            data[1] = np.array2string(data[1], max_line_width=np.inf)
+            data[2] = np.array2string(data[2], max_line_width=np.inf)
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
