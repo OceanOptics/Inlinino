@@ -106,6 +106,18 @@
       "log_raw": true,
       "log_products": true,
       "log_path": "data"
+    },
+    {
+      "module": "dataq",
+      "manufacturer": "WetLabs",
+      "model": "WSCD",
+      "serial_number": "859",
+      "log_path": "data",
+      "log_raw": false,
+      "log_products": true,
+      "channels_enabled": [
+        2
+      ]
     }
   ]
 }

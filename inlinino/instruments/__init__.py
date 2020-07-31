@@ -93,7 +93,9 @@ class Instrument:
         # Simple parser
         if 'separator' in cfg.keys():
             self.separator = cfg['separator']
+        if 'variable_columns' in cfg.keys():
             self.variable_columns = cfg['variable_columns']
+        if 'variable_types' in cfg.keys():
             self.variable_types = cfg['variable_types']
         # User Interface
         # self.manufacturer = cfg['manufacturer']

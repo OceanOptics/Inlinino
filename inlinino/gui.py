@@ -2,7 +2,6 @@ from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
 import pyqtgraph as pg
 import sys, os
 import logging
-import importlib
 from time import time, gmtime, strftime
 from serial.tools.list_ports import comports as list_serial_comports
 from serial import SerialException
@@ -10,6 +9,7 @@ from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
 from inlinino.instruments import Instrument
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.lisst import LISST
+from inlinino.instruments.dataq import DATAQ
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
 import numpy as np
@@ -228,8 +228,16 @@ class MainWindow(QtGui.QMainWindow):
                 self.timeseries_widget.plotItem.addItem(pg.PlotCurveItem(pen=(i, len(data))))
         # Update buffers
         self._buffer_timestamp.extend(timestamp)
-        for i in range(len(data)):
-            self._buffer_data[i].extend(data[i])
+        try:
+            for i in range(len(data)):
+                self._buffer_data[i].extend(data[i])
+        except IndexError:
+            # Special case were size of data changed
+            self._buffer_timestamp = None
+            # TODO Fix bug were previous curve do not disappear
+            for i in range(len(self.timeseries_widget.plotItem.items)):
+                self.timeseries_widget.plotItem.items[i].clear()
+            self.on_new_data(data, timestamp)
         # TODO Update real-time figure (depend on instrument type)
         # Update timeseries figure
         if time() - self.last_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
@@ -313,6 +321,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         getattr(self, 'combobox_' + k).setCurrentIndex(0)
                     else:
                         getattr(self, 'combobox_' + k).setCurrentIndex(1)
+            # Populate special fields specific to each module
+            if self.cfg['module'] == 'dataq':
+                for c in self.cfg['channels_enabled']:
+                    getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
         else:
             raise ValueError('Invalid instance type for template.')
         if 'button_browse_log_directory' in self.__dict__.keys():
@@ -454,6 +466,18 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = True
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'dataq':
+            self.cfg['channels_enabled'] = []
+            for c in range(4):
+                if getattr(self, 'checkbox_channel%d_enabled' % (c+1)).isChecked():
+                    self.cfg['channels_enabled'].append(c)
+            if not self.cfg['channels_enabled']:
+                self.notification('At least one channel must be enabled.', 'Nothing to log if no channels are enabled.')
+                return
+            if 'log_raw' not in self.cfg.keys():
+                self.cfg['log_raw'] = False
+            if 'log_products' not in self.cfg.keys():
+                self.cfg['log_products'] = True
         # Update global instrument cfg
         if self.create:
             CFG.instruments.append(self.cfg)
@@ -514,6 +538,8 @@ class App(QtGui.QApplication):
             self.main_window.init_instrument(Instrument(instrument_index, InstrumentSignals()))
         elif instrument_module_name == 'acs':
             self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
+        elif instrument_module_name == 'dataq':
+            self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
         elif instrument_module_name == 'lisst':
             self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
         else:
