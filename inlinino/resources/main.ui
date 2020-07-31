@@ -71,7 +71,7 @@
        <property name="title">
         <string>Controls</string>
        </property>
-       <layout class="QFormLayout" name="formLayout_5">
+       <layout class="QFormLayout" name="group_box_controls_layout">
         <property name="labelAlignment">
          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
         </property>
@@ -146,7 +146,7 @@
        <property name="title">
         <string>Logger</string>
        </property>
-       <layout class="QFormLayout" name="formLayout">
+       <layout class="QFormLayout" name="group_box_logger_layout">
         <property name="labelAlignment">
          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
         </property>
@@ -218,7 +218,7 @@
        <property name="title">
         <string>Packets</string>
        </property>
-       <layout class="QFormLayout" name="formLayout_2">
+       <layout class="QFormLayout" name="group_box_packets_layout">
         <property name="labelAlignment">
          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
         </property>
@@ -270,6 +270,27 @@
           </property>
          </widget>
         </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="group_box_aux_data">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="title">
+        <string>Auxiliary Data</string>
+       </property>
+       <layout class="QFormLayout" name="group_box_aux_data_layout">
+        <property name="labelAlignment">
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+        </property>
+        <property name="formAlignment">
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+        </property>
+        <property name="verticalSpacing">
+         <number>8</number>
+        </property>
        </layout>
       </widget>
      </item>

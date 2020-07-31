@@ -6,6 +6,7 @@ import pyqtgraph as pg
 from time import time
 import numpy as np
 
+
 class ACS(Instrument):
 
     REGISTRATION_BYTES = b'\xff\x00\xff\x00'
@@ -44,6 +45,10 @@ class ACS(Instrument):
         self._plot.getAxis('left').enableAutoSIPrefix(False)
 
         super().__init__(cfg_id, signal, *args, **kwargs)
+
+        # Auxiliary Data Plugin
+        self.plugin_aux_data = True
+        self.plugin_aux_data_variable_names = ['Internal Temp. (ºC)', 'External Temp. (ºC)', 'Outside Cal Range']
 
     def setup(self, cfg):
         # Set ACS specific attributes
@@ -90,6 +95,7 @@ class ACS(Instrument):
     def handle_data(self, data, timestamp):
         # Update plots
         self.signal.new_data.emit([data[1][30], data[2][30]], timestamp)
+        self.signal.new_aux_data.emit(self.format_aux_data(data[3:6]))
         self._plot_curve_c.setData(self._parser.lambda_c, data[1])
         self._plot_curve_a.setData(self._parser.lambda_a, data[2])
         # Flag outside temperature calibration range
@@ -104,3 +110,7 @@ class ACS(Instrument):
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
+
+    @staticmethod
+    def format_aux_data(data):
+        return ['%.2f' % data[0], '%.2f' % data[1], '%s' % data[2]]

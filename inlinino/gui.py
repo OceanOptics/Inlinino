@@ -24,6 +24,7 @@ class InstrumentSignals(QtCore.QObject):
     packet_corrupted = QtCore.pyqtSignal()
     packet_logged = QtCore.pyqtSignal()
     new_data = QtCore.pyqtSignal(list, float)
+    new_aux_data = QtCore.pyqtSignal(list)
 
 
 def seconds_to_strmmss(seconds):
@@ -103,6 +104,9 @@ class MainWindow(QtGui.QMainWindow):
         self.signal_clock = QtCore.QTimer()
         self.signal_clock.timeout.connect(self.set_clock)
         self.signal_clock.start(1000)
+        # Plugins variables
+        self.plugin_aux_data_variable_names = []
+        self.plugin_aux_data_variable_values = []
 
     def init_instrument(self, instrument):
         self.instrument = instrument
@@ -113,6 +117,19 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.packet_logged.connect(self.on_packet_logged)
         self.instrument.signal.new_data.connect(self.on_new_data)
         self.on_status_update()  # Need to be run as on instrument setup the signals were not connected
+
+        # Set Plugins specific to instrument
+        # Auxiliary Data Plugin
+        self.group_box_aux_data.setVisible(self.instrument.plugin_aux_data)
+        if self.instrument.plugin_aux_data:
+            # Set aux variable names
+            for v in self.instrument.plugin_aux_data_variable_names:
+                self.plugin_aux_data_variable_names.append(QtGui.QLabel(v))
+                self.plugin_aux_data_variable_values.append(QtGui.QLabel('?'))
+                self.group_box_aux_data_layout.addRow(self.plugin_aux_data_variable_names[-1],
+                                                      self.plugin_aux_data_variable_values[-1])
+            # Connect signal
+            self.instrument.signal.new_aux_data.connect(self.on_new_aux_data)
 
     def set_clock(self):
         zulu = gmtime(time())
@@ -253,6 +270,12 @@ class MainWindow(QtGui.QMainWindow):
             # self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
         self.timeseries_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
         self.last_plot_refresh = time()
+
+    @QtCore.pyqtSlot(list)
+    def on_new_aux_data(self, data):
+        if self.instrument.plugin_aux_data:
+            for i, v in enumerate(data):
+                self.plugin_aux_data_variable_values[i].setText(str(v))
 
     def closeEvent(self, event):
         reply = QtGui.QMessageBox.question(self, 'Closing application',

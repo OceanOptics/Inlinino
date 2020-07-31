@@ -37,6 +37,10 @@ class LISST(Instrument):
         self._plot.getAxis('bottom').enableAutoSIPrefix(False)
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Auxiliary Data Plugin
+        self.plugin_aux_data = True
+        self.plugin_aux_data_variable_names = ['Laser Power', 'Laser Reference', 'Temperature']
+
     def setup(self, cfg):
         # Set LISST specific attributes
         if 'ini_file' not in cfg.keys():
@@ -70,7 +74,8 @@ class LISST(Instrument):
         return [raw_beta] + aux.tolist()
 
     def handle_data(self, data, timestamp):
-        self.signal.new_data.emit([data[0][15], data[1], data[4], data[6]], timestamp)
+        self.signal.new_data.emit(data[0][15], timestamp)
+        self.signal.new_aux_data.emit(self.format_aux_data([data[1], data[4], data[6]]))
         self._plot_curve.setData(self._parser.angles, data[0])
         if self.log_prod_enabled and self._log_active:
             # np arrays must be pre-formated to be written
@@ -94,6 +99,10 @@ class LISST(Instrument):
 
     def write_to_serial(self):
         self._serial.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
+
+    @staticmethod
+    def format_aux_data(data):
+        return ['%.2f' % v for v in data]
 
 
 class LISSTParser:

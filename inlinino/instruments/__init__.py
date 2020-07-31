@@ -46,6 +46,7 @@ class Instrument:
         self.variable_names = None
         self.variable_units = None
         self.variable_displayed = None
+        self.plugin_aux_data = False
 
         # Load cfg
         self.cfg_id = cfg_id
