@@ -5,6 +5,7 @@ from pyACS.acs import FrameIncompleteError, NumberWavelengthIncorrectError
 import pyqtgraph as pg
 from time import time
 import numpy as np
+from threading import Lock
 
 
 class ACS(Instrument):
@@ -50,6 +51,21 @@ class ACS(Instrument):
         self.plugin_aux_data = True
         self.plugin_aux_data_variable_names = ['Internal Temp. (ºC)', 'External Temp. (ºC)', 'Outside Cal Range']
 
+        # Select Channels to Plot Plugin
+        self.plugin_active_timeseries_variables = True
+        self.plugin_active_timeseries_variables_names = ['c(%s)' % x for x in self._parser.lambda_c] + \
+                                                        ['a(%s)' % x for x in self._parser.lambda_a]
+        self.plugin_active_timeseries_variables_selected = []
+        self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_c_wavelengths = np.zeros(len(self._parser.lambda_c), dtype=bool)
+        self.active_timeseries_a_wavelengths = np.zeros(len(self._parser.lambda_a), dtype=bool)
+        for wl in [532]:
+            channel_name = 'c(%s)' % self._parser.lambda_c[np.argmin(np.abs(self._parser.lambda_c - wl))]
+            self.udpate_active_timeseries_variables(channel_name, True)
+        for wl in [532, 676]:
+            channel_name = 'a(%s)' % self._parser.lambda_a[np.argmin(np.abs(self._parser.lambda_a - wl))]
+            self.udpate_active_timeseries_variables(channel_name, True)
+
     def setup(self, cfg):
         # Set ACS specific attributes
         if 'device_file' not in cfg.keys():
@@ -94,7 +110,15 @@ class ACS(Instrument):
 
     def handle_data(self, data, timestamp):
         # Update plots
-        self.signal.new_data.emit([data[1][30], data[2][30]], timestamp)
+        if self.active_timeseries_variables_lock.acquire(timeout=0.125):
+            try:
+                self.signal.new_data.emit(np.concatenate((data[1][self.active_timeseries_c_wavelengths],
+                                                          data[2][self.active_timeseries_a_wavelengths])),
+                                          timestamp)
+            finally:
+                self.active_timeseries_variables_lock.release()
+        else:
+            self.logger.error('Unable to acquire lock to update timeseries plot')
         self.signal.new_aux_data.emit(self.format_aux_data(data[3:6]))
         self._plot_curve_c.setData(self._parser.lambda_c, data[1])
         self._plot_curve_a.setData(self._parser.lambda_a, data[2])
@@ -114,3 +138,25 @@ class ACS(Instrument):
     @staticmethod
     def format_aux_data(data):
         return ['%.2f' % data[0], '%.2f' % data[1], '%s' % data[2]]
+
+    def udpate_active_timeseries_variables(self, name, state):
+        if not ((state and name not in self.plugin_active_timeseries_variables_selected) or
+                (not state and name in self.plugin_active_timeseries_variables_selected)):
+            return
+        if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+            try:
+                if name[0] == 'c':
+                    index = self.plugin_active_timeseries_variables_names.index(name)
+                    self.active_timeseries_c_wavelengths[index] = state
+                elif name[0] == 'a':
+                    offset = len(self._parser.lambda_c)
+                    index = self.plugin_active_timeseries_variables_names.index(name, offset) - offset
+                    self.active_timeseries_a_wavelengths[index] = state
+            finally:
+                self.active_timeseries_variables_lock.release()
+        else:
+            self.logger.error('Unable to acquire lock to update active timeseries variables')
+        # Update list of active variables for GUI keeping the order
+        self.plugin_active_timeseries_variables_selected = \
+            ['c(%s)' % wl for wl in self._parser.lambda_c[self.active_timeseries_c_wavelengths]] + \
+            ['a(%s)' % wl for wl in self._parser.lambda_a[self.active_timeseries_a_wavelengths]]

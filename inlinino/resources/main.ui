@@ -295,6 +295,33 @@
       </widget>
      </item>
      <item>
+      <widget class="QGroupBox" name="group_box_active_timeseries_variables">
+       <property name="title">
+        <string>Select Channel(s)</string>
+       </property>
+       <layout class="QVBoxLayout" name="group_box_active_timeseries_variables_layout">
+        <item>
+         <widget class="QScrollArea" name="group_box_active_timeseries_variables_scroll_area">
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="group_box_active_timeseries_variables_scroll_area_content">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>189</width>
+             <height>77</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="group_box_active_timeseries_variables_scroll_area_content_layout"/>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>

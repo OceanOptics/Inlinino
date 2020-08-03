@@ -23,7 +23,7 @@ class InstrumentSignals(QtCore.QObject):
     packet_received = QtCore.pyqtSignal()
     packet_corrupted = QtCore.pyqtSignal()
     packet_logged = QtCore.pyqtSignal()
-    new_data = QtCore.pyqtSignal(list, float)
+    new_data = QtCore.pyqtSignal(object, float)
     new_aux_data = QtCore.pyqtSignal(list)
 
 
@@ -75,19 +75,8 @@ class MainWindow(QtGui.QMainWindow):
         self._buffer_timestamp = None
         self._buffer_data = []
         self.last_plot_refresh = time()
-        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()}, enableMenu=False)  # Date Axis available in newer versions of pqtgraph
-        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseTimeAxisItem(self.BUFFER_LENGTH, 1, orientation='bottom')}, enableMenu=False)  # Disable time on bottom axis
-        # self.timeseries_widget.plotItem.setLabel('bottom', 'Time since acquisition', units='mm:ss')
-        self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseAxisItem(self.BUFFER_LENGTH, orientation='bottom')}, enableMenu=False)
-        self.timeseries_widget.plotItem.setLabel('bottom', 'Samples', units='#')
-        self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
-        self.timeseries_widget.plotItem.setLabel('left', 'Signal')  # Update units depending on instrument  #, units='Counts'
-        self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
-        self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
-        self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
-        self.timeseries_widget.plotItem.showGrid(x=False, y=True)
-        self.timeseries_widget.plotItem.enableAutoRange(x=True, y=True)
-        self.setCentralWidget(self.timeseries_widget)
+        self.timeseries_widget = None
+        self.init_timeseries_plot()
         # Set instrument
         if instrument:
             self.init_instrument(instrument)
@@ -130,6 +119,35 @@ class MainWindow(QtGui.QMainWindow):
                                                       self.plugin_aux_data_variable_values[-1])
             # Connect signal
             self.instrument.signal.new_aux_data.connect(self.on_new_aux_data)
+
+        # Select Channels To Plot Plugin
+        self.group_box_active_timeseries_variables.setVisible(self.instrument.plugin_active_timeseries_variables)
+        if self.instrument.plugin_active_timeseries_variables:
+            # Set sel channels check_box
+            for v in self.instrument.plugin_active_timeseries_variables_names:
+                check_box = QtWidgets.QCheckBox(v)
+                check_box.stateChanged.connect(self.on_active_timeseries_variables_update)
+                if v in self.instrument.plugin_active_timeseries_variables_selected:
+                    check_box.setChecked(True)
+                self.group_box_active_timeseries_variables_scroll_area_content_layout.addWidget(check_box)
+
+    def init_timeseries_plot(self):
+        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()}, enableMenu=False)  # Date Axis available in newer versions of pqtgraph
+        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseTimeAxisItem(self.BUFFER_LENGTH, 1, orientation='bottom')}, enableMenu=False)  # Disable time on bottom axis
+        # self.timeseries_widget.plotItem.setLabel('bottom', 'Time since acquisition', units='mm:ss')
+        self.timeseries_widget = pg.PlotWidget(
+            axisItems={'bottom': ReverseAxisItem(self.BUFFER_LENGTH, orientation='bottom')}, enableMenu=False)
+        self.timeseries_widget.plotItem.setLabel('bottom', 'Samples', units='#')
+        self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
+        self.timeseries_widget.plotItem.setLabel('left',
+                                                 'Signal')  # Update units depending on instrument  #, units='Counts'
+        self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
+        self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
+        self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
+        self.timeseries_widget.plotItem.showGrid(x=False, y=True)
+        self.timeseries_widget.plotItem.enableAutoRange(x=True, y=True)
+        self.timeseries_widget.plotItem.addLegend()
+        self.setCentralWidget(self.timeseries_widget)
 
     def set_clock(self):
         zulu = gmtime(time())
@@ -235,26 +253,25 @@ class MainWindow(QtGui.QMainWindow):
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
 
     @QtCore.pyqtSlot(list, float)
+    @QtCore.pyqtSlot(np.ndarray, float)
     def on_new_data(self, data, timestamp):
-        if self._buffer_timestamp is None:
+        if len(self._buffer_data) != len(data):
             # Init buffers
             self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
             self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
+            # Init Plot (need to do so when number of curve changes)
+            self.init_timeseries_plot()
             # Init curves
+            if self.instrument.plugin_active_timeseries_variables:
+                legend = self.instrument.plugin_active_timeseries_variables_selected
+            else:
+                legend = self.instrument.variable_names
             for i in range(len(data)):
-                self.timeseries_widget.plotItem.addItem(pg.PlotCurveItem(pen=(i, len(data))))
+                self.timeseries_widget.plotItem.addItem(pg.PlotCurveItem(pen=(i, len(data)), name=legend[i]))
         # Update buffers
         self._buffer_timestamp.extend(timestamp)
-        try:
-            for i in range(len(data)):
-                self._buffer_data[i].extend(data[i])
-        except IndexError:
-            # Special case were size of data changed
-            self._buffer_timestamp = None
-            # TODO Fix bug were previous curve do not disappear
-            for i in range(len(self.timeseries_widget.plotItem.items)):
-                self.timeseries_widget.plotItem.items[i].clear()
-            self.on_new_data(data, timestamp)
+        for i in range(len(data)):
+            self._buffer_data[i].extend(data[i])
         # TODO Update real-time figure (depend on instrument type)
         # Update timeseries figure
         if time() - self.last_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
@@ -276,6 +293,11 @@ class MainWindow(QtGui.QMainWindow):
         if self.instrument.plugin_aux_data:
             for i, v in enumerate(data):
                 self.plugin_aux_data_variable_values[i].setText(str(v))
+
+    @QtCore.pyqtSlot(int)
+    def on_active_timeseries_variables_update(self, state):
+        if self.instrument.plugin_active_timeseries_variables:
+            self.instrument.udpate_active_timeseries_variables(self.sender().text(), state)
 
     def closeEvent(self, event):
         reply = QtGui.QMessageBox.question(self, 'Closing application',

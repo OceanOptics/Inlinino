@@ -47,6 +47,7 @@ class Instrument:
         self.variable_units = None
         self.variable_displayed = None
         self.plugin_aux_data = False
+        self.plugin_active_timeseries_variables = False
 
         # Load cfg
         self.cfg_id = cfg_id

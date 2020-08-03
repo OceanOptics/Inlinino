@@ -13,7 +13,7 @@ import os
 import traceback
 
 
-__version__ = '2.3'
+__version__ = '2.4'
 
 # Setup Logger
 logging.basicConfig(level=logging.DEBUG)

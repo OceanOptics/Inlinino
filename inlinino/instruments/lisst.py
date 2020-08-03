@@ -3,6 +3,7 @@ import pyqtgraph as pg
 import configparser
 import numpy as np
 from time import sleep
+from threading import Lock
 
 
 class LISST(Instrument):
@@ -39,7 +40,19 @@ class LISST(Instrument):
 
         # Auxiliary Data Plugin
         self.plugin_aux_data = True
-        self.plugin_aux_data_variable_names = ['Laser Power', 'Laser Reference', 'Temperature']
+        self.plugin_aux_data_variables_selected = [0, 3, 5]
+        self.plugin_aux_data_variable_names = [self._parser.aux_labels[i] + ' (' + self._parser.aux_units[i] + ')' \
+                                               for i in self.plugin_aux_data_variables_selected]
+
+        # Select Channels to Plot Plugin
+        self.plugin_active_timeseries_variables = True
+        self.plugin_active_timeseries_variables_names = ['beta(%.5f)' % x for x in self._parser.angles]
+        self.plugin_active_timeseries_variables_selected = []
+        self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_angles = np.zeros(len(self._parser.angles), dtype=bool)
+        for theta in [0.08, 0.32, 1.28, 5.12]:
+            channel_name = 'beta(%.5f)' % self._parser.angles[np.argmin(np.abs(self._parser.angles - theta))]
+            self.udpate_active_timeseries_variables(channel_name, True)
 
     def setup(self, cfg):
         # Set LISST specific attributes
@@ -74,8 +87,16 @@ class LISST(Instrument):
         return [raw_beta] + aux.tolist()
 
     def handle_data(self, data, timestamp):
+        # Update plots
+        if self.active_timeseries_variables_lock.acquire(timeout=0.5):
+            try:
+                self.signal.new_data.emit(data[1][self.active_timeseries_angles], timestamp)
+            finally:
+                self.active_timeseries_variables_lock.release()
+        else:
+            self.logger.error('Unable to acquire lock to update timeseries plot')
         self.signal.new_data.emit(data[0][15], timestamp)
-        self.signal.new_aux_data.emit(self.format_aux_data([data[1], data[4], data[6]]))
+        self.signal.new_aux_data.emit(self.format_aux_data([data[i+1] for i in self.plugin_aux_data_variables_selected]))
         self._plot_curve.setData(self._parser.angles, data[0])
         if self.log_prod_enabled and self._log_active:
             # np arrays must be pre-formated to be written
@@ -103,6 +124,22 @@ class LISST(Instrument):
     @staticmethod
     def format_aux_data(data):
         return ['%.2f' % v for v in data]
+
+    def udpate_active_timeseries_variables(self, name, state):
+        if not ((state and name not in self.plugin_active_timeseries_variables_selected) or
+                (not state and name in self.plugin_active_timeseries_variables_selected)):
+            return
+        if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+            try:
+                index = self.plugin_active_timeseries_variables_names.index(name)
+                self.active_timeseries_angles[index] = state
+            finally:
+                self.active_timeseries_variables_lock.release()
+        else:
+            self.logger.error('Unable to acquire lock to update active timeseries variables')
+        # Update list of active variables for GUI keeping the order
+        self.plugin_active_timeseries_variables_selected = \
+            ['beta(%.5f)' % theta for theta in self._parser.angles[self.active_timeseries_angles]]
 
 
 class LISSTParser:
