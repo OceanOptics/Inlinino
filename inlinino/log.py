@@ -1,5 +1,5 @@
 import os
-from time import gmtime, strftime
+from time import gmtime, strftime, time
 from struct import pack
 import logging
 import atexit
@@ -62,6 +62,11 @@ class Log:
         else:
             self.filename = self.filename_prefix + '_<time>' + '.' + self.FILE_EXT
 
+    def write_header(self):
+        if self.variable_names:
+            self._file.write('time, ' + ', '.join(x for x in self.variable_names) + self.terminator)
+            self._file.write('yyyy/mm/dd HH:MM:SS.fff, ' + ', '.join(x for x in self.variable_units) + self.terminator)
+
     def open(self, timestamp):
         self.set_filename(timestamp)
         # Create File
@@ -69,12 +74,8 @@ class Log:
         # TODO specify number of bytes in buffer depending on instrument
         self._file = open(os.path.join(self.path, self.filename), self.FILE_MODE)
         self.__logger.info('Open file %s' % self.filename)
-        # Write header (only if has variable names)
-        if self.variable_names:
-            self._file.write(
-                'time, ' + ', '.join(x for x in self.variable_names) + self.terminator)
-            self._file.write(
-                'HH:MM:SS.fff, ' + ', '.join(x for x in self.variable_units) + self.terminator)
+        # Write header
+        self.write_header()
         # Time file open
         self._file_timestamp = timestamp
         if self.signal_new_file:
@@ -123,14 +124,19 @@ class LogBinary(Log):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.variable_names = []
-        self.variable_units = []
-        self.registration = b'\xff\x00\xff\x00'
-        self.terminator = b''
 
-    def write(self, data, timestamp):
-        self._smart_open(timestamp)
-        self._file.write(self.registration + data + self.terminator + pack('!d', timestamp))
+    def write_header(self):
+        pass
+
+    def write(self, data, timestamp=None):
+        if timestamp:
+            self._smart_open(timestamp)
+            self._file.write(data + pack('!d', timestamp))
+        else:
+            # Open file only if doesn't exist (keep in same file as previous bytes logged)
+            if self._file is None or self._file.closed:
+                self.open(time())
+            self._file.write(data)
         # TODO Test unpacking (especially for ACS and HyperSAS)
 
 
@@ -141,9 +147,11 @@ class LogText(Log):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.variable_names = ['packet']
-        self.variable_units = [self.ENCODING]
         self.registration = ''
+
+    def write_header(self):
+        self._file.write('time, packet' + self.terminator)
+        self._file.write('yyyy/mm/dd HH:MM:SS.fff, ' + self.ENCODING + self.terminator)
 
     def write(self, data, timestamp):
         """

@@ -300,10 +300,13 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.udpate_active_timeseries_variables(self.sender().text(), state)
 
     def closeEvent(self, event):
-        reply = QtGui.QMessageBox.question(self, 'Closing application',
-                                           "Are you sure to quit?", QtGui.QMessageBox.Yes |
-                                           QtGui.QMessageBox.No, QtGui.QMessageBox.No)
-        if reply == QtGui.QMessageBox.Yes:
+        msg = QtGui.QMessageBox()
+        msg.setIcon(QtGui.QMessageBox.Question)
+        msg.setWindowTitle("Inlinino: Closing Application")
+        msg.setText("Are you sure to quit ?")
+        msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+        msg.setDefaultButton(QtGui.QMessageBox.No)
+        if msg.exec_() == QtGui.QMessageBox.Yes:
             QtGui.QApplication.instance().closeAllWindows()  # NEEDED IF OTHER WINDOWS OPEN BY SPECIFIC INSTRUMENTS
             event.accept()
         else:
@@ -443,7 +446,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.cfg['log_prefix'] += 'DARK'
         if self.checkbox_prefix_custom.isChecked():
             self.cfg['log_prefix'] += self.le_prefix_custom.text()
-        self.cfg['log_prefix'] += '_'
+        if self.cfg['log_prefix']:
+            self.cfg['log_prefix'] += '_'
         # Check All required fields are complete
         for f in self.OPTIONAL_FIELDS:
             try:
@@ -579,19 +583,34 @@ class App(QtGui.QApplication):
                           + CFG.instruments[instrument_index]['serial_number']
         instrument_module_name = CFG.instruments[instrument_index]['module']
         logger.debug('Loading instrument ' + instrument_name)
-        if instrument_module_name == 'generic':
-            self.main_window.init_instrument(Instrument(instrument_index, InstrumentSignals()))
-        elif instrument_module_name == 'acs':
-            self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
-        elif instrument_module_name == 'dataq':
-            self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
-        elif instrument_module_name == 'lisst':
-            self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
-        else:
-            logger.critical('Instrument module not supported')
-            raise ValueError('Instrument module not supported')
-
+        instrument_loaded = False
+        while not instrument_loaded:
+            try:
+                if instrument_module_name == 'generic':
+                    self.main_window.init_instrument(Instrument(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'acs':
+                    self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'dataq':
+                    self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'lisst':
+                    self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
+                else:
+                    logger.critical('Instrument module not supported')
+                    sys.exit(-1)
+                instrument_loaded = True
+            except Exception as e:
+                logger.warning('Unable to load instrument.')
+                logger.warning(e)
+                self.closeAllWindows()  # ACS and LISST are opening pyqtgraph windows
+                # Dialog Box
+                setup_dialog = DialogInstrumentSetup(instrument_index)
+                setup_dialog.show()
+                setup_dialog.notification('Unable to load instrument. Please check configuration', e)
+                if setup_dialog.exec_():
+                    logger.info('Updated configuration')
+                else:
+                    logger.info('Setup closed')
+                    self.start()  # Restart application to go back to startup screen
         # Start Main Window
         self.main_window.show()
         sys.exit(self.exec_())
-

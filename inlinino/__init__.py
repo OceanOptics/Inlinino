@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: nils
-# @Date:   2016-05-14 16:55:33
-# @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 16:28:37
 import numpy as np
 import logging
 from logging.handlers import RotatingFileHandler
@@ -13,7 +8,7 @@ import os
 import traceback
 
 
-__version__ = '2.4'
+__version__ = '2.4.2'
 
 # Setup Logger
 logging.basicConfig(level=logging.DEBUG)

@@ -1,7 +1,7 @@
 from inlinino.instruments import Instrument
 from inlinino.log import LogBinary
 from pyACS.acs import ACS as ACSParser
-from pyACS.acs import FrameIncompleteError, NumberWavelengthIncorrectError
+from pyACS.acs import ACSError
 import pyqtgraph as pg
 from time import time
 import numpy as np
@@ -19,7 +19,6 @@ class ACS(Instrument):
     def __init__(self, cfg_id, signal, *args, **kwargs):
         # ACS Specific attributes
         self._parser = None
-        self.force_parsing = False  # TODO Add force parsing to GUI setup window
         self._timestamp_flag_out_T_cal = 0
 
         # Init Graphic for real time spectrum visualization
@@ -74,11 +73,11 @@ class ACS(Instrument):
         if 'force_parsing' in cfg.keys():
             self.force_parsing = cfg['force_parsing']
         # Overload cfg with ACS specific parameters
-        cfg['variable_names'] = ['timestamp', 'c', 'a', 'T_int', 'T_ext', 'flag_outside_calibration_range']
+        cfg['variable_names'] = ['acs_timestamp', 'c', 'a', 'T_int', 'T_ext', 'flag_outside_calibration_range']
         cfg['variable_units'] = ['ms', '1/m', '1/m', 'deg_C', 'deg_C', 'bool']
         cfg['variable_units'][1] = '1/m\tlambda=' + ' '.join('%s' % x for x in self._parser.lambda_c)
         cfg['variable_units'][2] = '1/m\tlambda=' + ' '.join('%s' % x for x in self._parser.lambda_a)
-        cfg['variable_precision'] = ['%d', '%s', '%s', '%.6f', '%.6f', '%s']
+        cfg['variable_precision'] = ['%d', '%s', '%s', '%.2f', '%.2f', '%s']
         cfg['terminator'] = self.REGISTRATION_BYTES
         # Set standard configuration and check cfg input
         super().setup(cfg, LogBinary)
@@ -94,50 +93,67 @@ class ACS(Instrument):
             baudrate = self._parser.baudrate  # Default 115200
         super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
+    def data_received(self, data, timestamp):
+        self._buffer.extend(data)
+        frame = True
+        while frame:
+            # Get Frame
+            frame, valid, self._buffer, unknown_bytes = self._parser.find_frame(self._buffer)
+            if unknown_bytes:
+                # Log bytes in raw files (no warning as expect the pad bytes here)
+                if self.log_raw_enabled and self._log_active:
+                    self._log_raw.write(unknown_bytes)
+            if frame and valid:
+                self.handle_packet(frame, timestamp)
+            if frame and not valid:
+                # Warn user
+                # Log only registration bytes as rest will be logged by unknown_bytes
+                self.signal.packet_corrupted.emit()
+                if self.log_raw_enabled and self._log_active:
+                    self._log_raw.write(self._parser.REGISTRATION_BYTES)
+
     def parse(self, packet):
+        data_raw = self._parser.unpack_frame(packet)
         try:
-            raw_frame = self._parser.unpack_frame(self.REGISTRATION_BYTES + packet, self.force_parsing)
-            c, a, T_int, T_ext, flag_out_T_cal = self._parser.calibrate_frame(raw_frame, get_auxiliaries=True)
-            return [raw_frame.time_stamp, c, a, T_int, T_ext, flag_out_T_cal]
-        except FrameIncompleteError as e:
+            self._parser.check_data(data_raw)
+        except ACSError as e:
             self.signal.packet_corrupted.emit()
             self.logger.warning(e)
-            self.logger.warning('This might happen on first packet received.')
-        except NumberWavelengthIncorrectError as e:
-            self.signal.packet_corrupted.emit()
-            self.logger.warning(e)
-            self.logger.warning('Likely due to invalid device file.')
+            self.logger.debug(self.REGISTRATION_BYTES + packet)
+        data_cal = self._parser.calibrate_frame(data_raw, get_external_temperature=True)
+        return data_raw.time_stamp, data_cal
 
     def handle_data(self, data, timestamp):
-        # Update plots
+        # Update timeseries plot
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                self.signal.new_data.emit(np.concatenate((data[1][self.active_timeseries_c_wavelengths],
-                                                          data[2][self.active_timeseries_a_wavelengths])),
+                self.signal.new_data.emit(np.concatenate((data[1].c[self.active_timeseries_c_wavelengths],
+                                                          data[1].a[self.active_timeseries_a_wavelengths])),
                                           timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update timeseries plot')
-        self.signal.new_aux_data.emit(self.format_aux_data(data[3:6]))
-        self._plot_curve_c.setData(self._parser.lambda_c, data[1])
-        self._plot_curve_a.setData(self._parser.lambda_a, data[2])
+        # Format and signal aux data
+        self.signal.new_aux_data.emit(['%.2f' % data[1].internal_temperature,
+                                       '%.2f' % data[1].external_temperature,
+                                       '%s' % data[1].flag_outside_calibration_range])
+        # Update spectrum plot
+        self._plot_curve_c.setData(self._parser.lambda_c, data[1].c)
+        self._plot_curve_a.setData(self._parser.lambda_a, data[1].a)
         # Flag outside temperature calibration range
-        if data[5] and time() - self._timestamp_flag_out_T_cal > 120:
+        if data[1].flag_outside_calibration_range and time() - self._timestamp_flag_out_T_cal > 120:
             self._timestamp_flag_out_T_cal = time()
             self.logger.warning('Internal temperature outside calibration range.')
         # Log parsed data
         if self.log_prod_enabled and self._log_active:
-            # np arrays must be pre-formated to be written
-            data[1] = np.array2string(data[1], max_line_width=np.inf)
-            data[2] = np.array2string(data[2], max_line_width=np.inf)
-            self._log_prod.write(data, timestamp)
+            self._log_prod.write([data[0],  # Instrument timestamp
+                                  np.array2string(data[1].c, max_line_width=np.inf),  # pre-format np.array
+                                  np.array2string(data[1].a, max_line_width=np.inf),  # pre-format np.array
+                                  data[1].internal_temperature, data[1].external_temperature,
+                                  data[1].flag_outside_calibration_range], timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
-
-    @staticmethod
-    def format_aux_data(data):
-        return ['%.2f' % data[0], '%.2f' % data[1], '%s' % data[2]]
 
     def udpate_active_timeseries_variables(self, name, state):
         if not ((state and name not in self.plugin_active_timeseries_variables_selected) or

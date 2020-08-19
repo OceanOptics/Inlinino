@@ -154,9 +154,10 @@ class Instrument:
             try:
                 # read all that is there or wait for one byte (blocking)
                 data = self._serial.read(self._serial.in_waiting or 1)
+                timestamp = time()
                 if data:
                     try:
-                        self.data_received(data)
+                        self.data_received(data, timestamp)
                         if len(self._buffer) > self._max_buffer_length:
                             self.logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
                             self._buffer = bytearray()
@@ -169,12 +170,12 @@ class Instrument:
                 break
         self.close(wait_thread_join=False)
 
-    def data_received(self, data):
+    def data_received(self, data, timestamp):
         self._buffer.extend(data)
         while self._terminator in self._buffer:
             packet, self._buffer = self._buffer.split(self._terminator, 1)
             try:
-                self.handle_packet(packet)
+                self.handle_packet(packet, timestamp)
             except IndexError:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning('Incomplete packet or Incorrect variable column requested.')
@@ -194,15 +195,15 @@ class Instrument:
                 # if __debug__:
                 #     raise e
 
-    def handle_packet(self, packet):
-        timestamp = time()
+    def handle_packet(self, packet, timestamp):
         self.signal.packet_received.emit()
         self.write_to_serial()
         if self.log_raw_enabled and self._log_active:
             self._log_raw.write(packet, timestamp)
             self.signal.packet_logged.emit()
         data = self.parse(packet)
-        self.handle_data(data, timestamp)
+        if data:
+            self.handle_data(data, timestamp)
 
     def handle_data(self, data, timestamp):
         self.signal.new_data.emit(data, timestamp)
