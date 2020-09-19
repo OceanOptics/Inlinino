@@ -118,6 +118,46 @@
       "channels_enabled": [
         2
       ]
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs091_20200217.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "91",
+      "log_raw": true,
+      "log_products": true
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs057_20200129.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "57",
+      "log_raw": true,
+      "log_products": true
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs279_20180524.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "279",
+      "log_raw": true,
+      "log_products": true
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs111_20200918.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "111",
+      "log_raw": true,
+      "log_products": true
     }
   ]
 }

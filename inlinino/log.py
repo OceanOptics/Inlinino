@@ -25,7 +25,7 @@ class Log:
         if 'variable_precision' not in cfg.keys():
             cfg['variable_precision'] = []
 
-        self._file = None
+        self._file = type('obj', (object,), {'closed': True})
         self._file_timestamp = None
         # self.file_mode_binary = cfg['mode_binary']
         self.file_length = cfg['length'] * 60  # seconds
@@ -83,11 +83,11 @@ class Log:
 
     def _smart_open(self, timestamp):
         # Open file if necessary
-        if self._file is None or self._file.closed or \
+        if self._file.closed or \
                 gmtime(self._file_timestamp).tm_mday != gmtime(timestamp).tm_mday or \
                 timestamp - self._file_timestamp >= self.file_length:
             # Close previous file if open
-            if self._file and not self._file.closed:
+            if not self._file.closed:
                 self.close()
             # Create new file
             self.open(timestamp)
@@ -108,8 +108,7 @@ class Log:
                              ', ' + ', '.join(str(d) for d in data) + self.terminator)
 
     def close(self):
-        # TODO Fix bug when close file alraedy closed DEBUG:Log:Close file BB3349_<time>.csv
-        if self._file:
+        if not self._file.closed:
             self._file.close()
             self.__logger.debug('Close file %s' % self.filename)
             self.set_filename()
@@ -134,7 +133,7 @@ class LogBinary(Log):
             self._file.write(data + pack('!d', timestamp))
         else:
             # Open file only if doesn't exist (keep in same file as previous bytes logged)
-            if self._file is None or self._file.closed:
+            if self._file.closed:
                 self.open(time())
             self._file.write(data)
         # TODO Test unpacking (especially for ACS and HyperSAS)

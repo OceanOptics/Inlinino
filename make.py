@@ -34,6 +34,7 @@ PyInstaller.__main__.run([
     '--distpath=%s' % DIST_PATH,
     '--clean',
     '--noconfirm',
+    # '--debug=all',
     '--windowed',
     os.path.join('inlinino', '__main__.py')
 ])

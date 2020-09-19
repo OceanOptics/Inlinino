@@ -280,7 +280,8 @@ class MainWindow(QtGui.QMainWindow):
         for i in range(len(data)):
             y = self._buffer_data[i].get(self.BUFFER_LENGTH)
             x = np.arange(len(y))
-            sel = ~np.isnan(y)
+            y[np.isinf(y)] = 0
+            sel = np.logical_not(np.isnan(y))
             y[~sel] = np.interp(x[~sel], x[sel], y[sel])
             self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
             # TODO Put back X-Axis with time without high demand on cpu

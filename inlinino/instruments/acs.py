@@ -139,8 +139,10 @@ class ACS(Instrument):
                                        '%.2f' % data[1].external_temperature,
                                        '%s' % data[1].flag_outside_calibration_range])
         # Update spectrum plot
-        self._plot_curve_c.setData(self._parser.lambda_c, data[1].c)
-        self._plot_curve_a.setData(self._parser.lambda_a, data[1].a)
+        sel = np.logical_not(np.logical_or(np.isinf(data[1].c), np.isnan(data[1].c)))
+        self._plot_curve_c.setData(self._parser.lambda_c[sel], data[1].c[sel])
+        sel = np.logical_not(np.logical_or(np.isinf(data[1].a), np.isnan(data[1].a)))
+        self._plot_curve_a.setData(self._parser.lambda_a[sel], data[1].a[sel])
         # Flag outside temperature calibration range
         if data[1].flag_outside_calibration_range and time() - self._timestamp_flag_out_T_cal > 120:
             self._timestamp_flag_out_T_cal = time()
