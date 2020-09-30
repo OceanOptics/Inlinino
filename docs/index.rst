@@ -1,20 +1,11 @@
-Welcome to Inlinino's documentation!
-====================================
+Welcome to Inlinino
+===================
 
-Inlinino is a simple data logger. It was developed to log measurments from scientific instruments during extended periods of time (months) but can be used or adapted to your need. It supports any instrument with serial or analog interface as long as there is an API for it or you can make one.
+Inlinino is an open-source software data logger for oceanographers. It primarily log measurements from optical instruments deployed on research vessels during month long campaigns. Secondarily, it  provides real-time visualization, which helps users troubleshoot instruments in the field and ensure collection of quality data. Inlinino is designed to interface with either serial (RS-232) or analog instruments. The data received is logged in a timestamped raw format (as communicated by the instrument) or in a comma separated file (csv) for easy importation in data analysis software. Typically, a new log file is created every hour for simplicity of post-processing and easy backups. Instruments supported are: SeaBird TSG, Satlantic PAR, WET Labs ECO sensors (e.g. ECO-BB3, ECO-FLBBCD, ECO-BBFL2, ECO-3X1M, ECO-BB9, ECO-BBRT), WET Labs ACS, Sequoia LISST, and analog sensors through a data acquisition system (DataQ DI-1100 ). Other instruments can be added via the user interface if they output simple ascii data frame, otherwise the code is intended to be modular to support new instruments. The use and validation of the software are documented in Haëntjens and Boss 2020 (`DIY Oceanography <https://doi.org/10.5670/oceanog.2020.112>`_).
 
-Few instruments from WETLabs are implemented and have been extensively tested during cruises: ECO-BB3, ECO-BB9, and WSCD. To log signal from analog instruments an Arduino, or an ADS-1X15 interface are available.
-
-The configuration of the software is mostly done with json files but some instruments will require adding some python class (just basic coding notions are needed, we keep it simple).
-
-Data recorded by Inlinino is saved hourly (by default) in csv files. Post processing can be done through the software it-self (after updating the code) or with any data analysis tools such as Python, R, or Matlab.
-
-There are two interfaces available to date: a friendly `Graphical User Interface <gui.html>`__ also known as a `GUI <gui.html>`__ (default) and a `Command Line Interface (CLI) <cli.html>`__ for use on servers or power use.
-
-The software is written in python 3+, on top of pySerial and numpy. The GUI is based on PyQt. The software was tested on both Windows 7 and OSX.
-
-.. image:: screenshots/mw_global.png
-  :scale: 50 %
+.. image:: screenshots/main_window_acs.png
+  :scale: 35 %
+  :align: center
 
 Index
 ^^^^^
@@ -22,8 +13,5 @@ Index
    :maxdepth: 2
 
     Quick Start<quick_start>
-    Installation<install>
     Configuration<cfg>
-    Graphical User Interface (GUI)<gui>
-    Command Line Interface (CLI)<cli>
     Precision Analog to Serial Converter (PASC)<pasc>
