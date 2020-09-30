@@ -1,0 +1,163 @@
+{
+  "instruments": [
+    {
+      "manufacturer": "WetLabs",
+      "model": "BB3",
+      "serial_number": "349",
+      "module": "generic",
+      "terminator": {
+        "__bytes__": "ascii",
+        "content": "\r\n"
+      },
+      "separator": {
+        "__bytes__": "ascii",
+        "content": "\t"
+      },
+      "variable_names": [
+        "beta470",
+        "beta532",
+        "beta660"
+      ],
+      "variable_units": [
+        "counts",
+        "counts",
+        "counts"
+      ],
+      "variable_columns": [
+        3,
+        5,
+        7
+      ],
+      "variable_types": [
+        "int",
+        "int",
+        "int"
+      ],
+      "variable_precision": [
+        "%d",
+        "%d",
+        "%d"
+      ],
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "variable_displayed": [
+        "beta470",
+        "beta532",
+        "beta660"
+      ]
+    },
+    {
+      "manufacturer": "SeaBird",
+      "model": "TSG",
+      "serial_number": "0XX",
+      "module": "generic",
+      "terminator": {
+        "__bytes__": "ascii",
+        "content": "\r\n"
+      },
+      "separator": ",",
+      "variable_names": [
+        "T",
+        "C",
+        "S"
+      ],
+      "variable_units": [
+        "deg_C",
+        "S/m",
+        "no units"
+      ],
+      "variable_columns": [
+        0,
+        1,
+        2
+      ],
+      "variable_types": [
+        "float",
+        "float",
+        "float"
+      ],
+      "variable_precision": [
+        "%.3f",
+        "%.3f",
+        "%.3f"
+      ],
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    },
+    {
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "301",
+      "module": "acs",
+      "device_file": "cfg/acs301_20180129.dev",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    },
+    {
+      "manufacturer": "Sequoia",
+      "model": "LISST",
+      "serial_number": "1183",
+      "module": "lisst",
+      "ini_file": "cfg/LISST1183_20180119_Lisst.ini",
+      "device_file": "cfg/LISST1183_20180119_InstrumentData.txt",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    },
+    {
+      "module": "dataq",
+      "manufacturer": "WetLabs",
+      "model": "WSCD",
+      "serial_number": "859",
+      "log_path": "data",
+      "log_raw": false,
+      "log_products": true,
+      "channels_enabled": [
+        2
+      ]
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs091_20200217.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "91",
+      "log_raw": true,
+      "log_products": true
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs057_20200129.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "57",
+      "log_raw": true,
+      "log_products": true
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs279_20180524.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "279",
+      "log_raw": true,
+      "log_products": true
+    },
+    {
+      "module": "acs",
+      "device_file": "cfg/acs111_20200918.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "111",
+      "log_raw": true,
+      "log_products": true
+    }
+  ]
+}

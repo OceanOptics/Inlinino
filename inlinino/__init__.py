@@ -1,158 +1,127 @@
-# -*- coding: utf-8 -*-
-# @Author: nils
-# @Date:   2016-05-14 16:55:33
-# @Last Modified by:   nils
-# @Last Modified time: 2016-07-05 16:28:37
-
-import os
-import importlib
+import numpy as np
+import logging
+from logging.handlers import RotatingFileHandler
+from time import strftime, gmtime
+import json
 import sys
-
-from cfg import Cfg
-from instruments import Communication
-from log import LogData
+import os
+import traceback
 
 
-class Inlinino():
-    '''
-    Main class for the application
-    '''
+__version__ = '2.4.3'
 
-    # Set variables
-    m_cfg = None
-    m_instruments = {}
-    m_log_data = None
-    m_com = None
+# Setup Logger
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('PyQt5').setLevel(logging.WARNING)
+root_logger = logging.getLogger()   # Get root logger
 
-    def __init__(self, _cfg_filename):
-        # Load configuration
-        self.m_cfg = Cfg()
-        self.m_cfg.Load(_cfg_filename)
-        if not self.m_cfg.Check():
-            if self.m_cfg.m_v > 0:
-                print('Configuration check failed, exit')
-            exit()
 
-        # Initialize instruments
-        if any(self.m_cfg.m_instruments):
-            for name, cfg in self.m_cfg.m_instruments.items():
-                if 'module' in cfg.keys() and 'name' in cfg.keys():
-                    module = importlib.import_module('instruments.' +
-                                                     cfg['module'].lower() +
-                                                     '.' + cfg['name'].lower())
-                    class_ = getattr(module, cfg['name'])
-                    self.m_instruments[name] = class_(name, cfg)
-                else:
-                    if self.m_cfg.m_v > 0:
-                        print('Need to specify module and name of' +
-                              ' instrument ' + name)
-                    exit()
+# Catch errors in log
+def except_hook(exc_type, exc_value, exc_tb):
+    tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    root_logger.error(tb)
+
+
+sys.excepthook = except_hook
+
+
+# Setup Path
+if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+    root_logger.debug('Running in bundled mode')
+    package_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
+    os.chdir(package_dir)
+else:
+    root_logger.debug('Running from source')
+    package_dir = os.path.dirname(__file__)
+PATH_TO_RESOURCES = os.path.join(package_dir, 'resources')
+PATH_TO_CFG_FILE = os.path.join(package_dir, 'inlinino_cfg.json')
+
+# Logging in file
+path_to_log = os.path.join(package_dir, 'logs')
+if not os.path.isdir(path_to_log):
+    root_logger.debug('Create log directory: %s' % path_to_log)
+    os.mkdir(path_to_log)
+log_filename = os.path.join(path_to_log, 'inlinino_' + strftime('%Y%m%d_%H%M%S', gmtime()) + '.log')
+ch_file = RotatingFileHandler(log_filename, maxBytes=1048576 * 5, backupCount=9)
+formater_file = logging.Formatter("%(asctime)s %(levelname)-8.8s [%(name)s]  %(message)s")
+ch_file.setFormatter(formater_file)
+root_logger.addHandler(ch_file)
+
+
+class BytesEncoder(json.JSONEncoder):
+    ENCODING = 'ascii'
+
+    def default(self, obj):
+        if isinstance(obj, bytes):
+            return {'__bytes__': self.ENCODING, 'content': obj.decode(self.ENCODING)}
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
+
+def as_bytes(dct):
+    if '__bytes__' in dct:
+        return bytes(dct['content'], dct['__bytes__'])
+    return dct
+
+
+class Cfg:
+    KEYS_NOT_SAVED = ['log_prefix']
+
+    def __init__(self):
+        self.__logger = logging.getLogger('CFG')
+        with open(PATH_TO_CFG_FILE) as file:
+            self.__logger.debug('Reading configuration.')
+            cfg = json.load(file, object_hook=as_bytes)
+        if 'instruments' not in cfg.keys():
+            self.__logger.critical('Unable to load instruments from configuration file.')
+            sys.exit(-1)
+        self.instruments = cfg['instruments']
+
+    def write(self):
+        self.__logger.info('Writing configuration.')
+        cfg = {'instruments': []}
+        # Remove keys not saved
+        for i in self.instruments:
+            foo = i.copy()
+            for k in self.KEYS_NOT_SAVED:
+                if k in foo.keys():
+                    del foo[k]
+            cfg['instruments'].append(foo)
+        with open(PATH_TO_CFG_FILE, 'w') as file:
+            json.dump(cfg, file, cls=BytesEncoder)
+
+
+CFG = Cfg()
+
+
+class RingBuffer:
+    # Ring buffer based on numpy.roll for np.array
+    # Same concept as FIFO except that the size of the numpy array does not vary
+    def __init__(self, _length, _dtype=None):
+        # initialize buffer with NaN values
+        # length correspond to the size of the buffer
+        if _dtype is None:
+            self.data = np.empty(_length)  # np.dtype = float64
+            self.data[:] = np.NAN
         else:
-            if self.m_cfg.m_v > 0:
-                print('No Instrument, exit')
-            exit()
+            # type needs to be compatible with np.NaN
+            self.data = np.empty(_length, dtype=_dtype)
+            self.data[:] = None
 
-        # Initiliaze com ports
-        self.m_com = Communication()
+    def extend(self, _x):
+        # Add np.array at the end of the buffer
+        x = np.array(_x, copy=False)  # dtype=None
+        step = x.size
+        self.data = np.roll(self.data, -step)
+        self.data[-step:] = x
 
-        # Initialize data logger
-        self.m_log_data = LogData(
-            self.m_cfg.m_log, self.m_instruments, self.m_cfg.m_instruments)
+    def get(self, _n=1):
+        # return the most recent n element(s) in buffer
+        return self.data[-1 * _n:]
 
-        # Self-t   est
-        # self.m_log_data.Start()
-        # self.m_log_data.Stop()
-
-        # Load interface
-        if 'interface' not in self.m_cfg.m_app.keys():
-            if self.m_cfg.m_v > 0:
-                print('Need to specify user interface, exit')
-            exit()
-        if self.m_cfg.m_app['interface'] == 'gui':
-            # Load Graphical User Interface
-            module = importlib.import_module('gui')
-            GUI = getattr(module, 'GUI')
-            # Load Qt
-            module = importlib.import_module('pyqtgraph.Qt')
-            QtGui = getattr(module, 'QtGui')
-            # init Qt
-            gui_app = QtGui.QApplication(sys.argv)
-            # init GUI
-            self.m_gui = GUI(self)
-            # start GUI
-            foo = gui_app.exec_()
-            gui_app.deleteLater()  # Needed for QThread
-            sys.exit(foo)
-        elif self.m_cfg.m_app['interface'] == 'cli':
-            # Initialize plots (with matplotlib)
-            # module = importlib.import_module('plot')
-            # Plot = getattr(module, 'Plot')
-            # self.m_plot = Plot(self.m_log_data)
-            # Load Command Line Interface
-            module = importlib.import_module('cli')
-            CLI = getattr(module, 'CLI')
-            try:
-                CLI(self).cmdloop()
-            except KeyboardInterrupt:
-                print('Keyboard Interrupt received.\n' +
-                      'Trying to close connection with instrument(s),' +
-                      ' to save data and close log file properly.')
-                self.Close()
-        else:
-            if self.m_cfg.m_v > 0:
-                print('Unknown user interface type, exit')
-            exit()
-
-        # Connect all instruments
-        # for name, inst in self.m_instruments.items():
-        #     if self.m_cfg.m_v > 0:
-        #         print('Connecting ' + name)
-        #     inst.Connect()
-
-    def Close(self):
-        # Close connection with instruments still active
-        if self.m_instruments is not None:
-            for name, inst in self.m_instruments.items():
-                if inst.m_active:
-                    if self.m_cfg.m_v > 1:
-                        print('Closing connection with ' + name)
-                    inst.Close()
-        # Close openned log file
-        if self.m_log_data is not None:
-            if self.m_log_data.m_active_log:
-                print('Stop logging data.')
-                self.m_log_data.Stop()
-            if self.m_log_data.m_active_buffer:
-                print('Stop buffer thread.')
-                self.m_log_data.StopThread()
-
-    def ListInstruments(self):
-        print('WARNING: function deprecated\n' +
-              'Prefer: list(self.m_app.m_instruments.keys())')
-        ls = []
-        for key, value in self.m_instruments.items():
-            ls.append(value.m_name)
-        return ls
+    def getleft(self, _n=1):
+        # return the oldest n element(s) in buffer
+        return self.data[0:_n]
 
     def __str__(self):
-        foo = str(self.m_cfg) + '\n[Instruments]\n'
-        for inst, inst in self.m_instruments.items():
-            foo += '\t' + str(inst) + '\n'
-        return foo
-
-    def __del__(self):
-        # Close safely application
-        # Object with thread running won't call the __del__ method
-        #   Need to close thread manually before
-        self.Close()
-
-
-# Test Inlinino App
-if __name__ == '__main__':
-    if len(sys.argv) == 2:
-        inlinino = Inlinino(sys.argv[1])
-    elif __debug__:
-        inlinino = Inlinino(os.path.join('cfg', 'test_cfg.json'))
-    else:
-        inlinino = Inlinino(os.path.join('cfg', 'simulino_cfg.json'))
-    print(inlinino)
+        return str(self.data)

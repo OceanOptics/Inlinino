@@ -1,805 +1,617 @@
-# -*- coding: utf-8 -*-
-# @Author: nils
-# @Date:   2016-05-14 16:55:47
-# @Last Modified by:   nils
-# @Last Modified time: 2017-01-16 15:35:52
-
-import os
-import sys
-from time import sleep, gmtime, strftime, time
-from functools import partial
-from numpy import isnan as np_isnan
-from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
 import pyqtgraph as pg
-
-
-class GUI(QtGui.QMainWindow):
-
-    # Interface
-    m_app_icon = 'ressources/inlinino.ico'
-
-    def __init__(self, _app):
-        super(GUI, self).__init__()
-        self.m_app = _app
-        self.initUI()
-
-    def initUI(self):
-        # Splash screen
-        splashScreen = QtGui.QSplashScreen(QtGui.QPixmap(self.m_app_icon))
-        splashScreen.show()
-
-        # Check input
-        if self.m_app is None:
-            print('Need Inlinino app as argument')
-            exit(-1)
-        else:
-            if 'theme' not in self.m_app.m_cfg.m_app.keys():
-                if self.m_app.m_cfg.m_v > 0:
-                    print('app_cfg:theme is missing')
-                return False
-            if 'ui_update_frequency' not in self.m_app.m_cfg.m_app.keys():
-                if self.m_app.m_cfg.m_v > 0:
-                    print('app_cfg:ui_update_frequency is missing')
-                return False
-            if 'ui_disp_pos_shift' not in self.m_app.m_cfg.m_app.keys():
-                if self.m_app.m_cfg.m_v > 0:
-                    print('app_cfg:ui_disp_pos_shift is missing')
-                return False
-            else:
-                pos_shift = self.m_app.m_cfg.m_app['ui_disp_pos_shift']
-
-        # Set window position/size
-        self.resize(800, 600)
-        self.center()
-
-        # Set icon
-        self.setWindowTitle('Inlinino')
-        self.setWindowIcon(QtGui.QIcon(self.m_app_icon))
-
-        # Set action of Menu Bar
-        actInstrConnect = QtGui.QAction(QtGui.QIcon('none'), '&Connect', self)
-        actInstrConnect.setShortcut('Ctrl+S')
-        actInstrConnect.setStatusTip(
-            'Connect an instrument to the application')
-        actInstrConnect.triggered.connect(self.ActInstrConnect)
-        actInstrClose = QtGui.QAction(QtGui.QIcon('none'), '&Disconnect', self)
-        actInstrClose.setShortcut('Ctrl+D')
-        actInstrClose.setStatusTip(
-            'Disconnect an instrument from the application')
-        actInstrClose.triggered.connect(self.ActInstrClose)
-        actInstrList = QtGui.QAction(QtGui.QIcon('none'), '&List', self)
-        # actInstrList.setShortcut('Ctrl+L')
-        actInstrList.setStatusTip('List all instruments available')
-        actInstrList.triggered.connect(self.ActInstrList)
-
-        self.m_actLogStart = QtGui.QAction(QtGui.QIcon('none'), '&Start', self)
-        self.m_actLogStart.setShortcut('Ctrl+L')
-        self.m_actLogStart.setStatusTip('Start logging data')
-        self.m_actLogStart.triggered.connect(self.ActLogStart)
-        self.m_actLogStop = QtGui.QAction(QtGui.QIcon('none'), '&Stop', self)
-        self.m_actLogStop.setShortcut('Ctrl+K')
-        self.m_actLogStop.setStatusTip('Stop logging data')
-        self.m_actLogStop.triggered.connect(self.ActLogStop)
-        actLogHeader = QtGui.QAction(QtGui.QIcon('none'), '&File header', self)
-        actLogHeader.setShortcut('Ctrl+H')
-        actLogHeader.setStatusTip('Change header of log file name')
-        actLogHeader.triggered.connect(self.ActLogHeader)
-        actLogPath = QtGui.QAction(QtGui.QIcon('none'), '&File location', self)
-        actLogPath.setShortcut('Ctrl+J')
-        actLogPath.setStatusTip('Change location of log files')
-        actLogPath.triggered.connect(self.ActLogPath)
-
-        actHelpHelp = QtGui.QAction(QtGui.QIcon('none'), '&Help', self)
-        actHelpHelp.setStatusTip('Help')
-        actHelpHelp.triggered.connect(self.ActHelpHelp)
-        actHelpSupport = QtGui.QAction(QtGui.QIcon('none'), '&Support', self)
-        actHelpSupport.setStatusTip('Support')
-        actHelpSupport.triggered.connect(self.ActHelpSupport)
-        actHelpCredits = QtGui.QAction(QtGui.QIcon('none'), '&Credits', self)
-        actHelpCredits.setStatusTip('Credits')
-        actHelpCredits.triggered.connect(self.ActHelpCredits)
-
-        # Set menu bar
-        menuBar = self.menuBar()
-        # Add menu to menu bar
-        menuInstr = menuBar.addMenu('&Instrument')
-        menuLog = menuBar.addMenu('&Log')
-        menuHelp = menuBar.addMenu('&Help')
-        # Add actions to menu
-        menuInstr.addAction(actInstrConnect)
-        menuInstr.addAction(actInstrClose)
-        menuInstr.addAction(actInstrList)
-        menuLog.addAction(self.m_actLogStart)
-        menuLog.addAction(self.m_actLogStop)
-        menuLog.addAction(actLogHeader)
-        menuLog.addAction(actLogPath)
-        menuHelp.addAction(actHelpHelp)
-        menuHelp.addAction(actHelpSupport)
-        menuHelp.addAction(actHelpCredits)
-
-        # Set docked sidebar (sd)
-        # Display data
-        sd_data = QtGui.QGridLayout()
-        wdgt, self.m_time_display, self.m_date_display = \
-            self.QVarDisplay('Time (Zulu)',
-                    self.m_app.m_log_data.m_buffer['timestamp'].get()[0],
-                    'yyyy/mm/dd')
-        sd_data.addWidget(wdgt)
-        self.m_var_display = {}
-        i = 0
-        for varkey, vardisplayed, varname, varunits in zip(self.m_app.m_log_data.m_varkeys,
-                                        self.m_app.m_log_data.m_vardisplayed,
-                                        self.m_app.m_log_data.m_varnames,
-                                        self.m_app.m_log_data.m_varunits):
-            if vardisplayed:
-                wdgt, self.m_var_display[varkey], foo = self.QVarDisplay(varname,
-                    self.m_app.m_log_data.m_buffer[varkey].get(), varunits)
-                sd_data.addWidget(wdgt, (i + pos_shift) // 3, (i + pos_shift) % 3)
-                i += 1
-        # Instrument Status
-        sd_instr_status = QtGui.QVBoxLayout()
-        self.m_instr_status = {}
-        self.m_instr_pckt_rcvd = {}
-        self.m_instr_pckt_mssd = {}
-        self.m_instr_connect_btn = {}
-        self.m_instr_close_btn = {}
-        for instr_key in self.m_app.m_cfg.m_instruments.keys():
-            instr_val = self.m_app.m_instruments[instr_key]
-            wdgt, self.m_instr_status[instr_key], \
-                  self.m_instr_pckt_rcvd[instr_key], \
-                  self.m_instr_pckt_mssd[instr_key], \
-                  self.m_instr_connect_btn[instr_key], \
-                  self.m_instr_close_btn[instr_key] = self.QInstrDisplay(
-                               instr_key, instr_val.m_active,
-                               instr_val.m_n, instr_val.m_nNoResponse)
-            QtCore.QObject.connect(self.m_instr_connect_btn[instr_key],
-                                   QtCore.SIGNAL('clicked()'),
-                                   partial(self.ActInstrConnect, line=False, _instr_key=instr_key))
-            QtCore.QObject.connect(self.m_instr_close_btn[instr_key],
-                                   QtCore.SIGNAL('clicked()'),
-                                   partial(self.ActInstrClose, line=False, _instr_key=instr_key))
-            self.m_instr_close_btn[instr_key].hide()
-            sd_instr_status.addWidget(wdgt)
-        # Log status/Action
-        sd_log_fname_lbl = QtGui.QLabel('Data logged in:')
-        sd_log_fname_lbl.setWordWrap(True);
-        self.m_sd_log_fname_val = QtGui.QLabel('...')
-        self.m_sd_log_fname_val.setWordWrap(True);
-        self.m_sd_start_btn = QtGui.QPushButton('Start')
-        self.m_sd_stop_btn = QtGui.QPushButton('Stop')
-        QtCore.QObject.connect(self.m_sd_start_btn, QtCore.SIGNAL('clicked()'),
-                               self.ActLogStart)
-        QtCore.QObject.connect(self.m_sd_stop_btn, QtCore.SIGNAL('clicked()'),
-                               self.ActLogStop)
-        sd_log = QtGui.QVBoxLayout()
-        sd_log.addWidget(sd_log_fname_lbl)
-        sd_log.addWidget(self.m_sd_log_fname_val)
-        sd_log_action = QtGui.QHBoxLayout()
-        sd_log_action.addWidget(self.m_sd_start_btn)
-        sd_log_action.addWidget(self.m_sd_stop_btn)
-        sd_log.addLayout(sd_log_action)
-        self.SetLogFileVal()
-        self.SetEnableLogButtons()
-        # Graph actions
-        self.m_graph_freeze_cb = QtGui.QCheckBox("Freeze figure", self)
-        self.m_graph_freeze_cb.setStatusTip("Freeze only figure, " +
-                                            "log keep running in background")
-        # Debug buttons
-        if __debug__:
-            dbg_info_lbl = QtGui.QLabel('DEBUG MODE')
-            dbg_refresh_btn = QtGui.QPushButton('Refresh')
-            QtCore.QObject.connect(dbg_refresh_btn, QtCore.SIGNAL('clicked()'),
-                                   self.RefreshAll)
-            dbg_layout = QtGui.QVBoxLayout()
-            dbg_layout.addWidget(dbg_info_lbl)
-            dbg_layout.addWidget(dbg_refresh_btn)
-        # Custom status bar at the bottom of the widget
-        self.m_statusBar = QtGui.QLabel('Inlinino is ready.')
-        self.m_statusBar.setWordWrap(True)
-        # Set sidebar widgets in dock
-        self.dockWidgetContent = QtGui.QWidget()
-        self.sidebar = QtGui.QVBoxLayout(self.dockWidgetContent)
-        self.sidebar.addLayout(sd_data)
-        self.sidebar.addWidget(self.HLine())
-        self.sidebar.addLayout(sd_instr_status)
-        self.sidebar.addWidget(self.HLine())
-        self.sidebar.addLayout(sd_log)
-        self.sidebar.addWidget(self.HLine())
-        self.sidebar.addWidget(self.m_graph_freeze_cb)
-        if __debug__:
-            self.sidebar.addWidget(self.HLine())
-            self.sidebar.addLayout(dbg_layout)
-        self.sidebar.addStretch(1)
-        self.sidebar.addWidget(self.m_statusBar)
-        # Setup the dock widget
-        self.dockWidget = QtGui.QDockWidget(self)
-        self.dockWidget.setObjectName('Sidebar')
-        self.dockWidget.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea |
-                                        QtCore.Qt.RightDockWidgetArea)
-        self.dockWidget.setWidget(self.dockWidgetContent)
-        self.dockWidget.setFeatures(QtGui.QDockWidget.DockWidgetMovable |
-                                    QtGui.QDockWidget.DockWidgetFloatable)
-        # self.dockWidget.setFeatures(QtGui.QDockWidget.NoDockWidgetFeatures)
-        self.dockWidget.setTitleBarWidget(QtGui.QWidget(None))
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockWidget)
-
-        # Set Colors
-        palette = QtGui.QPalette()
-        if (self.m_app.m_cfg.m_app['theme'] == "light" or
-            self.m_app.m_cfg.m_app['theme'] == "outside"):
-            palette.setColor(palette.Window, QtGui.QColor('#F8F8F2')) # Background
-            palette.setColor(palette.WindowText, QtGui.QColor('#26292C')) # Foreground
-            pg.setConfigOption('background', QtGui.QColor('#F8F8F2'))
-            pg.setConfigOption('foreground', QtGui.QColor('#26292C'))
-        else:
-            palette.setColor(palette.Window, QtGui.QColor('#26292C'))
-            palette.setColor(palette.WindowText, QtGui.QColor('#F8F8F2'))
-            pg.setConfigOption('background', QtGui.QColor('#26292C'))
-            pg.setConfigOption('foreground', QtGui.QColor('#F8F8F2'))
-        self.setPalette(palette)
-
-        # Button style is os dependend (can force with some CSS)
-        self.setFont(QtGui.QFont("Helvetica Neue Light"))
-
-        # Set figure with pyqtgraph
-        axis = DateAxis(orientation='bottom')
-        if __debug__:
-            self.m_pw = pg.PlotWidget(axisItems={'bottom': axis})
-        else:
-            self.m_pw = pg.PlotWidget(axisItems={'bottom': axis},
-                                      enableMenu=False)
-        self.m_plot = self.m_pw.plotItem
-        self.m_curves = []
-        # n = len(self.m_app.m_log_data.m_varkeys)
-        # for i in range(n):
-        n = sum(self.m_app.m_log_data.m_vardisplayed)
-        i = 0
-        for varkey, vardisplayed in zip(self.m_app.m_log_data.m_varkeys,
-                                        self.m_app.m_log_data.m_vardisplayed):
-            if vardisplayed:
-                # Init Curve Item
-                c = pg.PlotCurveItem(pen=(i, n))
-                # Change Color of Value Displayed
-                self.m_var_display[varkey].setStyleSheet(
-                    'color: ' + c.opts['pen'].color().name())
-                # Add item to plot
-                self.m_plot.addItem(c)
-                # Keep track of item
-                # might want to use self.m_plot.listDataItems() instead
-                self.m_curves.append(c)
-                # Increment to change color
-                i += 1
-        # self.m_plot.setLabel('bottom', 'Time' , units='s')
-        self.m_plot.setLabel('left', 'Signal', units='Counts')
-        # self.m_plot.setYRange(0, 5)
-        # self.m_plot.setXRange(0, 100)
-        self.m_plot.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
-        self.m_plot.setMouseEnabled(x=False, y=True)
-        self.m_plot.showGrid(x=False, y=True)
-        self.m_plot.enableAutoRange(x=True, y=True)
-
-        # Set layout in main window
-        widget = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(widget)
-        layout.addWidget(self.m_pw)
-        self.setCentralWidget(widget)
-
-        # Close splash screen before starting main app
-        if not __debug__:
-            sleep(0.5)
-        splashScreen.finish(self)
-
-        # Show main window and make it active
-        self.show()
-        self.raise_()
-
-        # Save state of current window
-        self.saveState()
-        # self.restorState()
-
-        # Connect background thread refreshing info on UI
-        self.m_refresh_thread = Thread()
-        self.m_refresh_worker = Worker(1/self.m_app.m_cfg.m_app['ui_update_frequency'])
-        self.m_refresh_worker.moveToThread(self.m_refresh_thread)
-        self.m_refresh_worker.refresh.connect(self.RefreshAll)
-        self.m_refresh_worker.finished.connect(self.m_refresh_thread.quit)
-        self.m_refresh_thread.started.connect(self.m_refresh_worker.RefreshPing)
-        # self.m_refresh_thread.start()
-
-    # Set plot (pyQtGraph)
-    def SetPlot(self):
-        n = self.m_app.m_log_data.m_buffer_size
-        timestamp = self.m_app.m_log_data.m_buffer['timestamp'].get(n)
-        # Update position with time
-        i = 0
-        for varkey, vardisplayed in zip(self.m_app.m_log_data.m_varkeys,
-                                        self.m_app.m_log_data.m_vardisplayed):
-            if vardisplayed:
-                data = self.m_app.m_log_data.m_buffer[varkey].get(n)
-                self.m_curves[i].setData(timestamp, data)
-                i += 1
-            # self.m_curves[i].setPos(self.m_app.m_log_data.m_buffer['timestamp'], 0)
-        self.m_plot.enableAutoRange(x=True)  # Needed as soon as mouth is used
-
-    # Instrument Actions
-    def ActInstrConnect(self, line, _instr_key=None):
-        # Get instrument to connect
-        if _instr_key == None:
-            list_instr = list(self.m_app.m_instruments.keys())
-            instr_key, ok = QtGui.QInputDialog.getItem(self, 'Connect instrument',
-                                                        'Select instrument',
-                                                        ['All'] + list_instr)
-        else:
-            instr_key = _instr_key
-            ok = True
-
-        # Connect instrument
-        if ok:
-            if instr_key == 'All':
-                # Connect all inactive instruments
-                allConnectionSuccess = True
-                allConnectionFailed = False
-                updateComPort = True
-                for instr_key in list_instr:
-                    if not self.m_app.m_instruments[instr_key].m_active:
-                        if (self.m_app.m_instruments[instr_key].m_connect_need_port
-                            and updateComPort):
-                            # Update list of com port if needed for first instrumnt
-                            self.m_app.m_com.ListPorts()
-                            updateComPort = False
-                        foo = self.InstrConnect(instr_key)
-                        if foo == False:
-                            allConnectionSuccess = False
-                        else:
-                            allConnectionFailed = False
-                if allConnectionSuccess:
-                    self.m_statusBar.setText('All instrument are ' +
-                                                 'connected')
-                elif allConnectionFailed:
-                    self.m_statusBar.setText('ERROR: All instrument ' +
-                                                 'connection failed')
-                else:
-                    self.m_statusBar.setText('WARNING: Some connection ' +
-                                                 'succeded, some failed')
-            else:
-                # Connect specified instrument
-                if self.m_app.m_instruments[instr_key].m_connect_need_port:
-                    # Update list of Com port if needed
-                    self.m_app.m_com.ListPorts()
-                self.InstrConnect(instr_key)
-        # Update Thread to Refresh UI
-        self.UpdateThread()
-
-    def InstrConnect(self, _instr_key):
-        if self.m_app.m_instruments[_instr_key].m_connect_need_port:
-            # Instrument need a port address to connect
-            port, ok = QtGui.QInputDialog.getItem(self, 'Connect Instrument',
-                                              'Connecting ' + _instr_key + '\nSelect port', self.m_app.m_com.GetPortList())
-            if ok:
-                if self.m_app.m_instruments[_instr_key].Connect(port):
-                    self.m_statusBar.setText(_instr_key + ' is connected to ' + port)
-                else:
-                    self.m_statusBar.setText('ERROR: Fail connecting ' + _instr_key + ' to ' + port)
-        else:
-            # Instrument do not need anything to connect
-            if self.m_app.m_instruments[_instr_key].Connect():
-                self.m_statusBar.setText(_instr_key + ' is connected')
-            else:
-                self.m_statusBar.setText('ERROR: Fail connecting ' + _instr_key)
-        # Set instrument status
-        self.SetInstrumentsStatus()
-
-    def ActInstrClose(self, line, _instr_key = None):
-        # Get instrument to disconnect
-        if _instr_key is None:
-            list_instr = list(self.m_app.m_instruments.keys())
-            instr_key, ok = QtGui.QInputDialog.getItem(self, 'Disconnect instrument',
-                                               'Select instrument', ['All'] + list_instr)
-        else:
-            instr_key = _instr_key
-            ok = True
-
-        # Disconnect instrument
-        if ok:
-            if instr_key == 'All':
-                for instr_key in list_instr:
-                    self.m_app.m_instruments[instr_key].Close()
-                self.m_statusBar.setText('All instrument connection closed')
-            else:
-                self.m_app.m_instruments[instr_key].Close()
-                self.m_statusBar.setText('Closed connection with ' + instr_key)
-        else:
-            self.m_statusBar.setText('Cancel instrument disconnection')
-
-        # Update display
-        self.SetInstrumentsStatus()
-        # Update Thread to Refresh UI
-        self.UpdateThread()
-
-    # Set instruments display
-    def SetInstrumentsVar(self):
-        # Update time and date
-        t = self.m_app.m_log_data.m_buffer['timestamp'].get()[0]
-        if not np_isnan(t):
-            zulu = gmtime(t)
-            self.m_time_display.setText(strftime('%H:%M:%S', zulu))
-            self.m_time_display.repaint()
-            self.m_date_display.setText(strftime('%Y/%m/%d', zulu))
-            self.m_date_display.repaint()
-        # Update variables
-        for varkey, vardisplayed in zip(self.m_app.m_log_data.m_varkeys,
-                          self.m_app.m_log_data.m_vardisplayed):
-            if vardisplayed:
-                # Update only variables to display
-                foo = self.m_app.m_log_data.m_buffer[varkey].get()[0]
-                if foo is not None and type(foo) is not str:
-                    # Update variable if type is number, not None or string
-                    if isinstance(foo, int):
-                        if foo < 100000:
-                            self.m_var_display[varkey].setText(str(foo))
-                        else:
-                            self.m_var_display[varkey].setText('%.2E' % foo)
-                    elif isinstance(foo, float):
-                        if foo < 10000:
-                            self.m_var_display[varkey].setText('%.2f' % foo)
-                        else:
-                            self.m_var_display[varkey].setText('%.2E' % foo)
-                    self.m_var_display[varkey].repaint()
-
-    def SetInstrumentsStatus(self):
-        for instr_key, instr_value in self.m_app.m_instruments.items():
-            if instr_value.m_active:
-                # Change status
-                self.m_instr_status[instr_key].setText('active')
-                self.m_instr_status[instr_key].setStyleSheet('color: #9ce22e')
-                # Change button
-                self.m_instr_connect_btn[instr_key].hide()
-                self.m_instr_close_btn[instr_key].show()
-            else:
-                # Change status
-                self.m_instr_status[instr_key].setText('inactive')
-                self.m_instr_status[instr_key].setStyleSheet('color: #f92670')
-                # Change button
-                self.m_instr_connect_btn[instr_key].show()
-                self.m_instr_close_btn[instr_key].hide()
-            self.m_instr_status[instr_key].repaint()
-
-    def SetInstrumentsPackets(self):
-        for instr_key, instr_value in self.m_app.m_instruments.items():
-            self.m_instr_pckt_rcvd[instr_key].setText(str(instr_value.m_n))
-            self.m_instr_pckt_mssd[instr_key].setText(str(instr_value.m_nNoResponse))
-            self.m_instr_pckt_rcvd[instr_key].repaint()
-            self.m_instr_pckt_mssd[instr_key].repaint()
-
-    # Action Log
-    def ActInstrList(self, line):
-        foo = ''
-        for instr_val in self.m_app.m_instruments.values():
-            foo += '  ' + str(instr_val) + '\n'
-        reply = QtGui.QMessageBox.information(self, 'Instrument list',
-                                              'List of instruments:\n' + foo)
-
-    def ActLogStart(self):
-        if not self.m_app.m_log_data.m_active_log:
-            if self.m_app.m_log_data.CountActiveInstruments() < 1:
-                reply = QtGui.QMessageBox.warning(self, 'Start logging data',
-                    "No instruments are connected, do you still want to start logging data ?", QtGui.QMessageBox.Yes |
-                    QtGui.QMessageBox.No, QtGui.QMessageBox.No)
-
-                if reply == QtGui.QMessageBox.Yes:
-                    self.m_app.m_log_data.Start()
-                    self.m_statusBar.setText('Start logging data')
-                else:
-                    self.m_statusBar.setText('Cancel Start logging data')
-            else:
-                self.m_app.m_log_data.Start()
-                self.m_statusBar.setText('Start logging data')
-        else:
-            QtGui.QMessageBox.information(self, 'Start logging data',
-                                              'Already logging data')
-        self.SetEnableLogButtons()
-        # Wait that threads starts before updating file name
-        sleep(self.m_app.m_log_data.m_buffer_interval+0.001)
-        self.SetLogFileVal()
-
-    def ActLogStop(self):
-        if self.m_app.m_log_data.m_active_log:
-            self.m_app.m_log_data.Stop()
-            self.m_statusBar.setText('Stop logging data')
-        else:
-            QtGui.QMessageBox.information(self, 'Stop logging data',
-                                              'Already stopped logging data')
-        self.SetEnableLogButtons()
-        self.SetLogFileVal()
-        self.UpdateThread() # turno off buffer thread if all instruments are off
-
-    def ActLogHeader(self):
-        header, ok = QtGui.QInputDialog.getText(self, 'Set log file name header',
-                                                'New header:')
-        if ok:
-            self.m_app.m_log_data.m_file_header = header
-            self.m_statusBar.setText('Set log file header to ' + header)
-        self.SetLogFileVal()
-
-    def ActLogPath(self):
-        path = QtGui.QFileDialog.getExistingDirectory(self,
-                'Select directory', self.m_app.m_log_data.m_file_path)
-
-        if path == '':
-            print('Cancel')
-        else:
-            self.m_app.m_log_data.m_file_path = path
-            self.m_statusBar.setText('Set log directory to ' + path)
-        self.SetLogFileVal()
-
-    # Set log display
-    def SetEnableLogButtons(self):
-        if self.m_app.m_log_data.m_active_log:
-            self.m_sd_start_btn.setEnabled(False)
-            self.m_sd_stop_btn.setEnabled(True)
-            self.m_actLogStart.setEnabled(False)
-            self.m_actLogStop.setEnabled(True)
-        else:
-            self.m_sd_start_btn.setEnabled(True)
-            self.m_sd_stop_btn.setEnabled(False)
-            self.m_actLogStart.setEnabled(True)
-            self.m_actLogStop.setEnabled(False)
-
-    def SetLogFileVal(self):
-        if (self.m_app.m_log_data.m_file_name is not None and
-                self.m_app.m_log_data.m_active_log):
-            foo = os.path.join(self.m_app.m_log_data.m_file_path,
-                               self.m_app.m_log_data.m_file_name)
-        else:
-            foo = os.path.join(self.m_app.m_log_data.m_file_path,
-                               self.m_app.m_log_data.m_file_header) \
-                + '_yyyymmdd_HHMMSS.csv'
-        self.m_sd_log_fname_val.setText('...' + foo[-30:])
-        self.m_sd_log_fname_val.repaint()
-
-    # Refresh user interface with data from other thread
-    def RefreshAll(self):
-        # if __debug__:
-        #     print('GUI:RefreshAll')
-        self.SetInstrumentsVar()
-        self.SetInstrumentsPackets()
-        self.SetInstrumentsStatus()
-        self.SetLogFileVal()
-        if not self.m_graph_freeze_cb.isChecked():
-            self.SetPlot()
-
-    # Action Help
-    def ActHelpHelp(self):
-        msg = QtGui.QMessageBox()
-        msg.setIcon(QtGui.QMessageBox.Question)
-        msg.setText("Inlinino Help")
-        msg.setInformativeText('Inlinino is a simple data logger.\n' +
-                               'To start logging data:\n' +
-                               '   1. connect an instrument (Instrument>' +
-                               'Connect)\n' +
-                               '   2. start the logger (Log>Start)\n' +
-                               'To stop logging data:\n' +
-                               '   + stop the logger (Log>Stop)\n' +
-                               '   + exit application (will stop logging to)' +
-                               '\nMore details at: github.com/OceanOptics/' +
-                               'Inlinino')
-        msg.setWindowTitle('Help')
-        msg.exec_()
-
-    def ActHelpSupport(self):
-        msg = QtGui.QMessageBox()
-        msg.setIcon(QtGui.QMessageBox.Question)
-        msg.setText('Inlinino Support')
-        msg.setInformativeText('Send questions, bug reports, fixes, ' +
-                               'enhancements, t-shirts, ' +
-                               'money, lobsters & beers to Nils\n' +
-                               '<nils.haentjens+inlinino@maine.edu>')
-        msg.setWindowTitle('Support')
-        msg.exec_()
-
-    def ActHelpCredits(self):
-        msg = QtGui.QMessageBox()
-        msg.setIcon(QtGui.QMessageBox.Information)
-        msg.setText('Inlinino Credits')
-        msg.setInformativeText('Developped by Nils Haëntjens (University of ' +
-                               'Maine)\nGNU GENERAL PUBLIC LICENSE\nVersion ' +
-                               '3, 29 June 2007')
-        msg.setWindowTitle('Credits')
-        msg.exec_()
-
-    # UI specific actions
-    def closeEvent(self, event):
-        if not __debug__:
-            reply = QtGui.QMessageBox.question(self, 'Closing application',
-                "Are you sure to quit?", QtGui.QMessageBox.Yes |
-                QtGui.QMessageBox.No, QtGui.QMessageBox.No)
-
-            if reply == QtGui.QMessageBox.Yes:
-                event.accept()
-            else:
-                event.ignore()
-
-    def center(self):
-        qr = self.frameGeometry()
-        cp = QtGui.QDesktopWidget().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.move(qr.topLeft())
-
-    # UI custom widgets
-    def HLine(self):
-        foo = QtGui.QFrame()
-        foo.setFrameShape(QtGui.QFrame.HLine)
-        foo.setFrameShadow(QtGui.QFrame.Sunken)
-        return foo
-
-    def QVarDisplay(self, _name, _value, _unit='No Units'):
-        name = QtGui.QLabel(_name)
-        name.setFont(QtGui.QFont("Helvetica Neue Light", 10))
-        name.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignBottom)
-        value = QtGui.QLabel(str(_value))
-        value.setFont(QtGui.QFont("Helvetica Neue Light", 12))
-        value.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
-        unit = QtGui.QLabel(_unit)
-        unit.setFont(QtGui.QFont("Helvetica Neue Light", 10))
-        unit.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignTop)
-
-        widget = QtGui.QWidget()
-        group = QtGui.QVBoxLayout(widget)
-        group.setSpacing(0)
-        group.setContentsMargins(0, 0, 0, 0)
-        group.addWidget(name)
-        group.addWidget(value)
-        group.addWidget(unit)
-
-        return widget, value, unit
-
-    def QInstrDisplay(self, _name, _status, _pckt_received, _pckt_missed):
-        name = QtGui.QLabel(_name)
-        # name.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        status_lbl1 = QtGui.QLabel(' [')
-        status_lbl2 = QtGui.QLabel('] : ')
-        if _status:
-            status_val = QtGui.QLabel('active')
-            status_val.setStyleSheet('color: #9ce22e')
-        else:
-            status_val = QtGui.QLabel('inactive')
-            status_val.setStyleSheet('color: #f92670') # 5cd9ef
-        connect_btn = QtGui.QPushButton('>')
-        connect_btn.setToolTip('Connect ' + _name)
-        close_btn = QtGui.QPushButton('o')
-        close_btn.setToolTip('Disconnect ' + _name)
-        pckt_received_lbl = QtGui.QLabel('  pckt received: ')
-        pckt_received_val = QtGui.QLabel(str(_pckt_received))
-        pckt_missed_lbl = QtGui.QLabel('  pckt missed: ')
-        pckt_missed_val = QtGui.QLabel(str(_pckt_missed))
-
-        widget = QtGui.QWidget()
-        group = QtGui.QVBoxLayout(widget)
-        group.setSpacing(0)
-        group.setContentsMargins(0, 0, 0, 0)
-        header = QtGui.QHBoxLayout()
-        header.addWidget(name)
-        header.addWidget(status_lbl1)
-        header.addWidget(status_val)
-        header.addWidget(status_lbl2)
-        header.addWidget(connect_btn)
-        header.addWidget(close_btn)
-        header.addStretch(1)
-        group.addLayout(header)
-        pckt_received = QtGui.QHBoxLayout()
-        pckt_received.addWidget(pckt_received_lbl)
-        pckt_received.addWidget(pckt_received_val)
-        group.addLayout(pckt_received)
-        pckt_missed = QtGui.QHBoxLayout()
-        pckt_missed.addWidget(pckt_missed_lbl)
-        pckt_missed.addWidget(pckt_missed_val)
-        group.addLayout(pckt_missed)
-
-        return widget, status_val, pckt_received_val, pckt_missed_val, \
-            connect_btn, close_btn
-
-    def UpdateThread(self):
-        # if __debug__:
-        #     print('GUI:UpdateThread')
-        # If any instrument is active start log buffer
-        for instr_value in self.m_app.m_instruments.values():
-            if instr_value.m_active:
-                if not self.m_app.m_log_data.m_active_buffer:
-                    self.m_app.m_log_data.StartThread()
-                if not self.m_refresh_thread.isRunning():
-                    self.m_refresh_worker.m_active = True
-                    self.m_refresh_thread.start()
-                return
-        # If all instrument are off stop log buffer
-        if self.m_app.m_log_data.m_active_buffer:
-            self.m_app.m_log_data.StopThread()
-        if self.m_refresh_thread.isRunning():
-            self.m_refresh_worker.m_active = False
-
-
-# Thread and Workers to refresh data
-# From Matthew Levine on http://stackoverflow.com/questions/6783194
-class Worker(QtCore.QObject):
-    refresh = QtCore.pyqtSignal()
-    finished = QtCore.pyqtSignal()
-
-    def __init__(self, _timeout, _parent=None):
-        QtCore.QObject.__init__(self, _parent)
-        self.m_timeout = _timeout
-        self.m_active = True
-
-    def __del__(self):
-        self.m_active = False
-        if __debug__:
-            print('Closing Qtworker')
-
-    @QtCore.pyqtSlot()
-    def RefreshPing(self):
-        start_time = time()
-        while self.m_active:
-            try:
-                sleep(self.m_timeout - (time() - start_time) % self.m_timeout)
-                self.refresh.emit()
-                start_time = time()
-            except Exception as e:
-                print('Unexpected error while updating GUI')
-                print(e)
-        self.finished.emit()
-
-
-class Thread(QtCore.QThread):
-    def __init__(self, _parent=None):
-        QtCore.QThread.__init__(self, _parent)
-
-    def start(self):
-        QtCore.QThread.start(self)
-
-    def run(self):
-        QtCore.QThread.run(self)
-
-
-class DateAxis(pg.AxisItem):
-    def __init__(self, *args, **kwargs):
+import sys, os
+import logging
+from time import time, gmtime, strftime
+from serial.tools.list_ports import comports as list_serial_comports
+from serial import SerialException
+from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
+from inlinino.instruments import Instrument
+from inlinino.instruments.acs import ACS
+from inlinino.instruments.lisst import LISST
+from inlinino.instruments.dataq import DATAQ
+from pyACS.acs import ACS as ACSParser
+from inlinino.instruments.lisst import LISSTParser
+import numpy as np
+from math import floor
+
+logger = logging.getLogger('GUI')
+
+
+class InstrumentSignals(QtCore.QObject):
+    status_update = QtCore.pyqtSignal()
+    packet_received = QtCore.pyqtSignal()
+    packet_corrupted = QtCore.pyqtSignal()
+    packet_logged = QtCore.pyqtSignal()
+    new_data = QtCore.pyqtSignal(object, float)
+    new_aux_data = QtCore.pyqtSignal(list)
+
+
+def seconds_to_strmmss(seconds):
+    min = floor(seconds / 60)
+    sec = seconds % 60
+    return '%d:%02d' % (min, sec)
+
+
+class ReverseTimeAxisItem(pg.AxisItem):
+    def __init__(self, buffer_length, sample_rate, *args, **kwargs):
+        self.buffer_length = buffer_length
+        self.sample_rate = sample_rate
         pg.AxisItem.__init__(self, *args, **kwargs)
 
     def tickStrings(self, values, scale, spacing):
-        strns = []
-        if values:
-            rng = max(values) - min(values)
-            # if rng < 120:
-            #    return pg.AxisItem.tickStrings(self, values, scale, spacing)
-            if rng < 3600 * 24:
-                string = '%H:%M:%S'
-                label1 = '%b %d - '
-                label2 = '%d, %Y'
-            elif rng >= 3600 * 24 and rng < 3600 * 24 * 30:
-                string = '%d'
-                label1 = '%b - '
-                label2 = '%b,  %Y'
-            elif rng >= 3600 * 24 * 30 and rng < 3600 * 24 * 30 * 24:
-                string = '%b'
-                label1 = '%Y -'
-                label2 = ' %Y'
-            elif rng >= 3600 * 24 * 30 * 24:
-                string = '%Y'
-                label1 = ''
-                label2 = ''
-            for x in values:
-                try:
-                    strns.append(strftime(string, gmtime(x)))
-                except ValueError:  # Windows can't handle dates before 1970
-                    strns.append('')
-            # try:
-            #     label = strftime(label1, gmtime(min(values))) + \
-            #             strftime(label2, gmtime(max(values)))
-            # except ValueError:
-            #     label = ''
-            # self.setLabel(text=label)
-            return strns
-        else:
-            return []
+        return [seconds_to_strmmss((self.buffer_length - t) / self.sample_rate) for t in values]
 
-if __name__ == '__main__':
-    app = QtGui.QApplication(sys.argv)
-    main_ui = GUI(None)
-    sys.exit(app.exec_())
+
+class ReverseAxisItem(pg.AxisItem):
+    def __init__(self, buffer_length, *args, **kwargs):
+        self.buffer_length = buffer_length
+        pg.AxisItem.__init__(self, *args, **kwargs)
+
+    def tickStrings(self, values, scale, spacing):
+        return [self.buffer_length - t for t in values]
+
+
+class MainWindow(QtGui.QMainWindow):
+    BACKGROUND_COLOR = '#F8F8F2'
+    FOREGROUND_COLOR = '#26292C'
+    BUFFER_LENGTH = 240
+    MAX_PLOT_REFRESH_RATE = 4   # Hz
+
+    def __init__(self, instrument=None):
+        super(MainWindow, self).__init__()
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'main.ui'), self)
+        # Graphical Adjustments
+        self.dock_widget.setTitleBarWidget(QtGui.QWidget(None))
+        self.label_app_version.setText('Inlinino v' + __version__)
+        # Set Colors
+        palette = QtGui.QPalette()
+        palette.setColor(palette.Window, QtGui.QColor(self.BACKGROUND_COLOR))  # Background
+        palette.setColor(palette.WindowText, QtGui.QColor(self.FOREGROUND_COLOR))  # Foreground
+        self.setPalette(palette)
+        pg.setConfigOption('background', QtGui.QColor(self.BACKGROUND_COLOR))
+        pg.setConfigOption('foreground', QtGui.QColor(self.FOREGROUND_COLOR))
+        # Set figure with pyqtgraph
+        self._buffer_timestamp = None
+        self._buffer_data = []
+        self.last_plot_refresh = time()
+        self.timeseries_widget = None
+        self.init_timeseries_plot()
+        # Set instrument
+        if instrument:
+            self.init_instrument(instrument)
+        else:
+            self.instrument = None
+        self.packets_received = 0
+        self.packets_logged = 0
+        self.packets_corrupted = 0
+        # Set buttons
+        self.button_setup.clicked.connect(self.act_instrument_setup)
+        self.button_serial.clicked.connect(self.act_instrument_serial)
+        self.button_log.clicked.connect(self.act_instrument_log)
+        # Set clock
+        self.signal_clock = QtCore.QTimer()
+        self.signal_clock.timeout.connect(self.set_clock)
+        self.signal_clock.start(1000)
+        # Plugins variables
+        self.plugin_aux_data_variable_names = []
+        self.plugin_aux_data_variable_values = []
+
+    def init_instrument(self, instrument):
+        self.instrument = instrument
+        self.label_instrument_name.setText(self.instrument.name)
+        self.instrument.signal.status_update.connect(self.on_status_update)
+        self.instrument.signal.packet_received.connect(self.on_packet_received)
+        self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
+        self.instrument.signal.packet_logged.connect(self.on_packet_logged)
+        self.instrument.signal.new_data.connect(self.on_new_data)
+        self.on_status_update()  # Need to be run as on instrument setup the signals were not connected
+
+        # Set Plugins specific to instrument
+        # Auxiliary Data Plugin
+        self.group_box_aux_data.setVisible(self.instrument.plugin_aux_data)
+        if self.instrument.plugin_aux_data:
+            # Set aux variable names
+            for v in self.instrument.plugin_aux_data_variable_names:
+                self.plugin_aux_data_variable_names.append(QtGui.QLabel(v))
+                self.plugin_aux_data_variable_values.append(QtGui.QLabel('?'))
+                self.group_box_aux_data_layout.addRow(self.plugin_aux_data_variable_names[-1],
+                                                      self.plugin_aux_data_variable_values[-1])
+            # Connect signal
+            self.instrument.signal.new_aux_data.connect(self.on_new_aux_data)
+
+        # Select Channels To Plot Plugin
+        self.group_box_active_timeseries_variables.setVisible(self.instrument.plugin_active_timeseries_variables)
+        if self.instrument.plugin_active_timeseries_variables:
+            # Set sel channels check_box
+            for v in self.instrument.plugin_active_timeseries_variables_names:
+                check_box = QtWidgets.QCheckBox(v)
+                check_box.stateChanged.connect(self.on_active_timeseries_variables_update)
+                if v in self.instrument.plugin_active_timeseries_variables_selected:
+                    check_box.setChecked(True)
+                self.group_box_active_timeseries_variables_scroll_area_content_layout.addWidget(check_box)
+
+    def init_timeseries_plot(self):
+        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()}, enableMenu=False)  # Date Axis available in newer versions of pqtgraph
+        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseTimeAxisItem(self.BUFFER_LENGTH, 1, orientation='bottom')}, enableMenu=False)  # Disable time on bottom axis
+        # self.timeseries_widget.plotItem.setLabel('bottom', 'Time since acquisition', units='mm:ss')
+        self.timeseries_widget = pg.PlotWidget(
+            axisItems={'bottom': ReverseAxisItem(self.BUFFER_LENGTH, orientation='bottom')}, enableMenu=False)
+        self.timeseries_widget.plotItem.setLabel('bottom', 'Samples', units='#')
+        self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
+        self.timeseries_widget.plotItem.setLabel('left',
+                                                 'Signal')  # Update units depending on instrument  #, units='Counts'
+        self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
+        self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
+        self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
+        self.timeseries_widget.plotItem.showGrid(x=False, y=True)
+        self.timeseries_widget.plotItem.enableAutoRange(x=True, y=True)
+        self.timeseries_widget.plotItem.addLegend()
+        self.setCentralWidget(self.timeseries_widget)
+
+    def set_clock(self):
+        zulu = gmtime(time())
+        self.label_clock.setText(strftime('%H:%M:%S', zulu) + ' UTC')
+        # self.label_date.setText(strftime('%Y/%m/%d', zulu))
+
+    def act_instrument_setup(self):
+        logger.debug('Setup instrument')
+        setup_dialog = DialogInstrumentSetup(self.instrument.cfg_id)
+        setup_dialog.show()
+        if setup_dialog.exec_():
+            self.instrument.setup(setup_dialog.cfg)
+            self.label_instrument_name.setText(self.instrument.name)
+
+    def act_instrument_serial(self):
+        if self.instrument.alive:
+            logger.debug('Disconnect instrument')
+            self.instrument.close()
+        else:
+            # TODO Update Connect Modal
+            ports_list = list_serial_comports()
+            ports_list_name = [str(p.device) + ' - ' + str(p.product) for p in ports_list]
+            # Instrument need a port address to connect
+            selected_port, ok = QtGui.QInputDialog.getItem(self, 'Connect Instrument',
+                                                           'Connecting ' + self.instrument.name + '\nSelect port',
+                                                           ports_list_name)
+            if ok:
+                port = ports_list[ports_list_name.index(selected_port)].device
+                try:
+                    self.instrument.open(port)
+                except SerialException as e:
+                    QtGui.QMessageBox.warning(self, "Connect " + self.instrument.name,
+                                              'ERROR: Failed connecting ' + self.instrument.name + ' to ' +
+                                              port + '\n' + str(e),
+                                              QtGui.QMessageBox.Ok)
+
+    def act_instrument_log(self):
+        if self.instrument.log_active():
+            logger.debug('Stop logging')
+            self.instrument.log_stop()
+        else:
+            logger.debug('Start logging')
+            self.instrument.log_start()
+
+    @QtCore.pyqtSlot()
+    def on_status_update(self):
+        if self.instrument.alive:
+            self.button_serial.setText('Close')
+            self.button_serial.setToolTip('Disconnect instrument.')
+            self.button_log.setEnabled(True)
+            if self.instrument.log_active():
+                status = 'Logging'
+                if self.instrument.log_raw_enabled:
+                    if self.instrument.log_prod_enabled:
+                        status += ' (raw & prod)'
+                    else:
+                        status += ' (raw)'
+                else:
+                    status += ' (prod)'
+                self.label_status.setText(status)
+                self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #12ab29;')
+                # Green: #12ab29 (darker) #29ce42 (lighter) #9ce22e (pyQtGraph)
+                self.button_log.setText('Stop')
+                self.button_log.setToolTip('Stop logging data')
+            else:
+                self.label_status.setText('Connected')
+                self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #ff9e17;')
+                # Orange: #ff9e17 (darker) #ffc12f (lighter)
+                self.button_log.setText('Start')
+                self.button_log.setToolTip('Start logging data')
+        else:
+            self.label_status.setText('Disconnected')
+            self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #e0463e;')
+            # Red: #e0463e (darker) #5cd9ef (lighter)  #f92670 (pyQtGraph)
+            self.button_serial.setText('Open')
+            self.button_serial.setToolTip('Connect instrument.')
+            self.button_log.setEnabled(False)
+        self.le_filename.setText(self.instrument.log_get_filename())
+        self.le_directory.setText(self.instrument.log_get_path())
+        self.packets_received = 0
+        self.label_packets_received.setText(str(self.packets_received))
+        self.packets_logged = 0
+        self.label_packets_logged.setText(str(self.packets_logged))
+        self.packets_corrupted = 0
+        self.label_packets_corrupted.setText(str(self.packets_corrupted))
+
+    @QtCore.pyqtSlot()
+    def on_packet_received(self):
+        self.packets_received += 1
+        self.label_packets_received.setText(str(self.packets_received))
+
+    @QtCore.pyqtSlot()
+    def on_packet_logged(self):
+        self.packets_logged += 1
+        if self.packets_received < self.packets_logged < 2:  # Fix inconsistency when start logging
+            self.packets_received = self.packets_logged
+            self.label_packets_received.setText(str(self.packets_received))
+        self.label_packets_logged.setText(str(self.packets_logged))
+
+    @QtCore.pyqtSlot()
+    def on_packet_corrupted(self):
+        self.packets_corrupted += 1
+        self.label_packets_corrupted.setText(str(self.packets_corrupted))
+
+    @QtCore.pyqtSlot(list, float)
+    @QtCore.pyqtSlot(np.ndarray, float)
+    def on_new_data(self, data, timestamp):
+        if len(self._buffer_data) != len(data):
+            # Init buffers
+            self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
+            self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
+            # Init Plot (need to do so when number of curve changes)
+            self.init_timeseries_plot()
+            # Init curves
+            if self.instrument.plugin_active_timeseries_variables:
+                legend = self.instrument.plugin_active_timeseries_variables_selected
+            else:
+                legend = self.instrument.variable_names
+            for i in range(len(data)):
+                self.timeseries_widget.plotItem.addItem(pg.PlotCurveItem(pen=(i, len(data)), name=legend[i]))
+        # Update buffers
+        self._buffer_timestamp.extend(timestamp)
+        for i in range(len(data)):
+            self._buffer_data[i].extend(data[i])
+        # TODO Update real-time figure (depend on instrument type)
+        # Update timeseries figure
+        if time() - self.last_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
+            return
+        # timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)  # Not used anymore
+        for i in range(len(data)):
+            y = self._buffer_data[i].get(self.BUFFER_LENGTH)
+            x = np.arange(len(y))
+            y[np.isinf(y)] = 0
+            sel = np.logical_not(np.isnan(y))
+            y[~sel] = np.interp(x[~sel], x[sel], y[sel])
+            self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
+            # TODO Put back X-Axis with time without high demand on cpu
+            # self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
+        self.timeseries_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
+        self.last_plot_refresh = time()
+
+    @QtCore.pyqtSlot(list)
+    def on_new_aux_data(self, data):
+        if self.instrument.plugin_aux_data:
+            for i, v in enumerate(data):
+                self.plugin_aux_data_variable_values[i].setText(str(v))
+
+    @QtCore.pyqtSlot(int)
+    def on_active_timeseries_variables_update(self, state):
+        if self.instrument.plugin_active_timeseries_variables:
+            self.instrument.udpate_active_timeseries_variables(self.sender().text(), state)
+
+    def closeEvent(self, event):
+        msg = QtGui.QMessageBox()
+        msg.setIcon(QtGui.QMessageBox.Question)
+        msg.setWindowTitle("Inlinino: Closing Application")
+        msg.setText("Are you sure to quit ?")
+        msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+        msg.setDefaultButton(QtGui.QMessageBox.No)
+        if msg.exec_() == QtGui.QMessageBox.Yes:
+            QtGui.QApplication.instance().closeAllWindows()  # NEEDED IF OTHER WINDOWS OPEN BY SPECIFIC INSTRUMENTS
+            event.accept()
+        else:
+            event.ignore()
+
+
+class DialogStartUp(QtGui.QDialog):
+    LOAD_INSTRUMENT = 1
+    SETUP_INSTRUMENT = 2
+
+    def __init__(self):
+        super(DialogStartUp, self).__init__()
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'startup.ui'), self)
+        instruments_to_load = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"] for i in CFG.instruments]
+        self.instruments_to_setup = [i[6:-3] for i in os.listdir(PATH_TO_RESOURCES) if i[-3:] == '.ui' and i[:6] == 'setup_']
+        self.combo_box_instrument_to_load.addItems(instruments_to_load)
+        self.combo_box_instrument_to_setup.addItems(self.instruments_to_setup)
+        self.button_load.clicked.connect(self.act_load_instrument)
+        self.button_setup.clicked.connect(self.act_setup_instrument)
+        self.selection_index = None
+
+    def act_load_instrument(self):
+        self.selection_index = self.combo_box_instrument_to_load.currentIndex()
+        self.done(self.LOAD_INSTRUMENT)
+
+    def act_setup_instrument(self):
+        self.selection_index = self.combo_box_instrument_to_setup.currentIndex()
+        self.done(self.SETUP_INSTRUMENT)
+
+
+class DialogInstrumentSetup(QtGui.QDialog):
+    ENCODING = 'ascii'
+    OPTIONAL_FIELDS = ['Variable Precision', 'Prefix Custom']
+
+    def __init__(self, template):
+        super(DialogInstrumentSetup, self).__init__()
+        if isinstance(template, str):
+            # Load template from instrument type
+            self.create = True
+            self.cfg_index = -1
+            self.cfg = {'module': template}
+            uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + template + '.ui'), self)
+        elif isinstance(template, int):
+            # Load from preconfigured instrument
+            self.create = False
+            self.cfg_index = template
+            self.cfg = CFG.instruments[template]
+            uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + self.cfg['module'] + '.ui'), self)
+            # Populate fields
+            for k, v in self.cfg.items():
+                if hasattr(self, 'le_' + k):
+                    if isinstance(v, bytes):
+                        getattr(self, 'le_' + k).setText(v.decode().encode('unicode_escape').decode())
+                    elif isinstance(v, list):
+                        getattr(self, 'le_' + k).setText(', '.join([str(vv) for vv in v]))
+                    else:
+                        getattr(self, 'le_' + k).setText(v)
+                elif hasattr(self, 'combobox_' + k):
+                    if v:
+                        getattr(self, 'combobox_' + k).setCurrentIndex(0)
+                    else:
+                        getattr(self, 'combobox_' + k).setCurrentIndex(1)
+            # Populate special fields specific to each module
+            if self.cfg['module'] == 'dataq':
+                for c in self.cfg['channels_enabled']:
+                    getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
+        else:
+            raise ValueError('Invalid instance type for template.')
+        if 'button_browse_log_directory' in self.__dict__.keys():
+            self.button_browse_log_directory.clicked.connect(self.act_browse_log_directory)
+        if 'button_browse_device_file' in self.__dict__.keys():
+            self.button_browse_device_file.clicked.connect(self.act_browse_device_file)
+        if 'button_browse_ini_file' in self.__dict__.keys():
+            self.button_browse_ini_file.clicked.connect(self.act_browse_ini_file)
+
+        # Cannot use default save button as does not provide mean to correctly validate user input
+        self.button_save = QtGui.QPushButton('Save')
+        self.button_save.setDefault(True)
+        self.button_save.clicked.connect(self.act_save)
+        self.button_box.addButton(self.button_save, QtGui.QDialogButtonBox.ActionRole)
+        self.button_box.rejected.connect(self.reject)
+
+    def act_browse_log_directory(self):
+        self.le_log_path.setText(QtGui.QFileDialog.getExistingDirectory(caption='Choose logging directory'))
+
+    def act_browse_device_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose device file', filter='Device File (*.dev *.txt)')
+        self.le_device_file.setText(file_name)
+
+    def act_browse_ini_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose initialization file', filter='Ini File (*.ini)')
+        self.le_ini_file.setText(file_name)
+
+    def act_save(self):
+        # Read form
+        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or 'le_' in a]
+        empty_fields = list()
+        for f in fields:
+            field_prefix, field_name = f.split('_', 1)
+            field_pretty_name = field_name.replace('_', ' ').title()
+            if field_prefix == 'le':
+                value = getattr(self, f).text()
+                if not value:
+                    empty_fields.append(field_pretty_name)
+                    continue
+                # Apply special formatting to specific variables
+                try:
+                    if 'variable_' in field_name:
+                        value = value.split(',')
+                        value = [v.strip() for v in value]
+                        if 'variable_columns' in field_name:
+                            value = [int(x) for x in value]
+                    elif field_name in ['terminator', 'separator']:
+                        # if len(value) > 3 and (value[:1] == "b'" and value[-1] == "'"):
+                        #     value = bytes(value[2:-1], 'ascii')
+                        value = value.strip().encode(self.ENCODING).decode('unicode_escape').encode(self.ENCODING)
+                    else:
+                        value.strip()
+                except:
+                    self.notification('Unable to parse special variable: ' + field_pretty_name, sys.exc_info()[0])
+                    return
+                self.cfg[field_name] = value
+            elif field_prefix == 'combobox':
+                if getattr(self, f).currentText() == 'on':
+                    self.cfg[field_name] = True
+                else:
+                    self.cfg[field_name] = False
+        # Read Log Prefix (not saved in cfg)
+        self.cfg['log_prefix'] = ''
+        if self.checkbox_prefix_diw.isChecked():
+            self.cfg['log_prefix'] += 'DIW'
+        if self.checkbox_prefix_fsw.isChecked():
+            self.cfg['log_prefix'] += 'FSW'
+        if self.checkbox_prefix_dark.isChecked():
+            self.cfg['log_prefix'] += 'DARK'
+        if self.checkbox_prefix_custom.isChecked():
+            self.cfg['log_prefix'] += self.le_prefix_custom.text()
+        if self.cfg['log_prefix']:
+            self.cfg['log_prefix'] += '_'
+        # Check All required fields are complete
+        for f in self.OPTIONAL_FIELDS:
+            try:
+                empty_fields.pop(empty_fields.index(f))
+            except ValueError:
+                pass
+        if empty_fields:
+            self.notification('Fill required fields.', '\n'.join(empty_fields))
+            return
+        # Check generic special field
+        if self.cfg['module'] == 'generic':
+            variable_keys = [v for v in self.cfg.keys() if 'variable_' in v]
+            if variable_keys:
+                # Check length
+                n = len(self.cfg['variable_names'])
+                for k in variable_keys:
+                    if n != len(self.cfg[k]):
+                        self.notification('Inconsistent length. Variable Names, Variable Units, Variable Columns,'
+                                          'Variable Types, and Variable Precision must have the same number of elements '
+                                          'separated by commas.')
+                        return
+                # Check type
+                for v in self.cfg['variable_types']:
+                    if v not in ['int', 'float']:
+                        self.notification('Invalid variable type')
+                        return
+                # Check precision
+                if 'variable_precision' in self.cfg:
+                    for v in self.cfg['variable_precision']:
+                        if v[0] != '%' and v[-1] not in ['d', 'f']:
+                            self.notification('Invalid variable precision. '
+                                              'Expect type specific formatting (e.g. %d or %.3f) separated by commas.')
+                            return
+            if not self.cfg['log_raw'] and not self.cfg['log_products']:
+                self.notification('Invalid logger configuration. '
+                                  'At least one logger must be ON (to either log raw or parsed data).')
+                return
+        # Check ACS special fields
+        elif self.cfg['module'] == 'acs':
+            self.cfg['manufacturer'] = 'WetLabs'
+            try:
+                # serial number in ACSParser is given in hexadecimal and preceded by 2 bytes indicating meter type
+                foo = ACSParser(self.cfg['device_file']).serial_number
+                if foo[:4] == '0x53':
+                    self.cfg['model'] = 'ACS'
+                else:
+                    self.cfg['model'] = 'UnknownMeterType'
+                self.cfg['serial_number'] = str(int(foo[-6:], 16))
+            except:
+                self.notification('Unable to parse acs device file.')
+                return
+            if 'log_raw' not in self.cfg.keys():
+                self.cfg['log_raw'] = True
+            if 'log_products' not in self.cfg.keys():
+                self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'lisst':
+            self.cfg['manufacturer'] = 'Sequoia'
+            self.cfg['model'] = 'LISST'
+            try:
+                self.cfg['serial_number'] = str(LISSTParser(self.cfg['device_file'], self.cfg['ini_file']).serial_number)
+            except:
+                self.notification('Unable to parse lisst device and/or ini file.')
+                return
+            if 'log_raw' not in self.cfg.keys():
+                self.cfg['log_raw'] = True
+            if 'log_products' not in self.cfg.keys():
+                self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'dataq':
+            self.cfg['channels_enabled'] = []
+            for c in range(4):
+                if getattr(self, 'checkbox_channel%d_enabled' % (c+1)).isChecked():
+                    self.cfg['channels_enabled'].append(c)
+            if not self.cfg['channels_enabled']:
+                self.notification('At least one channel must be enabled.', 'Nothing to log if no channels are enabled.')
+                return
+            if 'log_raw' not in self.cfg.keys():
+                self.cfg['log_raw'] = False
+            if 'log_products' not in self.cfg.keys():
+                self.cfg['log_products'] = True
+        # Update global instrument cfg
+        if self.create:
+            CFG.instruments.append(self.cfg)
+            self.cfg_index = -1
+        else:
+            CFG.instruments[self.cfg_index] = self.cfg.copy()
+        CFG.write()
+        self.accept()
+
+    @staticmethod
+    def notification(message, details=None):
+        msg = QtGui.QMessageBox()
+        msg.setIcon(QtGui.QMessageBox.Warning)
+        msg.setText(message)
+        # msg.setInformativeText("This is additional information")
+        if details:
+            msg.setDetailedText(str(details))
+        msg.setWindowTitle("Inlinino: Setup Instrument Warning")
+        msg.setStandardButtons(QtGui.QMessageBox.Ok)
+        msg.exec_()
+
+
+class App(QtGui.QApplication):
+    def __init__(self, *args):
+        QtGui.QApplication.__init__(self, *args)
+        self.splash_screen = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
+        self.splash_screen.show()
+        self.main_window = MainWindow()
+        self.startup_dialog = DialogStartUp()
+        self.splash_screen.close()
+
+    def start(self, instrument_index=None):
+        if not instrument_index:
+            logger.debug('Startup Dialog')
+            self.startup_dialog.show()
+            act = self.startup_dialog.exec_()
+            if act == self.startup_dialog.LOAD_INSTRUMENT:
+                instrument_index = self.startup_dialog.selection_index
+            elif act == self.startup_dialog.SETUP_INSTRUMENT:
+                setup_dialog = DialogInstrumentSetup(
+                    self.startup_dialog.instruments_to_setup[self.startup_dialog.selection_index])
+                setup_dialog.show()
+                if setup_dialog.exec_():
+                    instrument_index = setup_dialog.cfg_index
+                else:
+                    logger.info('Setup closed')
+                    self.start()  # Restart application to go back to startup screen
+            else:
+                logger.info('Startup closed')
+                sys.exit()
+
+        # Load instrument
+        instrument_name = CFG.instruments[instrument_index]['model'] + ' ' \
+                          + CFG.instruments[instrument_index]['serial_number']
+        instrument_module_name = CFG.instruments[instrument_index]['module']
+        logger.debug('Loading instrument ' + instrument_name)
+        instrument_loaded = False
+        while not instrument_loaded:
+            try:
+                if instrument_module_name == 'generic':
+                    self.main_window.init_instrument(Instrument(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'acs':
+                    self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'dataq':
+                    self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'lisst':
+                    self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
+                else:
+                    logger.critical('Instrument module not supported')
+                    sys.exit(-1)
+                instrument_loaded = True
+            except Exception as e:
+                logger.warning('Unable to load instrument.')
+                logger.warning(e)
+                self.closeAllWindows()  # ACS and LISST are opening pyqtgraph windows
+                # Dialog Box
+                setup_dialog = DialogInstrumentSetup(instrument_index)
+                setup_dialog.show()
+                setup_dialog.notification('Unable to load instrument. Please check configuration', e)
+                if setup_dialog.exec_():
+                    logger.info('Updated configuration')
+                else:
+                    logger.info('Setup closed')
+                    self.start()  # Restart application to go back to startup screen
+        # Start Main Window
+        self.main_window.show()
+        sys.exit(self.exec_())

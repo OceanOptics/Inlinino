@@ -1,182 +1,262 @@
-# -*- coding: utf-8 -*-
-# @Author: nils
-# @Date:   2016-05-15 12:11:42
-# @Last Modified by:   nils
-# @Last Modified time: 2017-04-03 14:17:10
-
-# import sys
-# import glob
-from time import sleep
-import serial.tools.list_ports
+import serial
+from threading import Thread
+from time import time
+from inlinino.log import Log, LogText
+from inlinino import CFG
+import logging
 
 
-class Instrument(object):
+class Instrument:
     '''
-    Set frame for all instruments
+    Generic Interface for Serial Instruments
     '''
 
-    def __init__(self, _name):
-        # Init Parameters
-        self.m_name = _name
-        self.m_cache = {}
-        self.m_units = {}
-        self.m_varnames = []
-        self.m_cacheIsNew = {}
-        self.m_active = False
-        self.m_connect_need_port = None
-        self.m_thread = None
+    REQUIRED_CFG_FIELDS = ['model', 'serial_number', 'module', 'separator', 'terminator',
+                           'log_path', 'log_raw', 'log_products',
+                           'variable_columns', 'variable_types', 'variable_names', 'variable_units', 'variable_precision']
 
-        # Count data logged
-        self.m_n = 0
-        self.m_nNoResponse = 0
+    def __init__(self, cfg_id, signal=None):
+        self.logger = logging.getLogger(self.__class__.__name__)
 
-    def Connect(self, _port=None):
-        # Connect to instrument
-        #   To be implemented by subclass
-        #   if succesful connection to the instrument,
-        #   it should switch state of member variable m_active to True
-        #
-        # RETURN:
-        #   True    Succesful connection to the instrument
-        #   False   Failed conection to the instrument
-        pass
+        # Serial
+        self._serial = serial.Serial()
+        self._terminator = None
+        self._buffer = bytearray()
+        self._max_buffer_length = 16384
 
-    def Close(self):
-        # Close connection with instrument
-        #   To be implemented by subclass
-        #   it should switch state of member variable m_active to False
-        pass
+        # Thread
+        self._thread = None
+        self.alive = False  # Might be replaced by Thread.is_alive()
 
-    def RunUpdateCache(self):
-        while(self.m_active):
+        # Logger
+        self._log_raw = None
+        self._log_prod = None
+        self._log_active = False
+        self.log_raw_enabled = False
+        self.log_prod_enabled = False
+
+        # Simple parser
+        self.separator = None
+        self.variable_columns = None
+        self.variable_types = None
+
+        # User Interface
+        self.signal = signal
+        self.name = ''
+        self.variable_names = None
+        self.variable_units = None
+        self.variable_displayed = None
+        self.plugin_aux_data = False
+        self.plugin_active_timeseries_variables = False
+
+        # Load cfg
+        self.cfg_id = cfg_id
+        self.setup(CFG.instruments[self.cfg_id].copy())
+
+    def setup(self, cfg, raw_logger=LogText):
+        self.logger.debug('Setup')
+        if self.alive:
+            self.logger.warning('Closing port before updating connection')
+            self.close()
+        # Check missing fields
+        for f in self.REQUIRED_CFG_FIELDS:
+            if f not in cfg.keys():
+                raise ValueError('Missing field %s' % f)
+        # Check configuration
+        variable_keys = [v for v in cfg.keys() if 'variable_' in v]
+        if variable_keys:
+            # Check length
+            n = len(cfg['variable_names'])
+            for k in variable_keys:
+                if n != len(cfg[k]):
+                    raise ValueError('%s invalid length' % k)
+        # Serial
+        self._terminator = cfg['terminator']
+        # Logger
+        log_cfg = {'path': cfg['log_path']}
+        if 'log_prefix' in cfg.keys():
+            log_cfg['filename_prefix'] = cfg['log_prefix'] + cfg['model'] + cfg['serial_number']
+        else:
+            log_cfg['filename_prefix'] = cfg['model'] + cfg['serial_number']
+        for k in ['length', 'variable_names', 'variable_units', 'variable_precision']:
+            if k in cfg.keys():
+                log_cfg[k] = cfg[k]
+        if not self._log_raw:
+            self.logger.debug('Init loggers')
+            self._log_raw = raw_logger(log_cfg, self.signal.status_update)
+            self._log_prod = Log(log_cfg, self.signal.status_update)
+        else:
+            self.logger.debug('Update loggers configuration')
+            self._log_raw.update_cfg(log_cfg)
+            self._log_prod.update_cfg(log_cfg)
+        self._log_active = False
+        self.log_raw_enabled = cfg['log_raw']
+        self.log_prod_enabled = cfg['log_products']
+        # Simple parser
+        if 'separator' in cfg.keys():
+            self.separator = cfg['separator']
+        if 'variable_columns' in cfg.keys():
+            self.variable_columns = cfg['variable_columns']
+        if 'variable_types' in cfg.keys():
+            self.variable_types = cfg['variable_types']
+        # User Interface
+        # self.manufacturer = cfg['manufacturer']
+        # self.model = cfg['model']
+        # self.serial_number = cfg['serial_number']
+        self.name = cfg['model'] + ' ' + cfg['serial_number']
+        self.variable_names = cfg['variable_names']
+        self.variable_units = cfg['variable_units']
+        self.signal.status_update.emit()
+
+    def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=2):
+        if port is None:
+            raise ValueError('The instrument requires a port.')
+        if not self.alive:
+            # Open serial connection
+            self._serial.port = port
+            self._serial.baudrate = baudrate
+            self._serial.bytesize = bytesize
+            self._serial.parity = parity
+            self._serial.stopbits = stopbits
+            self._serial.timeout = timeout
+            self._serial.open()
+            self.alive = True
+            # Start reading/writing thread
+            self._thread = Thread(name=self.name, target=self.run)
+            self._thread.daemon = True
+            self._thread.start()
+            # Signal to UI
+            self.signal.status_update.emit()
+
+    def close(self, wait_thread_join=True):
+        if self.alive:
+            self.alive = False
+            self.signal.status_update.emit()
+            if hasattr(self._serial, 'cancel_read'):
+                self._serial.cancel_read()
+            if wait_thread_join:
+                self._thread.join(self._serial.timeout)
+                if self._thread.is_alive():
+                    self.logger.warning('Thread did not join.')
+            self.log_stop()
+            self._serial.close()
+
+    def run(self):
+        if self._serial.is_open:
+            # Empty buffers
+            self._serial.reset_input_buffer()
+            self._serial.reset_output_buffer()
+            if self._serial.in_waiting > 0:
+                self._serial.read(self._serial.in_waiting)
+            # Send init frame to instrument
+            self.init_serial()
+        while self.alive and self._serial.is_open:
             try:
-                self.UpdateCache()
-            except Exception as e:
-                print(self.m_name +
-                      ': Unexpected error while updating cache.\n' +
-                      'Suggestions:\n' +
-                      '\t-Instrument might be unplug\n' +
-                      '\t-No data sent by the instrument\n')
-                sleep(self.m_serial.timeout)
-                try:
-                    self.EmptyCache()
-                    self.CommunicationError()
-                except:
-                    print(self.m_name +
-                          ': Unexpected error while emptying cache')
-                print(e)
+                # read all that is there or wait for one byte (blocking)
+                data = self._serial.read(self._serial.in_waiting or 1)
+                timestamp = time()
+                if data:
+                    try:
+                        self.data_received(data, timestamp)
+                        if len(self._buffer) > self._max_buffer_length:
+                            self.logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
+                            self._buffer = bytearray()
+                    except Exception as e:
+                        self.logger.warning(e)
+            except serial.SerialException as e:
+                # probably some I/O problem such as disconnected USB serial
+                # adapters -> exit
+                self.logger.error(e)
+                break
+        self.close(wait_thread_join=False)
 
-    def UpdateCache(self):
-        # Update cache
-        #   To be implemented by subclass
+    def data_received(self, data, timestamp):
+        self._buffer.extend(data)
+        while self._terminator in self._buffer:
+            packet, self._buffer = self._buffer.split(self._terminator, 1)
+            try:
+                self.handle_packet(packet, timestamp)
+            except IndexError:
+                self.signal.packet_corrupted.emit()
+                self.logger.warning('Incomplete packet or Incorrect variable column requested.')
+                self.logger.debug(packet)
+                # if __debug__:
+                #     raise
+            except ValueError:
+                self.signal.packet_corrupted.emit()
+                self.logger.warning('Instrument or parser configuration incorrect.')
+                self.logger.debug(packet)
+                # if __debug__:
+                #     raise
+            except Exception as e:
+                self.signal.packet_corrupted.emit()
+                self.logger.warning(e)
+                self.logger.debug(packet)
+                # if __debug__:
+                #     raise e
+
+    def handle_packet(self, packet, timestamp):
+        self.signal.packet_received.emit()
+        self.write_to_serial()
+        if self.log_raw_enabled and self._log_active:
+            self._log_raw.write(packet, timestamp)
+            self.signal.packet_logged.emit()
+        data = self.parse(packet)
+        if data:
+            self.handle_data(data, timestamp)
+
+    def handle_data(self, data, timestamp):
+        self.signal.new_data.emit(data, timestamp)
+        if self.log_prod_enabled and self._log_active:
+            self._log_prod.write(data, timestamp)
+            if not self.log_raw_enabled:
+                self.signal.packet_logged.emit()
+
+    def log_start(self):
+        self._log_active = True
+        self.signal.status_update.emit()
+
+    def log_stop(self):
+        self._log_active = False
+        self.signal.status_update.emit()
+        self._log_raw.close()
+        self._log_prod.close()
+
+    def log_active(self):
+        return self._log_active
+
+    def log_get_path(self):
+        return self._log_raw.path
+
+    def log_get_filename(self):
+        if self.log_raw_enabled or not self.log_prod_enabled:
+            return self._log_raw.filename
+        else:
+            return self._log_prod.filename
+
+    def init_serial(self):
         pass
 
-    def CommunicationError(self, _msg=''):
-        # Set cache to None
-        for key in self.m_cache.keys():
-            self.m_cache[key] = None
+    def write_to_serial(self):
+        pass
 
-        # Error message if necessary
-        self.m_nNoResponse += 1
-        if (self.m_nNoResponse >= self.m_maxNoResponse and
-                self.m_nNoResponse % 60 == self.m_maxNoResponse):
-            print('%s did not respond %d times\n%s' % (self.m_name,
-                                                       self.m_nNoResponse,
-                                                       _msg))
-
-    def EmptyCache(self):
-        for key in self.m_cache.keys():
-            self.m_cache[key] = None
-
-    def ReadCache(self):
-        # Return dictionary with values in cache
-        return self.m_cache
-
-    def ReadVar(self, _key):
-        # Return value in cache corresponding to the key only if the value was
-        # updated since last read
-        if self.m_cacheIsNew[_key]:
-            self.m_cacheIsNew[_key] = False
-            return self.m_cache[_key]
-        else:
-            return None
+    def parse(self, packet):
+        foo = packet.split(self.separator)
+        bar = []
+        for c, t in zip(self.variable_columns, self.variable_types):
+            if t == "int":
+                bar.append(int(foo[c]))
+            elif t == "float":
+                bar.append(float(foo[c]))
+            else:
+                raise ValueError("Variable type not supported.")
+        return bar
 
     def __str__(self):
-        if self.m_active:
-            return self.m_name + '[active]'
+        if self.alive:
+            if self._log_active:
+                return self.name + '[alive][logging]'
+            else:
+                return self.name + '[alive][log-off]'
         else:
-            return self.m_name + '[close]'
-
-    # def __del__(self):
-    #     # Thread must be closed before __del__ happen
-    #     print('Instrument.__del__')
-
-
-class Communication():
-
-    m_port_list = []
-
-    def __init__(self, _robust=False):
-        # self.ListPorts()
-        self.robust = _robust
-
-    def ListPorts(self):
-        # Method working on Python 2.7
-        # pyserial version 2.7-py34_0 (default from conda) not working OSX py34
-        # pyserial version 3.1.1-py3.4 (2016-06-12) is working on OSX py34
-        self.m_port_list = serial.tools.list_ports.comports()
-
-        # Method from Thomas (http://stackoverflow.com/users/300783/thomas)
-        # Found on http://stackoverflow.com/questions/12090503
-        # if sys.platform.startswith('win'):
-        #     ports = ['COM%s' % (i + 1) for i in range(256)]
-        # elif (sys.platform.startswith('linux') or
-        #       sys.platform.startswith('cygwin')):
-        #     # this excludes your current terminal "/dev/tty"
-        #     ports = glob.glob('/dev/tty[A-Za-z]*')
-        # elif sys.platform.startswith('darwin'):
-        #     ports = glob.glob('/dev/tty.*')
-        # else:
-        #     raise EnvironmentError('Unsupported platform')
-
-        # self.m_port_list = []
-        # for port in ports:
-        #     try:
-        #         if self.robust:
-        #             s = serial.Serial(port)
-        #             s.close()
-        #         self.m_port_list.append(port)
-        #     except (OSError, serial.SerialException):
-        #         pass
-
-        return self.m_port_list
-
-    # Compatible with serial.tools.list_ports.comports() only
-    def PortInfo(self, _index):
-        foo = self.m_port_list[_index].device + ': ' + \
-            self.m_port_list[_index].description
-        if self.m_port_list[_index].manufacturer is not None:
-            foo += ' ' + self.m_port_list[_index].manufacturer
-        if self.m_port_list[_index].product is not None:
-            foo += ' ' + self.m_port_list[_index].product
-        return foo
-
-    def GetPortList(self):
-        l = []
-        for port in self.m_port_list:
-            l.append(port.device)
-        return l
-        # return self.m_port_list
-
-    def __str__(self):
-        foo = ''
-        for i in range(0, len(self.m_port_list)):
-            foo += self.PortInfo(i) + '\n'
-            # foo += self.m_port_list[i] + '\n'
-        return foo[0:-1]
-
-
-if __name__ == "__main__":
-    com = Communication()
-    com.ListPorts()
-    print(com)
+            return self.name + '[off]'
