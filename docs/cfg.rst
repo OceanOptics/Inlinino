@@ -38,7 +38,7 @@ List of parameters common and required by every instrument type.
     Path to the directory in which the data from the instruments is logged.
 
     .. note::
-        On Windows, the path need to include two backslashes as they are special characters in JSON. For example: ``C:\\Data\\Inlinino"``.
+        On Windows, the path need to include two backslashes as they are special characters in JSON. For example: ``C:\\Data\\Inlinino``.
 
 ``log_raw: <boolean>``
     Indicate if log the raw data coming from an instrument.

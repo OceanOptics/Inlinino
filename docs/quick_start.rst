@@ -17,6 +17,7 @@ Quick Start
     -darwin.zip">macOS</a>
 
 Inlinino is available for Windows and macOS, the packaged executable can be downloaded with the links below. Windows users will have to unzip the archive.
+
     + |link-to-ftp|\ |release|\ |end-link-win|
     + |link-to-ftp|\ |release|\ |end-link-mac|
 
@@ -27,11 +28,14 @@ Advance users or developers can setup the software directly from source (`GitHub
 Startup Menu
 ------------
 To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Windows and Inlinino-v\ |release|.app on macOS. When starting the software for the first time, it might take several seconds before displaying a window. Inlinino will first prompt which instrument will it be logging data from (:ref:`Screenshot 1<qs-figure-startup>`). Two options are available:
+
     + Setup a new instrument:
+
         1. Select the type of instrument to configure, the type of instrument available are listed in :ref:`Table 1<qs-table-instr-supported>`.
         2. Click on the setup button on the right side.
         3. A pop-up window will prompt you to configure the instrument, instructions for each type of instruments are available in the following sections.
         4. After validating the configuration of the instrument the main Inlinino window will be loaded.
+
     + Load a previously configured instrument:
         1. Select the instrument from the dropdown menu.
         2. Click on the load button on the right side.
@@ -69,6 +73,7 @@ Instruments are considered as generic if they send data as structured ascii fram
 
 ``Logger Group-Box <middle leftt>``
   It's possible to log the data in different format (select one or both options):
+
     + `raw data`: exact output of the instrument to which a timestamp is appended
     + `products`: variables of interest are extracted from the data frame received from the instrument and formatted into a comma separated value (csv) file with a timestamp.
 
@@ -185,6 +190,7 @@ The folder in which the data is logged is specified in the field `Log Directory`
 Main Window
 -----------
 Once an instrument selected or setup through the startup window, the main Inlinino window will be loaded. The model and serial number of instrument will be displayed at the top of the sidebar. The color of the instrument's model and serial number indicates the current status of the system:
+
     + red: the instrument is not connected
     + orange: the instrument is connected but not logging
     + green: the instrument is connected and logging data
@@ -220,6 +226,7 @@ Log data
 ^^^^^^^^
     1. Verify the configuration of the instrument by clicking on the setup button. Detailled instruction are provided in the, c.f. :ref:`next section<qs-edit-instrument-configuration>`.
     2. Connect the instrument:
+
         a. Click on ``Open`` button under the ``Controls`` section at the top of the sidebar.
         b. A pop-up window will prompt the serial port to which the instrument  should be connected to.
         c. Once connected the instrument name at the top of the sidebar will change to an orange color, and data can be visualize on the figure section of the window.
@@ -228,6 +235,7 @@ Log data
       If no data can be visualized or the data makes no sense, the instrument is either incorrectly configured, their is a problem wih the connection, the instrument has an issue, or the instrument is not sampling properly (e.g. bubbles in the sample).
 
     3. Log data:
+
         a. Click on ``Start`` button under the ``Controls`` section at the top of the sidebar.
         b. The name of the instrument will change to a green color. The filename under the ``Logger`` section will be updated to reflect the current file in which the data is logged. The filename is formatted as follow `<prefix><instrument_model><instrument_serial_number>_<YYYYMMDD>_<hhmmss>`. Prefix can be updated from the instrument `setup` (c.f. :ref:`Edit Instrument Configuration<qs-edit-instrument-configuration>`). is Typically, a new file is created hourly, however, this can be adjusted through the configuration file.
 

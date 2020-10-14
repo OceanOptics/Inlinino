@@ -7,6 +7,7 @@ PASC
 The precision analog to serial converter (PASC) is an optional data acquisition (DAQ) device. PASC is only required to log data from instruments communicating through analog channels. PASC can be built with an Arduino Uno type microcontroller and a precision analog to digital converter such as the Texas Instrument ADS1015 or ADS1115 `developpement boards <https://www.adafruit.com/product/1083>`__. The wiring instructions to build your own are available at `Adafruit website <https://learn.adafruit.com/adafruit-4-channel-adc-breakouts/assembly-and-wiring>`__.
 
 We uploaded the firmware to the microcontroller following these instructions.
+
     1. Load mcu_firmwares/PASC.cpp in the `Arduino IDE <https://www.arduino.cc/en/main/software>`__:
 
         1. In ~/Documents/Arduino create a folder PASC/
@@ -21,7 +22,9 @@ PASC Precision and Accuracy Validation
 
 The precision and accuracy of the PASC serial number 001 and 002 were assessed with a Fluke 85 III Voltmeter. We found no significant bias and a reasonable root mean square error of (5.3 mV), the data is presented in the Figure below.
 
-    .. image:: figures/pasc_validation.png
+    .. figure:: figures/pasc_validation.png
+      :scale: 50 %
+      :align: center
 
 
 Configuration in previous versions of Inlinino
@@ -142,3 +145,4 @@ Example of configuration for logging data of an analog fluorometer, the WET Labs
       }
     }
   }
+
