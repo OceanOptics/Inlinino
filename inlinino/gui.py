@@ -33,28 +33,19 @@ def seconds_to_strmmss(seconds):
     return '%d:%02d' % (min, sec)
 
 
-class ReverseTimeAxisItem(pg.AxisItem):
-    def __init__(self, buffer_length, sample_rate, *args, **kwargs):
-        self.buffer_length = buffer_length
-        self.sample_rate = sample_rate
-        pg.AxisItem.__init__(self, *args, **kwargs)
-
-    def tickStrings(self, values, scale, spacing):
-        return [seconds_to_strmmss((self.buffer_length - t) / self.sample_rate) for t in values]
-
-
-class ReverseAxisItem(pg.AxisItem):
-    def __init__(self, buffer_length, *args, **kwargs):
-        self.buffer_length = buffer_length
-        pg.AxisItem.__init__(self, *args, **kwargs)
-
-    def tickStrings(self, values, scale, spacing):
-        return [self.buffer_length - t for t in values]
-
-
 class MainWindow(QtGui.QMainWindow):
     BACKGROUND_COLOR = '#F8F8F2'
     FOREGROUND_COLOR = '#26292C'
+    PEN_COLORS = ['#1f77b4',  # muted blue
+                  '#2ca02c',  # cooked asparagus green
+                  '#ff7f0e',  # safety orange
+                  '#d62728',  # brick red
+                  '#9467bd',  # muted purple
+                  '#8c564b',  # chestnut brown
+                  '#e377c2',  # raspberry yogurt pink
+                  '#7f7f7f',  # middle gray
+                  '#bcbd22',  # curry yellow-green
+                  '#17becf']  # blue-teal
     BUFFER_LENGTH = 240
     MAX_PLOT_REFRESH_RATE = 4   # Hz
 
@@ -69,9 +60,10 @@ class MainWindow(QtGui.QMainWindow):
         palette.setColor(palette.Window, QtGui.QColor(self.BACKGROUND_COLOR))  # Background
         palette.setColor(palette.WindowText, QtGui.QColor(self.FOREGROUND_COLOR))  # Foreground
         self.setPalette(palette)
-        pg.setConfigOption('background', QtGui.QColor(self.BACKGROUND_COLOR))
-        pg.setConfigOption('foreground', QtGui.QColor(self.FOREGROUND_COLOR))
+        pg.setConfigOption('background', pg.mkColor(self.BACKGROUND_COLOR))
+        pg.setConfigOption('foreground', pg.mkColor(self.FOREGROUND_COLOR))
         # Set figure with pyqtgraph
+        # pg.setConfigOption('antialias', True)  # Lines are drawn with smooth edges at the cost of reduced performance
         self._buffer_timestamp = None
         self._buffer_data = []
         self.last_plot_refresh = time()
@@ -132,15 +124,10 @@ class MainWindow(QtGui.QMainWindow):
                 self.group_box_active_timeseries_variables_scroll_area_content_layout.addWidget(check_box)
 
     def init_timeseries_plot(self):
-        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()}, enableMenu=False)  # Date Axis available in newer versions of pqtgraph
-        # self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': ReverseTimeAxisItem(self.BUFFER_LENGTH, 1, orientation='bottom')}, enableMenu=False)  # Disable time on bottom axis
-        # self.timeseries_widget.plotItem.setLabel('bottom', 'Time since acquisition', units='mm:ss')
-        self.timeseries_widget = pg.PlotWidget(
-            axisItems={'bottom': ReverseAxisItem(self.BUFFER_LENGTH, orientation='bottom')}, enableMenu=False)
-        self.timeseries_widget.plotItem.setLabel('bottom', 'Samples', units='#')
+        self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem(utcOffset=0)}, enableMenu=False)
+        self.timeseries_widget.plotItem.setLabel('bottom', 'Time ', units='UTC')
         self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
-        self.timeseries_widget.plotItem.setLabel('left',
-                                                 'Signal')  # Update units depending on instrument  #, units='Counts'
+        self.timeseries_widget.plotItem.setLabel('left', 'Signal')
         self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
         self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
         self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
@@ -169,6 +156,7 @@ class MainWindow(QtGui.QMainWindow):
         else:
             # TODO Update Connect Modal
             ports_list = list_serial_comports()
+            # ports_list.append(type('obj', (object,), {'device': '/dev/ttys003', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
             ports_list_name = [str(p.device) + ' - ' + str(p.product) for p in ports_list]
             # Instrument need a port address to connect
             selected_port, ok = QtGui.QInputDialog.getItem(self, 'Connect Instrument',
@@ -267,7 +255,10 @@ class MainWindow(QtGui.QMainWindow):
             else:
                 legend = self.instrument.variable_names
             for i in range(len(data)):
-                self.timeseries_widget.plotItem.addItem(pg.PlotCurveItem(pen=(i, len(data)), name=legend[i]))
+                self.timeseries_widget.plotItem.addItem(
+                    pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
+                                     name=legend[i])
+                )
         # Update buffers
         self._buffer_timestamp.extend(timestamp)
         for i in range(len(data)):
@@ -276,16 +267,15 @@ class MainWindow(QtGui.QMainWindow):
         # Update timeseries figure
         if time() - self.last_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
             return
-        # timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)  # Not used anymore
+        timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)  # Not used anymore
         for i in range(len(data)):
             y = self._buffer_data[i].get(self.BUFFER_LENGTH)
             x = np.arange(len(y))
             y[np.isinf(y)] = 0
             sel = np.logical_not(np.isnan(y))
             y[~sel] = np.interp(x[~sel], x[sel], y[sel])
-            self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
-            # TODO Put back X-Axis with time without high demand on cpu
-            # self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
+            # self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
+            self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
         self.timeseries_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
         self.last_plot_refresh = time()
 
