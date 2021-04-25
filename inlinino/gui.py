@@ -1,3 +1,4 @@
+import serial
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
 from PyQt5 import QtMultimedia
 import pyqtgraph as pg
@@ -179,22 +180,16 @@ class MainWindow(QtGui.QMainWindow):
             logger.debug('Disconnect instrument')
             self.instrument.close()
         else:
-            # TODO Update Connect Modal
-            ports_list = list_serial_comports()
-            # ports_list.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
-            ports_list_name = [str(p.device) + ' - ' + str(p.product) for p in ports_list]
-            # Instrument need a port address to connect
-            selected_port, ok = QtGui.QInputDialog.getItem(self, 'Connect Instrument',
-                                                           'Connecting ' + self.instrument.name + '\nSelect port',
-                                                           ports_list_name)
-            if ok:
-                port = ports_list[ports_list_name.index(selected_port)].device
+            dialog = DialogSerialConnection(self.instrument)
+            dialog.show()
+            if dialog.exec_():
                 try:
-                    self.instrument.open(port)
+                    self.instrument.open(dialog.port, dialog.baudrate, dialog.bytesize,
+                                         dialog.parity, dialog.stopbits, dialog.timeout)
                 except SerialException as e:
-                    QtGui.QMessageBox.warning(self, "Connect " + self.instrument.name,
+                    QtGui.QMessageBox.warning(self, "Inlinino: Connect " + self.instrument.name,
                                               'ERROR: Failed connecting ' + self.instrument.name + ' to ' +
-                                              port + '\n' + str(e),
+                                              dialog.port + '\n' + str(e),
                                               QtGui.QMessageBox.Ok)
 
     def act_instrument_log(self):
@@ -585,6 +580,82 @@ class DialogInstrumentSetup(QtGui.QDialog):
         msg.setWindowTitle("Inlinino: Setup Instrument Warning")
         msg.setStandardButtons(QtGui.QMessageBox.Ok)
         msg.exec_()
+
+
+class DialogSerialConnection(QtGui.QDialog):
+    def __init__(self, instrument):
+        super(DialogSerialConnection, self).__init__()
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'serial_connection.ui'), self)
+        # Connect buttons
+        self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
+        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+        # Update ports list
+        self.ports = list_serial_comports()
+        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
+        for p in [str(p.device) + ' - ' + str(p.product) for p in self.ports]:
+            self.cb_port.addItem(p)
+        # # Set default values based on instrument
+        baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
+        if type(instrument) == ACS:
+            baudrate = str(instrument._parser.baudrate)  # TODO for ACS recover default from actual object
+            timeout = 1
+        elif type(instrument) == DATAQ:
+            baudrate, dataq = '115200', 1
+        elif type(instrument) == LISST:
+            baudrate, timeout = '9600', 10
+        self.cb_baudrate.setCurrentIndex([self.cb_baudrate.itemText(i) for i in range(self.cb_baudrate.count())].index(baudrate))
+        self.cb_bytesize.setCurrentIndex([self.cb_bytesize.itemText(i) for i in range(self.cb_bytesize.count())].index(bytesize))
+        self.cb_parity.setCurrentIndex([self.cb_parity.itemText(i) for i in range(self.cb_parity.count())].index(parity))
+        self.cb_stopbits.setCurrentIndex([self.cb_stopbits.itemText(i) for i in range(self.cb_stopbits.count())].index(stopbits))
+        self.sb_timeout.setValue(timeout)
+
+    @property
+    def port(self) -> str:
+        return self.ports[self.cb_port.currentIndex()].device
+
+    @property
+    def baudrate(self) -> int:
+        return int(self.cb_baudrate.currentText())
+
+    @property
+    def bytesize(self) -> int:
+        if self.cb_bytesize.currentText() == '5 bits':
+            return serial.FIVEBITS
+        elif self.cb_bytesize.currentText() == '6 bits':
+            return serial.SIXBITS
+        elif self.cb_bytesize.currentText() == '7 bits':
+            return serial.SEVENBITS
+        elif self.cb_bytesize.currentText() == '8 bits':
+            return serial.EIGHTBITS
+        raise ValueError('serial byte size not defined')
+
+    @property
+    def parity(self) -> int:
+        if self.cb_parity.currentText() == 'none':
+            return serial.PARITY_NONE
+        elif self.cb_parity.currentText() == 'even':
+            return serial.PARITY_EVEN
+        elif self.cb_parity.currentText() == 'odd':
+            return serial.PARITY_EVEN
+        elif self.cb_parity.currentText() == 'mark':
+            return serial.PARITY_MARK
+        elif self.cb_parity.currentText() == 'space':
+            return serial.PARITY_SPACE
+        raise ValueError('serial parity not defined')
+
+    @property
+    def stopbits(self) -> int:
+        if self.cb_stopbits.currentText() == '1':
+            return serial.STOPBITS_ONE
+        elif self.cb_stopbits.currentText() == '1.5':
+            return serial.STOPBITS_ONE_POINT_FIVE
+        elif self.cb_stopbits.currentText() == '2':
+            return serial.STOPBITS_TWO
+        raise ValueError('serial stop bits not defined')
+
+    @property
+    def timeout(self) -> int:
+        return int(self.sb_timeout.value())
 
 
 class App(QtGui.QApplication):
