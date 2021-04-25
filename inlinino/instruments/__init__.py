@@ -14,6 +14,7 @@ class Instrument:
     REQUIRED_CFG_FIELDS = ['model', 'serial_number', 'module', 'separator', 'terminator',
                            'log_path', 'log_raw', 'log_products',
                            'variable_columns', 'variable_types', 'variable_names', 'variable_units', 'variable_precision']
+    DATA_TIMEOUT = 60  # seconds
 
     def __init__(self, cfg_id, signal=None):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -150,6 +151,9 @@ class Instrument:
                 self._serial.read(self._serial.in_waiting)
             # Send init frame to instrument
             self.init_serial()
+            # Set data timeout flag
+            data_timeout_flag = False
+            data_received = None
         while self.alive and self._serial.is_open:
             try:
                 # read all that is there or wait for one byte (blocking)
@@ -161,12 +165,23 @@ class Instrument:
                         if len(self._buffer) > self._max_buffer_length:
                             self.logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
                             self._buffer = bytearray()
+                        data_received = timestamp
+                        if data_timeout_flag:
+                            data_timeout_flag = False
+                            self.signal.alarm.emit(False)
                     except Exception as e:
                         self.logger.warning(e)
+                else:
+                    if data_received is not None and \
+                            timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
+                        self.logger.error(f'No data received during the past {timestamp - data_received:.2f} seconds')
+                        data_timeout_flag = True
+                        self.signal.alarm.emit(True)
             except serial.SerialException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
                 self.logger.error(e)
+                self.signal.alarm.emit(True)
                 break
         self.close(wait_thread_join=False)
 

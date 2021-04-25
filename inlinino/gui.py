@@ -1,6 +1,7 @@
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
+from PyQt5 import QtMultimedia
 import pyqtgraph as pg
-import sys, os
+import sys, os, glob
 import logging
 from time import time, gmtime, strftime
 from serial.tools.list_ports import comports as list_serial_comports
@@ -25,6 +26,7 @@ class InstrumentSignals(QtCore.QObject):
     packet_logged = QtCore.pyqtSignal()
     new_data = QtCore.pyqtSignal(object, float)
     new_aux_data = QtCore.pyqtSignal(list)
+    alarm = QtCore.pyqtSignal(bool)
 
 
 def seconds_to_strmmss(seconds):
@@ -85,6 +87,28 @@ class MainWindow(QtGui.QMainWindow):
         self.signal_clock = QtCore.QTimer()
         self.signal_clock.timeout.connect(self.set_clock)
         self.signal_clock.start(1000)
+        # Alarm message box for data timeout
+        self.alarm_sound = QtMultimedia.QMediaPlayer()
+        self.alarm_playlist = QtMultimedia.QMediaPlaylist(self.alarm_sound)
+        for file in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'alarm*.wav'))):
+            self.alarm_playlist.addMedia(QtMultimedia.QMediaContent(QtCore.QUrl.fromLocalFile(file)))
+        if self.alarm_playlist.mediaCount() < 1:
+            logger.warning('No alarm sounds available: disabled alarm')
+        self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
+        self.alarm_sound.setPlaylist(self.alarm_playlist)
+        # self.alarm_sound.setMedia(QtMultimedia.QMediaContent(QtCore.QUrl.fromLocalFile(
+        #     os.path.join(PATH_TO_RESOURCES, 'alarm-arcade.wav'))))
+        self.alarm_message_box_active = False
+        self.alarm_message_box = QtWidgets.QMessageBox()
+        self.alarm_message_box.setIcon(QtWidgets.QMessageBox.Warning)
+        self.alarm_message_box.setWindowTitle("Data Timeout Alarm")
+        self.alarm_message_box.setText("An error with the serial connection occured or "
+                                       "no data was received in the past minute.\n\n"
+                                       "Does the instrument receive power?\n"
+                                       "Are the serial cable and serial to USB adapter connected?\n"
+                                       "Is the instruments set to continuously send data?\n")
+        self.alarm_message_box.setStandardButtons(QtWidgets.QMessageBox.Ignore)
+        self.alarm_message_box.buttonClicked.connect(self.alarm_message_box_button_clicked)
         # Plugins variables
         self.plugin_aux_data_variable_names = []
         self.plugin_aux_data_variable_values = []
@@ -97,6 +121,7 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
         self.instrument.signal.packet_logged.connect(self.on_packet_logged)
         self.instrument.signal.new_data.connect(self.on_new_data)
+        self.instrument.signal.alarm.connect(self.on_data_timeout)
         self.on_status_update()  # Need to be run as on instrument setup the signals were not connected
 
         # Set Plugins specific to instrument
@@ -156,7 +181,7 @@ class MainWindow(QtGui.QMainWindow):
         else:
             # TODO Update Connect Modal
             ports_list = list_serial_comports()
-            # ports_list.append(type('obj', (object,), {'device': '/dev/ttys003', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
+            # ports_list.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
             ports_list_name = [str(p.device) + ' - ' + str(p.product) for p in ports_list]
             # Instrument need a port address to connect
             selected_port, ok = QtGui.QInputDialog.getItem(self, 'Connect Instrument',
@@ -289,6 +314,28 @@ class MainWindow(QtGui.QMainWindow):
     def on_active_timeseries_variables_update(self, state):
         if self.instrument.plugin_active_timeseries_variables:
             self.instrument.udpate_active_timeseries_variables(self.sender().text(), state)
+
+    @QtCore.pyqtSlot(bool)
+    def on_data_timeout(self, active):
+        if active and not self.alarm_message_box_active:
+            # Start alarm and Open message box
+            self.alarm_playlist.setCurrentIndex(0)
+            self.alarm_sound.play()
+            self.alarm_message_box.open()
+            getattr(self.alarm_message_box, 'raise')
+            self.alarm_message_box_active = True
+        elif not active and self.alarm_message_box_active:
+            # Stop alarm and Close message box
+            self.alarm_sound.stop()
+            self.alarm_message_box.close()
+            self.alarm_message_box_active = False
+
+    def alarm_message_box_button_clicked(self, button):
+        if button.text() == 'Ignore':
+            logger.info('Ignored alarm')
+            self.alarm_sound.stop()
+            self.alarm_message_box.close()
+            self.alarm_message_box_active = False
 
     def closeEvent(self, event):
         msg = QtGui.QMessageBox()
