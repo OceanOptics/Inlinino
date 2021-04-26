@@ -10,8 +10,9 @@ from serial import SerialException
 from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
 from inlinino.instruments import Instrument
 from inlinino.instruments.acs import ACS
-from inlinino.instruments.lisst import LISST
 from inlinino.instruments.dataq import DATAQ
+from inlinino.instruments.lisst import LISST
+from inlinino.instruments.taratsg import TaraTSG
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
 import numpy as np
@@ -603,6 +604,8 @@ class DialogSerialConnection(QtGui.QDialog):
             baudrate, dataq = '115200', 1
         elif type(instrument) == LISST:
             baudrate, timeout = '9600', 10
+        elif type(instrument) == TaraTSG:
+            baudrate, timeout = '9600', 3
         self.cb_baudrate.setCurrentIndex([self.cb_baudrate.itemText(i) for i in range(self.cb_baudrate.count())].index(baudrate))
         self.cb_bytesize.setCurrentIndex([self.cb_bytesize.itemText(i) for i in range(self.cb_bytesize.count())].index(bytesize))
         self.cb_parity.setCurrentIndex([self.cb_parity.itemText(i) for i in range(self.cb_parity.count())].index(parity))
@@ -703,6 +706,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'lisst':
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'taratsg':
+                    self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:
                     logger.critical('Instrument module not supported')
                     sys.exit(-1)

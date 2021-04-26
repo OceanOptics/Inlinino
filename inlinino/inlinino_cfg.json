@@ -158,6 +158,72 @@
       "serial_number": "111",
       "log_raw": true,
       "log_products": true
+    },
+    {
+      "module": "generic",
+      "variable_names": [
+        "rtd",
+        "t",
+        "fault",
+        "ec_c",
+        "ec_v",
+        "ec_su"
+      ],
+      "variable_units": [
+        "counts",
+        "degC",
+        "nounits",
+        "counts",
+        "volts",
+        "ms/cm"
+      ],
+      "variable_columns": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "variable_types": [
+        "int",
+        "float",
+        "int",
+        "int",
+        "float",
+        "float"
+      ],
+      "variable_precision": [
+        "%d",
+        "%.4f",
+        "%d",
+        "%d",
+        "%.4f",
+        "%.4f"
+      ],
+      "terminator": {
+        "__bytes__": "ascii",
+        "content": "\r\n"
+      },
+      "separator": {
+        "__bytes__": "ascii",
+        "content": ","
+      },
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "manufacturer": "HH",
+      "model": "TSG",
+      "serial_number": "001"
+    },
+    {
+      "module": "taratsg",
+      "log_path": "data",
+      "log_products": true,
+      "log_raw": false,
+      "manufacturer": "Sea-Bird",
+      "model": "SBE38+45",
+      "serial_number": "Tara"
     }
   ]
 }
