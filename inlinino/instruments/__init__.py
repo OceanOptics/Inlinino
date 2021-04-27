@@ -171,6 +171,7 @@ class Instrument:
                             self.signal.alarm.emit(False)
                     except Exception as e:
                         self.logger.warning(e)
+                        # raise e
                 else:
                     if data_received is not None and \
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
@@ -195,20 +196,17 @@ class Instrument:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning('Incomplete packet or Incorrect variable column requested.')
                 self.logger.debug(packet)
-                # if __debug__:
-                #     raise
+                # raise
             except ValueError:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning('Instrument or parser configuration incorrect.')
                 self.logger.debug(packet)
-                # if __debug__:
-                #     raise
+                # raise
             except Exception as e:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning(e)
                 self.logger.debug(packet)
-                # if __debug__:
-                #     raise e
+                # raise e
 
     def handle_packet(self, packet, timestamp):
         self.signal.packet_received.emit()

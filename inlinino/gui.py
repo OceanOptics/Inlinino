@@ -12,6 +12,7 @@ from inlinino.instruments import Instrument
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.lisst import LISST
+from inlinino.instruments.serialnmea import SerialNMEA
 from inlinino.instruments.taratsg import TaraTSG
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
@@ -271,7 +272,7 @@ class MainWindow(QtGui.QMainWindow):
             # Init Plot (need to do so when number of curve changes)
             self.init_timeseries_plot()
             # Init curves
-            if self.instrument.plugin_active_timeseries_variables:
+            if hasattr(self.instrument, 'plugin_active_timeseries_variables_selected'):
                 legend = self.instrument.plugin_active_timeseries_variables_selected
             else:
                 legend = self.instrument.variable_names
@@ -293,10 +294,12 @@ class MainWindow(QtGui.QMainWindow):
             y = self._buffer_data[i].get(self.BUFFER_LENGTH)
             x = np.arange(len(y))
             y[np.isinf(y)] = 0
-            sel = np.logical_not(np.isnan(y))
-            y[~sel] = np.interp(x[~sel], x[sel], y[sel])
-            # self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
-            self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
+            nsel = np.isnan(y)
+            if not np.all(nsel):
+                sel = np.logical_not(nsel)
+                y[nsel] = np.interp(x[nsel], x[sel], y[sel])
+                # self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
+                self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
         self.timeseries_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
         self.last_plot_refresh = time()
 
@@ -355,7 +358,8 @@ class DialogStartUp(QtGui.QDialog):
         super(DialogStartUp, self).__init__()
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'startup.ui'), self)
         instruments_to_load = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"] for i in CFG.instruments]
-        self.instruments_to_setup = [i[6:-3] for i in os.listdir(PATH_TO_RESOURCES) if i[-3:] == '.ui' and i[:6] == 'setup_']
+        # self.instruments_to_setup = [i[6:-3] for i in sorted(os.listdir(PATH_TO_RESOURCES)) if i[-3:] == '.ui' and i[:6] == 'setup_']
+        self.instruments_to_setup = [os.path.basename(i)[6:-3] for i in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'setup_*.ui')))]
         self.combo_box_instrument_to_load.addItems(instruments_to_load)
         self.combo_box_instrument_to_setup.addItems(self.instruments_to_setup)
         self.button_load.clicked.connect(self.act_load_instrument)
@@ -604,6 +608,8 @@ class DialogSerialConnection(QtGui.QDialog):
             baudrate, dataq = '115200', 1
         elif type(instrument) == LISST:
             baudrate, timeout = '9600', 10
+        elif type(instrument) == SerialNMEA:
+            baudrate, timeout = '4800', 10
         elif type(instrument) == TaraTSG:
             baudrate, timeout = '9600', 3
         self.cb_baudrate.setCurrentIndex([self.cb_baudrate.itemText(i) for i in range(self.cb_baudrate.count())].index(baudrate))
@@ -706,6 +712,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'lisst':
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'serialnmea':
+                    self.main_window.init_instrument(SerialNMEA(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
                     self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:

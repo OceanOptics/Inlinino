@@ -8,7 +8,7 @@ class TaraTSG(Instrument):
                            'variable_names', 'variable_units', 'variable_precision']
 
     def setup(self, cfg):
-        # Overload cfg with LISST specific parameters
+        # Overload cfg with Tara TSG specific parameters
         cfg['variable_names'] = ['t1', 'c1', 's', 't2']
         cfg['variable_units'] = ['degC', 'S/m', 'psu', 'degC']
         cfg['variable_precision'] = ['%.4f', '%.5f', '%.4f', '%.4f']

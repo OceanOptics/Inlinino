@@ -7,17 +7,17 @@
     <x>0</x>
     <y>0</y>
     <width>530</width>
-    <height>300</height>
+    <height>400</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Inlinino: Setup TaraTSG Instrument</string>
+   <string>Inlinino: Setup NMEA Logger</string>
   </property>
   <widget class="QDialogButtonBox" name="button_box">
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>260</y>
+     <y>360</y>
      <width>491</width>
      <height>32</height>
     </rect>
@@ -36,7 +36,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>170</y>
+     <y>270</y>
      <width>491</width>
      <height>81</height>
     </rect>
@@ -111,11 +111,76 @@
     </layout>
    </widget>
   </widget>
+  <widget class="QGroupBox" name="groupBox_2">
+   <property name="geometry">
+    <rect>
+     <x>260</x>
+     <y>100</y>
+     <width>251</width>
+     <height>161</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Parser</string>
+   </property>
+   <widget class="QWidget" name="formLayoutWidget_2">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>30</y>
+      <width>231</width>
+      <height>121</height>
+     </rect>
+    </property>
+    <layout class="QFormLayout" name="formLayout_2">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_5">
+       <property name="text">
+        <string>Variable Names</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QLineEdit" name="le_variable_names"/>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label_6">
+       <property name="text">
+        <string>Variable Units</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QLineEdit" name="le_variable_units"/>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_8">
+       <property name="text">
+        <string>Variable Types</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QLineEdit" name="le_variable_types"/>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_9">
+       <property name="text">
+        <string>Variable Precision</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QLineEdit" name="le_variable_precision"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
   <widget class="QGroupBox" name="groupBox_3">
    <property name="geometry">
     <rect>
-     <x>280</x>
-     <y>10</y>
+     <x>20</x>
+     <y>110</y>
      <width>231</width>
      <height>151</height>
     </rect>
@@ -133,14 +198,25 @@
      </rect>
     </property>
     <layout class="QFormLayout" name="formLayout_3">
-     <item row="2" column="1">
-      <widget class="QLineEdit" name="le_log_path"/>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_12">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_10">
        <property name="text">
-        <string>Log Directory</string>
+        <string>Log Raw</string>
        </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QComboBox" name="combobox_log_raw">
+       <item>
+        <property name="text">
+         <string>on</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>off</string>
+        </property>
+       </item>
       </widget>
      </item>
      <item row="1" column="0">
@@ -164,29 +240,15 @@
        </item>
       </widget>
      </item>
-     <item row="0" column="1">
-      <widget class="QComboBox" name="combobox_log_raw">
-       <property name="currentIndex">
-        <number>1</number>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_12">
+       <property name="text">
+        <string>Log Directory</string>
        </property>
-       <item>
-        <property name="text">
-         <string>on</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>off</string>
-        </property>
-       </item>
       </widget>
      </item>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label_10">
-       <property name="text">
-        <string>Log Raw</string>
-       </property>
-      </widget>
+     <item row="2" column="1">
+      <widget class="QLineEdit" name="le_log_path"/>
      </item>
     </layout>
    </widget>
@@ -208,19 +270,16 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>40</y>
+     <y>20</y>
      <width>231</width>
-     <height>111</height>
+     <height>91</height>
     </rect>
    </property>
    <layout class="QFormLayout" name="formLayout_4">
-    <item row="0" column="1">
-     <widget class="QLineEdit" name="le_manufacturer">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
       <property name="text">
-       <string>Sea-Bird</string>
+       <string>Manufacturer</string>
       </property>
      </widget>
     </item>
@@ -231,15 +290,11 @@
       </property>
      </widget>
     </item>
+    <item row="0" column="1">
+     <widget class="QLineEdit" name="le_manufacturer"/>
+    </item>
     <item row="1" column="1">
-     <widget class="QLineEdit" name="le_model">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-      <property name="text">
-       <string>SBE38+45</string>
-      </property>
-     </widget>
+     <widget class="QLineEdit" name="le_model"/>
     </item>
     <item row="2" column="0">
      <widget class="QLabel" name="label_13">
@@ -249,18 +304,7 @@
      </widget>
     </item>
     <item row="2" column="1">
-     <widget class="QLineEdit" name="le_serial_number">
-      <property name="text">
-       <string>Tara</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0">
-     <widget class="QLabel" name="label">
-      <property name="text">
-       <string>Manufacturer</string>
-      </property>
-     </widget>
+     <widget class="QLineEdit" name="le_serial_number"/>
     </item>
    </layout>
   </widget>
@@ -273,6 +317,10 @@
   <tabstop>combobox_log_products</tabstop>
   <tabstop>le_log_path</tabstop>
   <tabstop>button_browse_log_directory</tabstop>
+  <tabstop>le_variable_names</tabstop>
+  <tabstop>le_variable_units</tabstop>
+  <tabstop>le_variable_types</tabstop>
+  <tabstop>le_variable_precision</tabstop>
   <tabstop>checkbox_prefix_diw</tabstop>
   <tabstop>checkbox_prefix_fsw</tabstop>
   <tabstop>checkbox_prefix_dark</tabstop>
