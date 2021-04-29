@@ -33,6 +33,7 @@ class SerialNMEA(Instrument):
 
     def parse(self, packet):
         msg = pynmea2.parse(packet.decode())
+        # print(msg.fields)
         data = [None] * len(self.variable_names)
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):
             try:

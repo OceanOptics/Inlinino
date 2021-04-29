@@ -269,6 +269,43 @@
         "%.1f",
         "%.1f"
       ]
+    },
+    {
+      "module": "serialnmea",
+      "variable_names": [
+        "datetime",
+        "latitude",
+        "longitude",
+        "spd_over_grnd",
+        "true_course"
+      ],
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data",
+      "manufacturer": "NMEA",
+      "model": "GPS",
+      "serial_number": "Discovery",
+      "variable_units": [
+        "",
+        "degN",
+        "degE",
+        "knots",
+        "degN"
+      ],
+      "variable_types": [
+        "str",
+        "float",
+        "float",
+        "float",
+        "float"
+      ],
+      "variable_precision": [
+        "%s",
+        "%.6f",
+        "%.6f",
+        "%.1f",
+        "%.1f"
+      ]
     }
   ]
 }
