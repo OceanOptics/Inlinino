@@ -11,6 +11,7 @@ from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
 from inlinino.instruments import Instrument
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
+from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.serialnmea import SerialNMEA
 from inlinino.instruments.taratsg import TaraTSG
@@ -602,10 +603,12 @@ class DialogSerialConnection(QtGui.QDialog):
         # # Set default values based on instrument
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if type(instrument) == ACS:
-            baudrate = str(instrument._parser.baudrate)  # TODO for ACS recover default from actual object
+            baudrate = str(instrument._parser.baudrate)
             timeout = 1
         elif type(instrument) == DATAQ:
             baudrate, dataq = '115200', 1
+        # elif type(instrument) == HyperBB:
+        #     baudrate, timeout = '19200', 2
         elif type(instrument) == LISST:
             baudrate, timeout = '9600', 10
         elif type(instrument) == SerialNMEA:
@@ -710,6 +713,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'dataq':
                     self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'hyperbb':
+                    self.main_window.init_instrument(HyperBB(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'lisst':
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'serialnmea':
@@ -721,13 +726,14 @@ class App(QtGui.QApplication):
                     sys.exit(-1)
                 instrument_loaded = True
             except Exception as e:
+                raise e
                 logger.warning('Unable to load instrument.')
                 logger.warning(e)
-                self.closeAllWindows()  # ACS and LISST are opening pyqtgraph windows
+                self.closeAllWindows()  # ACS, HyperBB, and LISST are opening pyqtgraph windows
                 # Dialog Box
                 setup_dialog = DialogInstrumentSetup(instrument_index)
                 setup_dialog.show()
-                setup_dialog.notification('Unable to load instrument. Please check configuration', e)
+                setup_dialog.notification('Unable to load instrument. Please check configuration.', e)
                 if setup_dialog.exec_():
                     logger.info('Updated configuration')
                 else:

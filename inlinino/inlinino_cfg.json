@@ -306,6 +306,15 @@
         "%.1f",
         "%.1f"
       ]
+    },
+    {
+      "module": "hyperbb",
+      "log_products": true,
+      "log_raw": true,
+      "manufacturer": "Sequoia",
+      "model": "HyperBB",
+      "serial_number": "8005",
+      "log_path": "data"
     }
   ]
 }
