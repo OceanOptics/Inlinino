@@ -90,12 +90,11 @@ class LISST(Instrument):
         # Update plots
         if self.active_timeseries_variables_lock.acquire(timeout=0.5):
             try:
-                self.signal.new_data.emit(data[1][self.active_timeseries_angles], timestamp)
+                self.signal.new_data.emit(data[0][self.active_timeseries_angles], timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update timeseries plot')
-        self.signal.new_data.emit(data[0][15], timestamp)
         self.signal.new_aux_data.emit(self.format_aux_data([data[i+1] for i in self.plugin_aux_data_variables_selected]))
         self._plot_curve.setData(self._parser.angles, data[0])
         if self.log_prod_enabled and self._log_active:
