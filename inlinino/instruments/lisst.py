@@ -25,7 +25,7 @@ class LISST(Instrument):
         self._plot = self._pw.plotItem
         self._plot.setLogMode(x=True)
         # Init Curve Items
-        self._plot_curve = pg.PlotCurveItem(pen=(0, 1))
+        self._plot_curve = pg.PlotCurveItem(pen=pg.mkPen(color='#d62728', width=2))
         # Add item to plot
         self._plot.addItem(self._plot_curve)
         # Decoration

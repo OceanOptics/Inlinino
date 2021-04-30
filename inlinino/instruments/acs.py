@@ -30,8 +30,8 @@ class ACS(Instrument):
         self._plot = self._pw.plotItem
         self._plot.addLegend()
         # Init Curve Items
-        self._plot_curve_c = pg.PlotCurveItem(pen=(0, 2), name='c')
-        self._plot_curve_a = pg.PlotCurveItem(pen=(1, 2), name='a')
+        self._plot_curve_c = pg.PlotCurveItem(pen=pg.mkPen(color='#1f77b4', width=2), name='c')
+        self._plot_curve_a = pg.PlotCurveItem(pen=pg.mkPen(color='#2ca02c', width=2), name='a')
         # Add item to plot
         self._plot.addItem(self._plot_curve_c)
         self._plot.addItem(self._plot_curve_a)
