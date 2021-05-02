@@ -76,7 +76,7 @@ class HyperBB(Instrument):
         cfg['variable_names'] = self.FRAME_VARIABLES
         cfg['variable_units'] = [''] * len(self.FRAME_VARIABLES)
         cfg['variable_precision'] = self.FRAME_PRECISION
-        cfg['terminator'] = b'\r\n'
+        cfg['terminator'] = b'\n'
         # Set standard configuration and check cfg input
         super().setup(cfg)
 

@@ -607,8 +607,8 @@ class DialogSerialConnection(QtGui.QDialog):
             timeout = 1
         elif type(instrument) == DATAQ:
             baudrate, dataq = '115200', 1
-        # elif type(instrument) == HyperBB:
-        #     baudrate, timeout = '19200', 2
+        elif type(instrument) == HyperBB:
+            baudrate, timeout = '9600', 1
         elif type(instrument) == LISST:
             baudrate, timeout = '9600', 10
         elif type(instrument) == SerialNMEA:

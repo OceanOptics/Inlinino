@@ -8,7 +8,7 @@ import os
 import traceback
 
 
-__version__ = '2.5.1'
+__version__ = '2.5.2'
 
 # Setup Logger
 logging.basicConfig(level=logging.DEBUG)
