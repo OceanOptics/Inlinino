@@ -12,6 +12,10 @@ Quick Start
 
     -windows.zip">Windows</a>
 
+.. |end-link-win7| raw:: html
+
+    -windows7.zip">Windows 7</a>
+
 .. |end-link-mac| raw:: html
 
     -darwin.zip">macOS</a>
@@ -19,7 +23,8 @@ Quick Start
 Inlinino is available for Windows and macOS, the packaged executable can be downloaded with the links below. Windows users will have to unzip the archive.
 
     + |link-to-ftp|\ |release|\ |end-link-win|
-    + `macOS Catalina <http://misclab.umeoce.maine.edu/software/Inlinino/Inlinino-v2.4.3-catalina.zip>`__
+    + |link-to-ftp|\ |release|\ |end-link-win7|
+    + |link-to-ftp|\ |release|\ |end-link-mac|
 
 Advance users or developers can setup the software directly from source (`GitHub Repository <https://github.com/OceanOptics/Inlinino/>`__).
 

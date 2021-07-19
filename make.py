@@ -8,7 +8,8 @@ if platform.system() == 'Windows':
     OS_OPERATOR = ';'
     ICON_EXT = 'ico'
     DIST_PATH = 'dist_windows'
-    PATH_TO_PYQTGRAPH_ICONS = r'C:\Users\nils\AppData\Local\Programs\Python\Python38\Lib\site-packages\pyqtgraph\icons'
+    PATH_TO_PYQTGRAPH_ICONS = r'C:\Users\nils\AppData\Local\Programs\Python\Python38\Lib\site-packages\pyqtgraph\icons'  # Windows 10
+    # PATH_TO_PYQTGRAPH_ICONS = r'C:\Program Files\Python38\Lib\site-packages\pyqtgraph\icons'  # Windows 7
 elif platform.system() == 'Darwin':
     # macOS
     OS_OPERATOR = ':'
