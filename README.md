@@ -19,13 +19,13 @@ Download Inlinino code.
  
     wget https://github.com/OceanOptics/Inlinino/archive/master.zip
     unzip master.zip
-    cd Inlinino
+    cd Inlinino-master
  
 We recommend setting Inlinino in a virtual environment (e.g. miniconda). To set up a new python virtual environment with conda and install Inlinino:
 
-    conda create --name Inlinino python=3
-    source activate Inlinino
-    python setup.py
+    conda create --name inlinino python=3.8
+    source activate inlinino
+    pip install -e .
 
 Inlinino can then be started with the following commands.
 

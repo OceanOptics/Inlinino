@@ -1,8 +1,18 @@
 import setuptools
-from inlinino import __version__
+import codecs
+import os.path
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+
+with codecs.open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inlinino', '__init__.py'), 'r') as fp:
+    for line in fp.read().splitlines():
+        if line.startswith('__version__'):
+            delimiter = '"' if '"' in line else "'"
+            __version__ = line.split(delimiter)[1]
+            break
+    else:
+        raise RuntimeError("Unable to find version string.")
 
 setuptools.setup(
     name="Inlinino",
@@ -14,8 +24,8 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/OceanOptics/Inlinino",
     packages=setuptools.find_packages(),
-    install_requires=['pyserial>=3.4', 'numpy', 'pyACS', 'PyQt5==5.15', 'pyqtgraph>=0.12.1', 'pynmea'],
-    python_requires='3.8',
+    install_requires=['pyserial>=3.4', 'numpy', 'pyACS', 'PyQt5>=5.15', 'pyqtgraph>=0.12.1', 'pynmea2'],
+    python_requires='==3.8.*',
     license='GPLv3',
     classifiers=[
         "Programming Language :: Python :: 3",
