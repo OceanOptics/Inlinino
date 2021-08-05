@@ -8,12 +8,12 @@ from time import time, gmtime, strftime
 from serial.tools.list_ports import comports as list_serial_comports
 from serial import SerialException
 from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
-from inlinino.instruments import Instrument
+from inlinino.instruments import Instrument, SerialInterface, SocketInterface, InterfaceException
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
-from inlinino.instruments.serialnmea import SerialNMEA
+from inlinino.instruments.nmea import NMEA
 from inlinino.instruments.taratsg import TaraTSG
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
@@ -85,7 +85,7 @@ class MainWindow(QtGui.QMainWindow):
         self.packets_corrupted = 0
         # Set buttons
         self.button_setup.clicked.connect(self.act_instrument_setup)
-        self.button_serial.clicked.connect(self.act_instrument_serial)
+        self.button_serial.clicked.connect(self.act_instrument_interface)
         self.button_log.clicked.connect(self.act_instrument_log)
         # Set clock
         self.signal_clock = QtCore.QTimer()
@@ -178,21 +178,27 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.setup(setup_dialog.cfg)
             self.label_instrument_name.setText(self.instrument.name)
 
-    def act_instrument_serial(self):
+    def act_instrument_interface(self):
         if self.instrument.alive:
             logger.debug('Disconnect instrument')
             self.instrument.close()
         else:
-            dialog = DialogSerialConnection(self.instrument)
+            if type(self.instrument._interface) == SerialInterface:
+                dialog = DialogSerialConnection(self.instrument)
+            elif type(self.instrument._interface) == SocketInterface:
+                dialog = DialogSocketConnection(self.instrument)
             dialog.show()
             if dialog.exec_():
                 try:
-                    self.instrument.open(dialog.port, dialog.baudrate, dialog.bytesize,
-                                         dialog.parity, dialog.stopbits, dialog.timeout)
-                except SerialException as e:
+                    if type(self.instrument._interface) == SerialInterface:
+                        self.instrument.open(port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
+                                             parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
+                    elif type(self.instrument._interface) == SocketInterface:
+                        self.instrument.open(ip=dialog.ip, port=dialog.port)
+                except InterfaceException as e:
                     QtGui.QMessageBox.warning(self, "Inlinino: Connect " + self.instrument.name,
-                                              'ERROR: Failed connecting ' + self.instrument.name + ' to ' +
-                                              dialog.port + '\n' + str(e),
+                                              'ERROR: Failed connecting ' + self.instrument.name + '. ' +
+                                              str(e),
                                               QtGui.QMessageBox.Ok)
 
     def act_instrument_log(self):
@@ -600,7 +606,7 @@ class DialogSerialConnection(QtGui.QDialog):
         # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
         for p in [str(p.device) + ' - ' + str(p.product) for p in self.ports]:
             self.cb_port.addItem(p)
-        # # Set default values based on instrument
+        # Set default values based on instrument
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if type(instrument) == ACS:
             baudrate = str(instrument._parser.baudrate)
@@ -611,7 +617,7 @@ class DialogSerialConnection(QtGui.QDialog):
             baudrate, timeout = '9600', 1
         elif type(instrument) == LISST:
             baudrate, timeout = '9600', 10
-        elif type(instrument) == SerialNMEA:
+        elif type(instrument) == NMEA:
             baudrate, timeout = '4800', 10
         elif type(instrument) == TaraTSG:
             baudrate, timeout = '9600', 3
@@ -670,6 +676,27 @@ class DialogSerialConnection(QtGui.QDialog):
         return int(self.sb_timeout.value())
 
 
+class DialogSocketConnection(QtGui.QDialog):
+    def __init__(self, instrument):
+        super(DialogSocketConnection, self).__init__()
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'socket_connection.ui'), self)
+        # Connect buttons
+        self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
+        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+
+    @property
+    def ip(self) -> str:
+        return self.le_ip.text()
+
+    @property
+    def port(self) -> int:
+        return int(self.sb_port.value())
+
+    # @property
+    # def timeout(self) -> int:
+    #     return int(self.sb_timeout.value())
+
+
 class App(QtGui.QApplication):
     def __init__(self, *args):
         QtGui.QApplication.__init__(self, *args)
@@ -717,8 +744,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(HyperBB(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'lisst':
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
-                elif instrument_module_name == 'serialnmea':
-                    self.main_window.init_instrument(SerialNMEA(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'nmea':
+                    self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
                     self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:

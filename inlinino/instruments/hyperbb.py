@@ -80,8 +80,8 @@ class HyperBB(Instrument):
         # Set standard configuration and check cfg input
         super().setup(cfg)
 
-    def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=10):
-        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+    # def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=10):
+    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
         return packet.decode().split()

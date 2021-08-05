@@ -3,7 +3,7 @@ import numpy as np
 import pynmea2
 
 
-class SerialNMEA(Instrument):
+class NMEA(Instrument):
 
     REQUIRED_CFG_FIELDS = ['model', 'serial_number', 'module',
                            'log_path', 'log_raw', 'log_products',
@@ -12,6 +12,7 @@ class SerialNMEA(Instrument):
     def __init__(self, cfg_id, signal, *args, **kwargs):
         self.active_timeseries_variables = []
         self.plugin_active_timeseries_variables_selected = list()
+        self._unknown_nmea_sentence = []
         super().__init__(cfg_id, signal, *args, **kwargs)
 
     def setup(self, cfg):
@@ -28,19 +29,27 @@ class SerialNMEA(Instrument):
                 self.plugin_active_timeseries_variables_selected.append(k)
         # self._log_prod.variable_precision = []  # Disable precision when writing with log
 
-    def open(self, port=None, baudrate=4800, bytesize=8, parity='N', stopbits=1, timeout=10):
-        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+    # def open(self, port=None, baudrate=4800, bytesize=8, parity='N', stopbits=1, timeout=10):
+    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
         msg = pynmea2.parse(packet.decode())
+        # except ValueError:
+        #     msg = packet.decode()
+        #     if msg[0] == '$':
+        #         header = msg.split(',', 1)[0]
+        #         if header not in self._unknown_nmea_sentence:
+        #             self._unknown_nmea_sentence.append(header)
+        #             self.signal.packet_corrupted.emit()
+        #             self.logger.warning(f'Unknown NMEA sentence: {header}')
         # print(msg.fields)
         data = [None] * len(self.variable_names)
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):
             try:
                 if t == 'int':
-                    data[i] = int(getattr(msg, k)) if hasattr(msg, k) else float('nan')
+                    data[i] = int(getattr(msg, k)) if hasattr(msg, k) and getattr(msg, k) != '' else float('nan')
                 elif t == 'float':
-                    data[i] = float(getattr(msg, k)) if hasattr(msg, k) else float('nan')
+                    data[i] = float(getattr(msg, k)) if hasattr(msg, k) and getattr(msg, k) != '' else float('nan')
                 elif t == 'str':
                     data[i] = str(getattr(msg, k)) if hasattr(msg, k) else 'nan'
                 else:

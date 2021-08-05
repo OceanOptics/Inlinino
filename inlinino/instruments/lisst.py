@@ -78,8 +78,8 @@ class LISST(Instrument):
         self._plot.setXRange(np.min(self._parser.angles), np.max(self._parser.angles))
         self._plot.setLimits(minXRange=np.min(self._parser.angles), maxXRange=np.max(self._parser.angles))
 
-    def open(self, port=None, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=10):
-        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+    # def open(self, port=None, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=10):
+    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
         raw_beta, raw_aux = self._parser.unpack_packet(packet)
@@ -104,21 +104,21 @@ class LISST(Instrument):
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def init_serial(self):
+    def init_interface(self):
         # TODO Check if OM, BI, SB, SI commands are necessary
         # TODO Check if configuration is correct
-        self._serial.write(b'OM 1' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Operating Mode: Real Time
-        self._serial.write(b'BI 6' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Seconds between Bursts: 6
-        self._serial.write(b'SB 1' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Samples per Burst: 1
-        self._serial.write(b'SI 6' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Seconds between Samples: 6
-        self._serial.write(b'MA 250' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))  # Measurements per Average: 250
+        self._interface.write(b'OM 1' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Operating Mode: Real Time
+        self._interface.write(b'BI 6' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Seconds between Bursts: 6
+        self._interface.write(b'SB 1' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Samples per Burst: 1
+        self._interface.write(b'SI 6' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))    # Seconds between Samples: 6
+        self._interface.write(b'MA 250' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))  # Measurements per Average: 250
         sleep(0.1)
-        response = self._serial.read(self._serial.in_waiting)
+        response = self._interface.read()
         # Query first data
-        self._serial.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
+        self._interface.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
 
-    def write_to_serial(self):
-        self._serial.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
+    def write_to_interface(self):
+        self._interface.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
 
     @staticmethod
     def format_aux_data(data):

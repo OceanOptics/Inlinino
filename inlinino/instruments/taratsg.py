@@ -16,8 +16,8 @@ class TaraTSG(Instrument):
         # Set standard configuration and check cfg input
         super().setup(cfg)
 
-    def open(self, port=None, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=3):
-        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+    # def open(self, port=None, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=3):
+    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
         foo = packet.split(b',')

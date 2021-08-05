@@ -1,3 +1,4 @@
+import socket
 import serial
 from threading import Thread
 from time import time
@@ -19,8 +20,8 @@ class Instrument:
     def __init__(self, cfg_id, signal=None):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        # Serial
-        self._serial = serial.Serial()
+        # Communication Interface
+        self._interface = SerialInterface()
         self._terminator = None
         self._buffer = bytearray()
         self._max_buffer_length = 16384
@@ -71,7 +72,14 @@ class Instrument:
             for k in variable_keys:
                 if n != len(cfg[k]):
                     raise ValueError('%s invalid length' % k)
-        # Serial
+        # Communication Interface (for retro-compatibility: default interface is serial)
+        if 'interface' in cfg.keys():
+            if cfg['interface'] == 'serial':
+                self._interface = SerialInterface()
+            elif cfg['interface'] == 'socket':
+                self._interface = SocketInterface()
+            else:
+                raise ValueError(f'Invalid communication interface {cfg["interface"]}')
         self._terminator = cfg['terminator']
         # Logger
         log_cfg = {'path': cfg['log_path']}
@@ -109,18 +117,10 @@ class Instrument:
         self.variable_units = cfg['variable_units']
         self.signal.status_update.emit()
 
-    def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=2):
-        if port is None:
-            raise ValueError('The instrument requires a port.')
+    def open(self, **kwargs):
         if not self.alive:
             # Open serial connection
-            self._serial.port = port
-            self._serial.baudrate = baudrate
-            self._serial.bytesize = bytesize
-            self._serial.parity = parity
-            self._serial.stopbits = stopbits
-            self._serial.timeout = timeout
-            self._serial.open()
+            self._interface.open(**kwargs)
             self.alive = True
             # Start reading/writing thread
             self._thread = Thread(name=self.name, target=self.run)
@@ -133,31 +133,28 @@ class Instrument:
         if self.alive:
             self.alive = False
             self.signal.status_update.emit()
-            if hasattr(self._serial, 'cancel_read'):
-                self._serial.cancel_read()
+            self._interface.stop()
             if wait_thread_join:
-                self._thread.join(self._serial.timeout)
+                self._thread.join(self._interface.timeout)
                 if self._thread.is_alive():
                     self.logger.warning('Thread did not join.')
             self.log_stop()
-            self._serial.close()
+            self._interface.close()
+            self._buffer = bytearray()
 
     def run(self):
-        if self._serial.is_open:
-            # Empty buffers
-            self._serial.reset_input_buffer()
-            self._serial.reset_output_buffer()
-            if self._serial.in_waiting > 0:
-                self._serial.read(self._serial.in_waiting)
+        if self._interface.is_open:
+            # Initialize interface (typically empty buffers)
+            self._interface.init()
             # Send init frame to instrument
-            self.init_serial()
+            self.init_interface()
             # Set data timeout flag
             data_timeout_flag = False
             data_received = None
-        while self.alive and self._serial.is_open:
+        while self.alive and self._interface.is_open:
             try:
                 # read all that is there or wait for one byte (blocking)
-                data = self._serial.read(self._serial.in_waiting or 1)
+                data = self._interface.read()
                 timestamp = time()
                 if data:
                     try:
@@ -178,7 +175,7 @@ class Instrument:
                         self.logger.error(f'No data received during the past {timestamp - data_received:.2f} seconds')
                         data_timeout_flag = True
                         self.signal.alarm.emit(True)
-            except serial.SerialException as e:
+            except InterfaceException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
                 self.logger.error(e)
@@ -210,7 +207,7 @@ class Instrument:
 
     def handle_packet(self, packet, timestamp):
         self.signal.packet_received.emit()
-        self.write_to_serial()
+        self.write_to_interface()
         if self.log_raw_enabled and self._log_active:
             self._log_raw.write(packet, timestamp)
             self.signal.packet_logged.emit()
@@ -247,10 +244,10 @@ class Instrument:
         else:
             return self._log_prod.filename
 
-    def init_serial(self):
+    def init_interface(self):
         pass
 
-    def write_to_serial(self):
+    def write_to_interface(self):
         pass
 
     def parse(self, packet):
@@ -273,3 +270,120 @@ class Instrument:
                 return self.name + '[alive][log-off]'
         else:
             return self.name + '[off]'
+
+
+class InterfaceException(Exception):
+    pass
+
+
+class Interface:
+    def __init__(self):
+        self._is_open = False
+        self._timeout = 1
+
+    @property
+    def is_open(self) -> bool:
+        return self._is_open
+
+    @property
+    def timeout(self) -> int:
+        return self._timeout
+
+    def open(self, **kwargs):
+        pass
+
+    def init(self):
+        # typically run once after connection is openned
+        pass
+
+    def stop(self):
+        # typically run once before closing connection
+        pass
+
+    def close(self):
+        pass
+
+    def read(self):
+        pass
+
+    def write(self, data):
+        pass
+
+
+class SerialInterface(Interface):
+    def __init__(self):
+        self._serial = serial.Serial()
+
+    @property
+    def is_open(self) -> bool:
+        return self._serial.is_open
+
+    @property
+    def timeout(self) -> int:
+        return self._serial.timeout
+
+    def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=2):
+        if port is None:
+            raise ValueError('SerialInterface requires a port.')
+        # Open serial connection
+        try:
+            self._serial.port = port
+            self._serial.baudrate = baudrate
+            self._serial.bytesize = bytesize
+            self._serial.parity = parity
+            self._serial.stopbits = stopbits
+            self._serial.timeout = timeout
+            self._serial.open()
+        except serial.SerialException as e:
+            raise InterfaceException(f'Unable to connect port {port}.\n{e}')
+
+    def init(self):
+        # Empty buffers
+        self._serial.reset_input_buffer()
+        self._serial.reset_output_buffer()
+        if self._serial.in_waiting > 0:
+            self._serial.read(self._serial.in_waiting)
+
+    def stop(self):
+        if hasattr(self._serial, 'cancel_read'):
+            self._serial.cancel_read()
+
+    def close(self):
+        self._serial.close()
+
+    def read(self):
+        try:
+            return self._serial.read(self._serial.in_waiting or 1)
+        except serial.SerialException as e:
+            raise InterfaceException(e)
+
+    def write(self, data):
+        self._serial.write(data)
+
+
+class SocketInterface(Interface):
+    def __init__(self):
+        super().__init__()
+        self._socket = None
+
+    @property
+    def timeout(self) -> int:
+        return self._socket.gettimeout()
+
+    def open(self, ip, port, timeout=1):
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.bind((ip, port))
+        # self._socket.settimeout(timeout)
+        self._is_open = True
+
+    def close(self):
+        self._is_open = False
+        if self._socket is not None:
+            self._socket.close()
+
+    def read(self):
+        return self._socket.recvfrom(socket.CMSG_SPACE(200))[0]
+
+    def write(self, data):
+        self._socket.send(data)
+

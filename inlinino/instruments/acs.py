@@ -87,11 +87,11 @@ class ACS(Instrument):
         self._plot.setXRange(min_lambda, max_lambda)
         self._plot.setLimits(minXRange=min_lambda, maxXRange=max_lambda)
 
-    def open(self, port=None, baudrate=None, bytesize=8, parity='N', stopbits=1, timeout=1):
-        if baudrate is None:
-            # Get default baudrate from device file via parser
-            baudrate = self._parser.baudrate  # Default 115200
-        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+    # def open(self, port=None, baudrate=None, bytesize=8, parity='N', stopbits=1, timeout=1):
+    #     if baudrate is None:
+    #         # Get default baudrate from device file via parser
+    #         baudrate = self._parser.baudrate  # Default 115200
+    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def data_received(self, data, timestamp):
         self._buffer.extend(data)

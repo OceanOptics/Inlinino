@@ -36,8 +36,8 @@ class DATAQ(Instrument):
         # Set standard configuration and check cfg input
         super().setup(cfg)
 
-    def open(self, port=None, baudrate=115200, bytesize=8, parity='N', stopbits=1, timeout=1):
-        super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+    # def open(self, port=None, baudrate=115200, bytesize=8, parity='N', stopbits=1, timeout=1):
+    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def close(self, *args, **kwargs):
         if self.alive:
@@ -47,20 +47,20 @@ class DATAQ(Instrument):
     def send_cmd(self, command):
         if self.alive:
             self.logger.debug('send_cmd: ' + command)
-            self._serial.write((command + '\r').encode())
+            self._interface.write((command + '\r').encode())
             sleep(0.1)
             if command not in ['start']:  # Exclude log echo for commands that do not return
                 cmd_time = time()
                 cmd_response = bytearray()
-                while self._terminator not in cmd_response and time() - cmd_time < 1.5 * self._serial.timeout:
-                    cmd_response.extend(self._serial.read(self._serial.inWaiting() or 1))
+                while self._terminator not in cmd_response and time() - cmd_time < 1.5 * self._interface.timeout:
+                    cmd_response.extend(self._interface.read())
                 if cmd_response:
                     # .strip('\r\n'+chr(0))
                     self.logger.info(cmd_response.decode(errors='ignore').strip(chr(0)))
         else:
             self.logger.warning('unable to send cmd, instrument not alive ' + command)
 
-    def init_serial(self):
+    def init_interface(self):
         # Set End of line character(s) for ASCII mode
         # 0 \r | 1 \n | 2 \r\n
         self.send_cmd('eol 0')

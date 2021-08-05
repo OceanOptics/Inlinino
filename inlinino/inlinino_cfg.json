@@ -226,7 +226,8 @@
       "serial_number": "Tara"
     },
     {
-      "module": "serialnmea",
+      "module": "nmea",
+      "interface": "socket",
       "variable_names": [
         "datetime",
         "latitude",
@@ -271,7 +272,7 @@
       ]
     },
     {
-      "module": "serialnmea",
+      "module": "nmea",
       "variable_names": [
         "datetime",
         "latitude",
