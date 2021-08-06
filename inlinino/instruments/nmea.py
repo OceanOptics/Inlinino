@@ -42,6 +42,7 @@ class NMEA(Instrument):
         #             self._unknown_nmea_sentence.append(header)
         #             self.signal.packet_corrupted.emit()
         #             self.logger.warning(f'Unknown NMEA sentence: {header}')
+        # print(packet)
         # print(msg.fields)
         data = [None] * len(self.variable_names)
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):

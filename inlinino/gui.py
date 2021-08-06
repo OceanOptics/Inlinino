@@ -418,6 +418,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if self.cfg['module'] == 'dataq':
                 for c in self.cfg['channels_enabled']:
                     getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
+            if hasattr(self, 'combobox_interface'):
+                if 'interface' in self.cfg.keys():
+                    if self.cfg['interface'] == 'serial':
+                        self.combobox_interface.setCurrentIndex(0)
+                    elif self.cfg['interface'] == 'socket':
+                        self.combobox_interface.setCurrentIndex(1)
         else:
             raise ValueError('Invalid instance type for template.')
         if 'button_browse_log_directory' in self.__dict__.keys():
@@ -454,7 +460,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
         for f in fields:
             field_prefix, field_name = f.split('_', 1)
             field_pretty_name = field_name.replace('_', ' ').title()
-            if field_prefix == 'le':
+            if f == 'combobox_interface':
+                self.cfg[field_name] = self.combobox_interface.currentText()
+            elif field_prefix == 'le':
                 value = getattr(self, f).text()
                 if not value:
                     empty_fields.append(field_pretty_name)
@@ -502,7 +510,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
         if empty_fields:
             self.notification('Fill required fields.', '\n'.join(empty_fields))
             return
-        # Check generic special field
+        # Check fields specific to modules
         if self.cfg['module'] == 'generic':
             variable_keys = [v for v in self.cfg.keys() if 'variable_' in v]
             if variable_keys:
@@ -530,7 +538,6 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.notification('Invalid logger configuration. '
                                   'At least one logger must be ON (to either log raw or parsed data).')
                 return
-        # Check ACS special fields
         elif self.cfg['module'] == 'acs':
             self.cfg['manufacturer'] = 'WetLabs'
             try:
