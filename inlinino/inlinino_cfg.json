@@ -317,7 +317,6 @@
       "serial_number": "8005",
       "log_path": "data"
     },
-    ,
     {
       "module": "nmea",
       "variable_names": [

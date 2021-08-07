@@ -6,7 +6,6 @@ import sys, os, glob
 import logging
 from time import time, gmtime, strftime
 from serial.tools.list_ports import comports as list_serial_comports
-from serial import SerialException
 from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
 from inlinino.instruments import Instrument, SerialInterface, SocketInterface, InterfaceException
 from inlinino.instruments.acs import ACS

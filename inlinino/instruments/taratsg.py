@@ -7,11 +7,18 @@ class TaraTSG(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
+    def __init__(self, cfg_id, signal, *args, **kwargs):
+        super().__init__(cfg_id, signal, *args, **kwargs)
+
+        # Auxiliary Data Plugin
+        self.plugin_aux_data = True
+        self.plugin_aux_data_variable_names = ['Temp. 1 (ºC)', 'Temp. 2 (ºC)', 'Cond. 1 (S/m)', 'Salinity (psu)']
+
     def setup(self, cfg):
         # Overload cfg with Tara TSG specific parameters
-        cfg['variable_names'] = ['t1', 'c1', 's', 't2']
-        cfg['variable_units'] = ['degC', 'S/m', 'psu', 'degC']
-        cfg['variable_precision'] = ['%.4f', '%.5f', '%.4f', '%.4f']
+        cfg['variable_names'] = ['t1', 'c1', 's', 'sv', 't2']
+        cfg['variable_units'] = ['degC', 'S/m', 'psu', 'm/s', 'degC']
+        cfg['variable_precision'] = ['%.4f', '%.5f', '%.4f', '%.3f', '%.4f']
         cfg['terminator'] = b'\r\n'
         # Set standard configuration and check cfg input
         super().setup(cfg)
@@ -21,7 +28,13 @@ class TaraTSG(Instrument):
 
     def parse(self, packet):
         foo = packet.split(b',')
-        bar = [0.0] * 4
-        for i in range(4):
+        bar = [0.0] * 5
+        for i in range(5):
             bar[i] = float(foo[i].split(b'=')[1])
         return bar
+
+    def handle_data(self, data, timestamp):
+        super().handle_data(data, timestamp)
+        # Format and signal aux data
+        self.signal.new_aux_data.emit(['%.4f' % data[0], '%.4f' % data[4],
+                                       '%.4f' % data[1], '%.4f' % data[2]])
