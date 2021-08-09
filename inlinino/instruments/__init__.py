@@ -382,7 +382,8 @@ class SocketInterface(Interface):
             self._socket.close()
 
     def read(self):
-        return self._socket.recvfrom(socket.CMSG_SPACE(200))[0]
+        return self._socket.recv(65536)
+        # return self._socket.recvfrom(socket.CMSG_SPACE(200))[0]  # socket.CMSG_SPACE is not supported by Windows
 
     def write(self, data):
         self._socket.send(data)
