@@ -431,6 +431,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_device_file.clicked.connect(self.act_browse_device_file)
         if 'button_browse_ini_file' in self.__dict__.keys():
             self.button_browse_ini_file.clicked.connect(self.act_browse_ini_file)
+        if 'button_browse_dcal_file' in self.__dict__.keys():
+            self.button_browse_dcal_file.clicked.connect(self.act_browse_dcal_file)
+        if 'button_browse_zsc_file' in self.__dict__.keys():
+            self.button_browse_zsc_file.clicked.connect(self.act_browse_zsc_file)
 
         # Cannot use default save button as does not provide mean to correctly validate user input
         self.button_save = QtGui.QPushButton('Save')
@@ -451,6 +455,16 @@ class DialogInstrumentSetup(QtGui.QDialog):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
             caption='Choose initialization file', filter='Ini File (*.ini)')
         self.le_ini_file.setText(file_name)
+
+    def act_browse_dcal_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose DCAL file', filter='DCAL File (*.asc)')
+        self.le_dcal_file.setText(file_name)
+
+    def act_browse_zsc_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose ZSC file', filter='ZSC File (*.asc)')
+        self.le_zsc_file.setText(file_name)
 
     def act_save(self):
         # Read form
@@ -558,9 +572,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.cfg['manufacturer'] = 'Sequoia'
             self.cfg['model'] = 'LISST'
             try:
-                self.cfg['serial_number'] = str(LISSTParser(self.cfg['device_file'], self.cfg['ini_file']).serial_number)
+                self.cfg['serial_number'] = str(LISSTParser(self.cfg['device_file'], self.cfg['ini_file'],
+                                                            self.cfg['dcal_file'], self.cfg['zsc_file']).serial_number)
             except:
-                self.notification('Unable to parse lisst device and/or ini file.')
+                self.notification('Unable to parse lisst device, ini, dcal, or zsc file.')
                 return
             if 'log_raw' not in self.cfg.keys():
                 self.cfg['log_raw'] = True

@@ -103,6 +103,8 @@
       "module": "lisst",
       "ini_file": "cfg/LISST1183_20180119_Lisst.ini",
       "device_file": "cfg/LISST1183_20180119_InstrumentData.txt",
+      "dcal_file": "cfg/LISST1183_20180119_ringarea.asc",
+      "zsc_file": "cfg/LISST1183_20180119_factory_zsc.asc",
       "log_raw": true,
       "log_products": true,
       "log_path": "data"
