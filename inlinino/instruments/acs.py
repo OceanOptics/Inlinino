@@ -27,6 +27,7 @@ class ACS(Instrument):
         pg.setConfigOption('background', '#F8F8F2')
         pg.setConfigOption('foreground', '#26292C')
         self._pw = pg.plot(enableMenu=False)
+        self._pw.setWindowTitle('ACS Spectrum')
         self._plot = self._pw.plotItem
         self._plot.addLegend()
         # Init Curve Items

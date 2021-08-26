@@ -2,6 +2,17 @@
 <ui version="4.0">
  <class>DialogStartUp</class>
  <widget class="QDialog" name="DialogStartUp">
+  <property name="windowModality">
+   <enum>Qt::ApplicationModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>316</width>
+    <height>167</height>
+   </rect>
+  </property>
   <property name="windowTitle">
    <string>Inlinino: Start up</string>
   </property>

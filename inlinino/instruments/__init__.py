@@ -44,7 +44,8 @@ class Instrument:
 
         # User Interface
         self.signal = signal
-        self.name = ''
+        self.model = ''
+        self.serial_number = ''
         self.variable_names = None
         self.variable_units = None
         self.variable_displayed = None
@@ -54,6 +55,14 @@ class Instrument:
         # Load cfg
         self.cfg_id = cfg_id
         self.setup(CFG.instruments[self.cfg_id].copy())
+
+    @property
+    def name(self) -> str:
+        return self.model + ' ' + self.serial_number
+
+    @property
+    def bare_log_prefix(self) -> str:
+        return self.model + self.serial_number
 
     def setup(self, cfg, raw_logger=LogText):
         self.logger.debug('Setup')
@@ -82,11 +91,9 @@ class Instrument:
                 raise ValueError(f'Invalid communication interface {cfg["interface"]}')
         self._terminator = cfg['terminator']
         # Logger
-        log_cfg = {'path': cfg['log_path']}
-        if 'log_prefix' in cfg.keys():
-            log_cfg['filename_prefix'] = cfg['log_prefix'] + cfg['model'] + cfg['serial_number']
-        else:
-            log_cfg['filename_prefix'] = cfg['model'] + cfg['serial_number']
+        self.model = cfg['model']
+        self.serial_number = cfg['serial_number']
+        log_cfg = {'path': cfg['log_path'], 'filename_prefix': self.bare_log_prefix}
         for k in ['length', 'variable_names', 'variable_units', 'variable_precision']:
             if k in cfg.keys():
                 log_cfg[k] = cfg[k]
@@ -95,9 +102,7 @@ class Instrument:
             self._log_raw = raw_logger(log_cfg, self.signal.status_update)
             self._log_prod = Log(log_cfg, self.signal.status_update)
         else:
-            self.logger.debug('Update loggers configuration')
-            self._log_raw.update_cfg(log_cfg)
-            self._log_prod.update_cfg(log_cfg)
+            self.log_update_cfg(log_cfg)
         self._log_active = False
         self.log_raw_enabled = cfg['log_raw']
         self.log_prod_enabled = cfg['log_products']
@@ -110,9 +115,7 @@ class Instrument:
             self.variable_types = cfg['variable_types']
         # User Interface
         # self.manufacturer = cfg['manufacturer']
-        # self.model = cfg['model']
-        # self.serial_number = cfg['serial_number']
-        self.name = cfg['model'] + ' ' + cfg['serial_number']
+
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
         self.signal.status_update.emit()
@@ -243,6 +246,17 @@ class Instrument:
             return self._log_raw.filename
         else:
             return self._log_prod.filename
+
+    def log_get_file_ext(self):
+        if self.log_raw_enabled or not self.log_prod_enabled:
+            return self._log_raw.FILE_EXT
+        else:
+            return self._log_prod.FILE_EXT
+
+    def log_update_cfg(self, log_cfg):
+        self.logger.debug('Update loggers configuration')
+        self._log_raw.update_cfg(log_cfg)
+        self._log_prod.update_cfg(log_cfg)
 
     def init_interface(self):
         pass

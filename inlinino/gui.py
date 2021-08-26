@@ -171,7 +171,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def act_instrument_setup(self):
         logger.debug('Setup instrument')
-        setup_dialog = DialogInstrumentSetup(self.instrument.cfg_id)
+        setup_dialog = DialogInstrumentSetup(self.instrument.cfg_id, self)
         setup_dialog.show()
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
@@ -183,9 +183,9 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.close()
         else:
             if type(self.instrument._interface) == SerialInterface:
-                dialog = DialogSerialConnection(self.instrument)
+                dialog = DialogSerialConnection(self)
             elif type(self.instrument._interface) == SocketInterface:
-                dialog = DialogSocketConnection(self.instrument)
+                dialog = DialogSocketConnection(self)
             dialog.show()
             if dialog.exec_():
                 try:
@@ -205,8 +205,14 @@ class MainWindow(QtGui.QMainWindow):
             logger.debug('Stop logging')
             self.instrument.log_stop()
         else:
-            logger.debug('Start logging')
-            self.instrument.log_start()
+            dialog = DialogLoggerOptions(self)
+            dialog.show()
+            if dialog.exec_():
+                self.instrument.log_update_cfg({'filename_prefix': dialog.cover_log_prefix +
+                                                                   self.instrument.bare_log_prefix,
+                                                'path': dialog.log_path})
+                logger.debug('Start logging')
+                self.instrument.log_start()
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
@@ -385,8 +391,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
     ENCODING = 'ascii'
     OPTIONAL_FIELDS = ['Variable Precision', 'Prefix Custom']
 
-    def __init__(self, template):
-        super(DialogInstrumentSetup, self).__init__()
+    def __init__(self, template, parent=None):
+        super().__init__(parent)
         if isinstance(template, str):
             # Load template from instrument type
             self.create = True
@@ -516,19 +522,6 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg[field_name] = True
                 else:
                     self.cfg[field_name] = False
-        # Read Log Prefix (not saved in cfg)
-        self.cfg['log_prefix'] = ''
-        if self.checkbox_prefix_diw.isChecked():
-            self.cfg['log_prefix'] += 'DIW'
-        if self.checkbox_prefix_fsw.isChecked():
-            self.cfg['log_prefix'] += 'FSW'
-        if self.checkbox_prefix_dark.isChecked():
-            self.cfg['log_prefix'] += 'DARK'
-        if self.checkbox_prefix_custom.isChecked():
-            self.cfg['log_prefix'] += self.le_prefix_custom.text()
-        if self.cfg['log_prefix']:
-            self.cfg['log_prefix'] += '_'
-        # Check All required fields are complete
         for f in self.OPTIONAL_FIELDS:
             try:
                 empty_fields.pop(empty_fields.index(f))
@@ -630,9 +623,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
 
 class DialogSerialConnection(QtGui.QDialog):
-    def __init__(self, instrument):
-        super(DialogSerialConnection, self).__init__()
+    def __init__(self, parent):
+        super().__init__(parent)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'serial_connection.ui'), self)
+        instrument = parent.instrument
         # Connect buttons
         self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
@@ -640,6 +634,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.ports = list_serial_comports()
         # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
         for p in self.ports:
+            print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
             p_name = str(p.device)
             if p.product is not None:
                 p_name += ' - ' + str(p.product)
@@ -715,8 +710,8 @@ class DialogSerialConnection(QtGui.QDialog):
 
 
 class DialogSocketConnection(QtGui.QDialog):
-    def __init__(self, instrument):
-        super(DialogSocketConnection, self).__init__()
+    def __init__(self, parent):
+        super().__init__(parent)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'socket_connection.ui'), self)
         # Connect buttons
         self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
@@ -733,6 +728,63 @@ class DialogSocketConnection(QtGui.QDialog):
     # @property
     # def timeout(self) -> int:
     #     return int(self.sb_timeout.value())
+
+
+class DialogLoggerOptions(QtGui.QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)  #, QtCore.Qt.WindowStaysOnTopHint
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'logger_options.ui'), self)
+        self.le_prefix_custom_connected = False
+        self.instrument = parent.instrument
+        # Logger Options
+        self.le_log_path.setText(self.instrument.log_get_path())
+        self.button_browse_log_directory.clicked.connect(self.act_browse_log_directory)
+        self.update_filename_template()
+        # Connect Prefix Checkbox to update Filename Template
+        self.cb_prefix_diw.toggled.connect(self.update_filename_template)
+        self.cb_prefix_fsw.toggled.connect(self.update_filename_template)
+        self.cb_prefix_dark.toggled.connect(self.update_filename_template)
+        self.cb_prefix_custom.toggled.connect(self.update_filename_template)
+        # Connect buttons
+        self.button_box.button(QtGui.QDialogButtonBox.Save).setDefault(True)
+        self.button_box.button(QtGui.QDialogButtonBox.Save).clicked.connect(self.accept)
+        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+
+    @property
+    def cover_log_prefix(self) -> str:
+        prefix = ''
+        if self.cb_prefix_diw.isChecked():
+            prefix += 'DIW'
+        if self.cb_prefix_fsw.isChecked():
+            prefix += 'FSW'
+        if self.cb_prefix_dark.isChecked():
+            prefix += 'DARK'
+        if self.cb_prefix_custom.isChecked():
+            if not self.le_prefix_custom_connected:
+                self.le_prefix_custom.textChanged.connect(self.update_filename_template)
+                self.le_prefix_custom_connected = True
+            prefix += self.le_prefix_custom.text()
+        elif self.le_prefix_custom_connected:
+            self.le_prefix_custom.textChanged.disconnect(self.update_filename_template)
+            self.le_prefix_custom_connected = False
+        if prefix:
+            prefix += '_'
+        # Check All required fields are complete
+        return prefix
+
+    @property
+    def log_path(self) -> str:
+        return self.le_log_path.text()
+
+    def act_browse_log_directory(self):
+        self.le_log_path.setText(QtGui.QFileDialog.getExistingDirectory(caption='Choose logging directory',
+                                                     directory=self.le_log_path.text()))
+        self.show()
+
+    def update_filename_template(self):
+        # self.le_filename_template.setText(instrument.log_get_filename())  # Not up to date
+        self.le_filename_template.setText(self.cover_log_prefix + self.instrument.bare_log_prefix +
+                                          '_YYYYMMDD_hhmmss.' + self.instrument.log_get_file_ext())
 
 
 class App(QtGui.QApplication):

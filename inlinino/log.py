@@ -59,7 +59,7 @@ class Log:
                                 '_' + str(suffix) + '.' + self.FILE_EXT
                 suffix += 1
         else:
-            self.filename = self.filename_prefix + '_<time>' + '.' + self.FILE_EXT
+            self.filename = self.filename_prefix + '_<date>_<time>' + '.' + self.FILE_EXT
 
     def write_header(self):
         if self.variable_names:

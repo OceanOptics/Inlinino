@@ -8,7 +8,7 @@ import os
 import traceback
 
 
-__version__ = '2.6.1'
+__version__ = '2.7.0'
 
 # Setup Logger
 logging.basicConfig(level=logging.DEBUG)
@@ -65,8 +65,6 @@ def as_bytes(dct):
 
 
 class Cfg:
-    KEYS_NOT_SAVED = ['log_prefix']
-
     def __init__(self):
         self.__logger = logging.getLogger('CFG')
         with open(PATH_TO_CFG_FILE) as file:
@@ -79,14 +77,7 @@ class Cfg:
 
     def write(self):
         self.__logger.info('Writing configuration.')
-        cfg = {'instruments': []}
-        # Remove keys not saved
-        for i in self.instruments:
-            foo = i.copy()
-            for k in self.KEYS_NOT_SAVED:
-                if k in foo.keys():
-                    del foo[k]
-            cfg['instruments'].append(foo)
+        cfg = {'instruments': self.instruments}
         with open(PATH_TO_CFG_FILE, 'w') as file:
             json.dump(cfg, file, cls=BytesEncoder)
 

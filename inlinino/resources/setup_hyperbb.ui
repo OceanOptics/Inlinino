@@ -2,12 +2,15 @@
 <ui version="4.0">
  <class>Dialog</class>
  <widget class="QDialog" name="Dialog">
+  <property name="windowModality">
+   <enum>Qt::WindowModal</enum>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>509</width>
-    <height>395</height>
+    <width>515</width>
+    <height>340</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -73,7 +76,7 @@
        <property name="title">
         <string>Logger</string>
        </property>
-       <layout class="QFormLayout" name="formLayout_2">
+       <layout class="QGridLayout" name="gridLayout">
         <property name="verticalSpacing">
          <number>5</number>
         </property>
@@ -82,10 +85,19 @@
           <property name="text">
            <string>Log Raw</string>
           </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
          </widget>
         </item>
         <item row="0" column="1">
          <widget class="QComboBox" name="combobox_log_raw">
+          <property name="maximumSize">
+           <size>
+            <width>71</width>
+            <height>30</height>
+           </size>
+          </property>
           <property name="currentIndex">
            <number>0</number>
           </property>
@@ -106,10 +118,19 @@
           <property name="text">
            <string>Log Products</string>
           </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
          </widget>
         </item>
         <item row="1" column="1">
          <widget class="QComboBox" name="combobox_log_products">
+          <property name="maximumSize">
+           <size>
+            <width>71</width>
+            <height>30</height>
+           </size>
+          </property>
           <property name="currentIndex">
            <number>0</number>
           </property>
@@ -130,13 +151,29 @@
           <property name="text">
            <string>Log Directory</string>
           </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
          </widget>
         </item>
         <item row="2" column="1">
-         <widget class="QLineEdit" name="le_log_path"/>
+         <widget class="QLineEdit" name="le_log_path">
+          <property name="minimumSize">
+           <size>
+            <width>125</width>
+            <height>0</height>
+           </size>
+          </property>
+         </widget>
         </item>
         <item row="3" column="1">
          <widget class="QPushButton" name="button_browse_log_directory">
+          <property name="maximumSize">
+           <size>
+            <width>87</width>
+            <height>40</height>
+           </size>
+          </property>
           <property name="text">
            <string>Browse</string>
           </property>
@@ -152,7 +189,7 @@
      <property name="title">
       <string>Calibration Files</string>
      </property>
-     <layout class="QFormLayout" name="formLayout">
+     <layout class="QGridLayout" name="gridLayout_2">
       <property name="verticalSpacing">
        <number>0</number>
       </property>
@@ -160,16 +197,6 @@
        <widget class="QLabel" name="label_3">
         <property name="text">
          <string>Plaque File</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Temperature File</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -200,6 +227,16 @@
         </item>
        </layout>
       </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Temperature File</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="1">
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <property name="spacing">
@@ -228,64 +265,17 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBox">
-     <property name="title">
-      <string>Append prefix to log file:</string>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_6">
-      <item>
-       <widget class="QCheckBox" name="checkbox_prefix_diw">
-        <property name="text">
-         <string>DIW</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkbox_prefix_dark">
-        <property name="text">
-         <string>DARK</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkbox_prefix_fsw">
-        <property name="text">
-         <string>FSW</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <item>
-         <widget class="QCheckBox" name="checkbox_prefix_custom">
-          <property name="text">
-           <string>Custom: </string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLineEdit" name="le_prefix_custom">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="inputMask">
-           <string/>
-          </property>
-          <property name="maxLength">
-           <number>10</number>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>0</height>
+      </size>
+     </property>
+    </spacer>
    </item>
    <item>
     <widget class="QDialogButtonBox" name="button_box">
@@ -306,7 +296,6 @@
   <tabstop>le_manufacturer</tabstop>
   <tabstop>le_model</tabstop>
   <tabstop>le_serial_number</tabstop>
-  <tabstop>le_prefix_custom</tabstop>
  </tabstops>
  <resources/>
  <connections>
