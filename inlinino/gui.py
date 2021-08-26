@@ -435,6 +435,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_dcal_file.clicked.connect(self.act_browse_dcal_file)
         if 'button_browse_zsc_file' in self.__dict__.keys():
             self.button_browse_zsc_file.clicked.connect(self.act_browse_zsc_file)
+        if 'button_browse_plaque_file' in self.__dict__.keys():
+            self.button_browse_plaque_file.clicked.connect(self.act_browse_plaque_file)
+        if 'button_browse_temperature_file' in self.__dict__.keys():
+            self.button_browse_temperature_file.clicked.connect(self.act_browse_temperature_file)
 
         # Cannot use default save button as does not provide mean to correctly validate user input
         self.button_save = QtGui.QPushButton('Save')
@@ -465,6 +469,16 @@ class DialogInstrumentSetup(QtGui.QDialog):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
             caption='Choose ZSC file', filter='ZSC File (*.asc)')
         self.le_zsc_file.setText(file_name)
+
+    def act_browse_plaque_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose plaque calibration file', filter='Plaque File (*.mat)')
+        self.le_plaque_file.setText(file_name)
+
+    def act_browse_temperature_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose temperature calibration file', filter='Temperature File (*.mat)')
+        self.le_temperature_file.setText(file_name)
 
     def act_save(self):
         # Read form
@@ -625,8 +639,11 @@ class DialogSerialConnection(QtGui.QDialog):
         # Update ports list
         self.ports = list_serial_comports()
         # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
-        for p in [str(p.device) + ' - ' + str(p.product) for p in self.ports]:
-            self.cb_port.addItem(p)
+        for p in self.ports:
+            p_name = str(p.device)
+            if p.product is not None:
+                p_name += ' - ' + str(p.product)
+            self.cb_port.addItem(p_name)
         # Set default values based on instrument
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if type(instrument) == ACS:
