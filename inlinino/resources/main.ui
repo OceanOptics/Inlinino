@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>600</height>
+    <height>710</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -135,6 +135,20 @@
          <widget class="QPushButton" name="button_log">
           <property name="text">
            <string>Start</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QPushButton" name="button_figure_clear">
+          <property name="text">
+           <string>Clear</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="label_9">
+          <property name="text">
+           <string>Figure</string>
           </property>
          </widget>
         </item>
@@ -328,8 +342,8 @@
        </property>
        <property name="sizeHint" stdset="0">
         <size>
-         <width>20</width>
-         <height>120</height>
+         <width>0</width>
+         <height>20</height>
         </size>
        </property>
       </spacer>
@@ -339,7 +353,7 @@
        <item>
         <widget class="QLabel" name="label_app_version">
          <property name="text">
-          <string>Inlinino v2.0</string>
+          <string>Inlinino v2.X</string>
          </property>
         </widget>
        </item>

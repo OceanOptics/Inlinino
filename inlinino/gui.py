@@ -86,6 +86,7 @@ class MainWindow(QtGui.QMainWindow):
         self.button_setup.clicked.connect(self.act_instrument_setup)
         self.button_serial.clicked.connect(self.act_instrument_interface)
         self.button_log.clicked.connect(self.act_instrument_log)
+        self.button_figure_clear.clicked.connect(self.act_clear_timeseries_plot)
         # Set clock
         self.signal_clock = QtCore.QTimer()
         self.signal_clock.timeout.connect(self.set_clock)
@@ -213,6 +214,10 @@ class MainWindow(QtGui.QMainWindow):
                                                 'path': dialog.log_path})
                 logger.debug('Start logging')
                 self.instrument.log_start()
+
+    def act_clear_timeseries_plot(self):
+        # Send no data which reset buffers
+        self.instrument.signal.new_data.emit([], time())
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
@@ -634,10 +639,10 @@ class DialogSerialConnection(QtGui.QDialog):
         self.ports = list_serial_comports()
         # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
         for p in self.ports:
-            print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
+            # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
             p_name = str(p.device)
-            if p.product is not None:
-                p_name += ' - ' + str(p.product)
+            if p.description is not None and p.description != 'n/a':
+                p_name += ' - ' + str(p.description)
             self.cb_port.addItem(p_name)
         # Set default values based on instrument
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
