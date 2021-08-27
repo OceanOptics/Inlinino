@@ -82,6 +82,8 @@ class MainWindow(QtGui.QMainWindow):
         self.packets_received = 0
         self.packets_logged = 0
         self.packets_corrupted = 0
+        self.packets_corrupted_flag = False
+        self.last_packet_corrupted_timestamp = 0
         # Set buttons
         self.button_setup.clicked.connect(self.act_instrument_setup)
         self.button_serial.clicked.connect(self.act_instrument_interface)
@@ -265,6 +267,9 @@ class MainWindow(QtGui.QMainWindow):
     def on_packet_received(self):
         self.packets_received += 1
         self.label_packets_received.setText(str(self.packets_received))
+        if self.packets_corrupted_flag and time() - self.last_packet_corrupted_timestamp > 5:
+            self.label_packets_corrupted.setStyleSheet(f'font-weight:normal;color: {self.FOREGROUND_COLOR};')
+            self.packets_corrupted_flag = False
 
     @QtCore.pyqtSlot()
     def on_packet_logged(self):
@@ -276,8 +281,13 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot()
     def on_packet_corrupted(self):
+        ts = time()
         self.packets_corrupted += 1
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
+        if ts - self.last_packet_corrupted_timestamp < 5:  # seconds
+            self.label_packets_corrupted.setStyleSheet('font-weight:bold;color: #e0463e;')  # red
+            self.packets_corrupted_flag = True
+        self.last_packet_corrupted_timestamp = ts
 
     @QtCore.pyqtSlot(list, float)
     @QtCore.pyqtSlot(np.ndarray, float)
