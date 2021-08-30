@@ -364,7 +364,7 @@ class MainWindow(QtGui.QMainWindow):
             self.alarm_message_box_active = False
 
     def closeEvent(self, event):
-        msg = QtGui.QMessageBox()
+        msg = QtGui.QMessageBox(self)
         msg.setIcon(QtGui.QMessageBox.Question)
         msg.setWindowTitle("Inlinino: Closing Application")
         msg.setText("Are you sure to quit ?")
