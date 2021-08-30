@@ -218,8 +218,9 @@ class MainWindow(QtGui.QMainWindow):
                 self.instrument.log_start()
 
     def act_clear_timeseries_plot(self):
-        # Send no data which reset buffers
-        self.instrument.signal.new_data.emit([], time())
+        if len(self._buffer_data) > 0:
+            # Send no data which reset buffers
+            self.instrument.signal.new_data.emit([], time())
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
