@@ -637,7 +637,66 @@ class DialogInstrumentSetup(QtGui.QDialog):
         msg.exec_()
 
 
+class WorkerSignals(QtCore.QObject):
+
+    status_update = QtCore.pyqtSignal(str, int)
+    new_data = QtCore.pyqtSignal(str)
+    finished = QtCore.pyqtSignal()
+
+
+class WorkerSerialConnection(QtCore.QObject):
+
+    def __init__(self, port, baudrate, bytesize, parity, stopbits, timeout):
+        super().__init__()
+        self.alive = False
+        self.signal = WorkerSignals()
+        # Serial Parameters
+        self.port, self.baudrate = port, baudrate
+        self.bytesize, self.parity, self.stopbits, self.timeout = bytesize, parity, stopbits, timeout
+
+    def run(self):
+        print(f'Worker:run {self.port}')
+        # from time import sleep
+        # sleep(2)
+        try:
+            self.alive = True
+            s = serial.Serial(self.port, self.baudrate, self.bytesize, self.parity, self.stopbits, self.timeout)
+            self.signal.status_update.emit('Connected', DialogSerialConnection.STYLE_SUCCESS)
+            print(f'Worker:run connected {self.port}')
+            while self.alive:
+                data = s.read(s.in_waiting or 1).decode('ascii', 'ignore')
+                self.signal.new_data.emit(data)
+        except serial.serialutil.SerialException as e:
+            print(e)
+            if e.errno == 16:
+                self.signal.status_update.emit('Could not open port, resource busy.', DialogSerialConnection.STYLE_DANGER)
+            else:
+                self.signal.status_update.emit(str(e), DialogSerialConnection.STYLE_DANGER)
+        except Exception as e:
+            print(e)
+            self.signal.status_update.emit(str(e), DialogSerialConnection.STYLE_DANGER)
+        finally:
+            print(f'Worker:finished {self.port}')
+            self.signal.finished.emit()
+
+    def quit(self):
+        print(f'Worker:quit {self.port}')
+        self.alive = False
+
+    # def deleteLater(self) -> None:
+    #     print(f'Worker:deleteLater {self.port}')
+    #     super().deleteLater()
+
+    # def __str__(self):
+    #     return f'Worker {self.port} {self.alive}'
+
+
 class DialogSerialConnection(QtGui.QDialog):
+
+    STYLE_SUCCESS = 0
+    STYLE_WARNING = 1
+    STYLE_DANGER = 2
+
     def __init__(self, parent):
         super().__init__(parent)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'serial_connection.ui'), self)
@@ -647,7 +706,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
-        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
+        self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'description': 'macOS Virtual Serial'}))  # Debug macOS serial
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
             p_name = str(p.device)
@@ -674,6 +733,92 @@ class DialogSerialConnection(QtGui.QDialog):
         self.cb_parity.setCurrentIndex([self.cb_parity.itemText(i) for i in range(self.cb_parity.count())].index(parity))
         self.cb_stopbits.setCurrentIndex([self.cb_stopbits.itemText(i) for i in range(self.cb_stopbits.count())].index(stopbits))
         self.sb_timeout.setValue(timeout)
+        # Connect parameter change to active running thread
+        self.cb_port.currentTextChanged.connect(self.run_serial_connection)
+        self.cb_baudrate.currentTextChanged.connect(self.run_serial_connection)
+        self.cb_bytesize.currentTextChanged.connect(self.run_serial_connection)
+        self.cb_parity.currentTextChanged.connect(self.run_serial_connection)
+        self.cb_stopbits.currentTextChanged.connect(self.run_serial_connection)
+        self.sb_timeout.valueChanged.connect(self.run_serial_connection)
+        # Setup Worker Object and Thread
+        # self.parent = parent
+        self.worker_thread = QtCore.QThread(self)
+        self.worker = WorkerSerialConnection(self.port, self.baudrate, self.bytesize, self.parity, self.stopbits, self.timeout)
+        self.worker.moveToThread(self.worker_thread)
+        # Connect Signals
+        self.worker_thread.started.connect(self.worker.run)
+        self.worker_signal_connected = False
+        # self.worker.finished.connect(self.worker_thread.quit)
+        # self.worker.status_update.connect(self.update_status)
+
+    def run_serial_connection(self):
+        # Stop previous thread if it was running
+        if self.worker_thread.isRunning():
+            # Disconnect signal to prevent UI update while closing process
+            self.worker.signal.new_data.disconnect(self.update_console)
+            self.worker.signal.status_update.disconnect(self.update_status)
+            self.worker_signal_connected = False
+            # Update dialog status
+            self.update_status('Disconnecting ...', self.STYLE_WARNING)
+            # Attempt graceful stop worker thread
+            self.worker.quit()
+            print(1)
+            self.worker_thread.quit()
+            print(2)
+            if not self.worker_thread.wait(500):
+                print(3)
+                # Thread did not finish, Force stop worker thread
+                print(f'Force stop worker thread {self.worker.port}')
+                self.worker_thread.terminate()
+                print(4)
+                self.worker_thread.wait()  # Required after terminate as thread might not terminate immediately
+        # Update status and clear console
+        self.update_status('Connecting ...', self.STYLE_WARNING)
+        self.pte_console.clear()
+        # Connect worker signals to Dialog
+        if not self.worker_signal_connected:
+            self.worker_signal_connected = True
+            self.worker.signal.new_data.connect(self.update_console)
+            self.worker.signal.status_update.connect(self.update_status)
+        # Update Worker Configuration
+        self.worker.port, self.worker.baudrate = self.port, self.baudrate
+        self.worker.bytesize, self.worker.parity = self.bytesize, self.parity
+        self.worker.stopbits, self.worker.timeout = self.stopbits, self.timeout
+        # Start working thread
+        # print(self.worker)
+        self.worker_thread.start()
+
+    def done(self, arg):
+        print(f'Dialog: done {arg}')
+        # Attempt graceful stop worker thread
+        self.worker.quit()
+        self.worker_thread.quit()
+        if not self.worker_thread.wait(1000):
+            # Force stop worker thread
+            # print('Force stop worker thread')
+            self.worker_thread.terminate()
+            self.worker_thread.wait()
+        super().done(arg)
+
+    def update_console(self, data):
+        self.pte_console.moveCursor(QtGui.QTextCursor.End)
+        self.pte_console.insertPlainText(data)
+        self.pte_console.moveCursor(QtGui.QTextCursor.StartOfLine)
+
+    def update_status(self, status, style):
+        self.label_status.setText(status)
+        if style == self.STYLE_SUCCESS:
+            self.label_status.setStyleSheet(f'font-weight:bold;color:#12ab29;')
+        elif style == self.STYLE_WARNING:
+            self.label_status.setStyleSheet(f'font-weight:normal;color:#ff9e17;')
+        elif style == self.STYLE_DANGER:
+            self.label_status.setStyleSheet(f'font-weight:bold;color:#e0463e;')
+
+    # def force_worker_quit(self):
+    #     if self.worker_thread.isRunning():
+    #         self.worker.alive = False
+    #         # self.worker.terminate()
+    #         # self.worker.wait()
 
     @property
     def port(self) -> str:
