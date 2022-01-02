@@ -39,6 +39,10 @@ class LISST(Instrument):
         self._plot.getAxis('bottom').enableAutoSIPrefix(False)
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Default serial communication parameters
+        self.default_serial_baudrate = 9600
+        self.default_serial_timeout = 10
+
         # Auxiliary Data Plugin
         self.plugin_aux_data = True
         self.plugin_aux_data_variables_selected = [0, 3, 5]

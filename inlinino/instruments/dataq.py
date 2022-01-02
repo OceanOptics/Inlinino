@@ -21,6 +21,10 @@ class DATAQ(Instrument):
 
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Default serial communication parameters
+        self.default_serial_baudrate = 115200
+        self.default_serial_timeout = 1
+
     def setup(self, cfg):
         # Set DATAQ specific attributes
         if 'channels_enabled' not in cfg.keys():

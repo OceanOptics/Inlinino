@@ -47,6 +47,10 @@ class ACS(Instrument):
 
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Default serial communication parameters
+        self.default_serial_baudrate = 115200
+        self.default_serial_timeout = 1
+
         # Auxiliary Data Plugin
         self.plugin_aux_data = True
         self.plugin_aux_data_variable_names = ['Internal Temp. (ºC)', 'External Temp. (ºC)', 'Outside Cal Range']
@@ -73,6 +77,7 @@ class ACS(Instrument):
         self._parser = ACSParser(cfg['device_file'])
         if 'force_parsing' in cfg.keys():
             self.force_parsing = cfg['force_parsing']
+        self.default_serial_baudrate = self._parser.baudrate
         # Overload cfg with ACS specific parameters
         cfg['variable_names'] = ['acs_timestamp', 'c', 'a', 'T_int', 'T_ext', 'flag_outside_calibration_range']
         cfg['variable_units'] = ['ms', '1/m', '1/m', 'deg_C', 'deg_C', 'bool']

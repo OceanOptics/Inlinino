@@ -41,6 +41,10 @@ class HyperBB(Instrument):
 
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Default serial communication parameters
+        self.default_serial_baudrate = 9600
+        self.default_serial_timeout = 1
+
         # Set wavelength range
         self._plot.setXRange(np.min(self._parser.wavelength), np.max(self._parser.wavelength))
         self._plot.setLimits(minXRange=np.min(self._parser.wavelength), maxXRange=np.max(self._parser.wavelength))

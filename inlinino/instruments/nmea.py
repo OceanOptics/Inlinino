@@ -15,6 +15,10 @@ class NMEA(Instrument):
         self._unknown_nmea_sentence = []
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Default serial communication parameters
+        self.default_serial_baudrate = 4800
+        self.default_serial_timeout = 10
+
     def setup(self, cfg):
         # Overload cfg
         cfg['terminator'] = b'\r\n'

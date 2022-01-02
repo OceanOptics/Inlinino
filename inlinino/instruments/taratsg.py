@@ -10,6 +10,10 @@ class TaraTSG(Instrument):
     def __init__(self, cfg_id, signal, *args, **kwargs):
         super().__init__(cfg_id, signal, *args, **kwargs)
 
+        # Default serial communication parameters
+        self.default_serial_baudrate = 9600
+        self.default_serial_timeout = 3
+
         # Auxiliary Data Plugin
         self.plugin_aux_data = True
         self.plugin_aux_data_variable_names = ['Temp. 1 (ºC)', 'Temp. 2 (ºC)', 'Cond. 1 (S/m)', 'Salinity (psu)']

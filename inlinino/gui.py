@@ -657,19 +657,10 @@ class DialogSerialConnection(QtGui.QDialog):
             self.cb_port.addItem(p_name)
         # Set default values based on instrument
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
-        if type(instrument) == ACS:
-            baudrate = str(instrument._parser.baudrate)
-            timeout = 1
-        elif type(instrument) == DATAQ:
-            baudrate, dataq = '115200', 1
-        elif type(instrument) == HyperBB:
-            baudrate, timeout = '9600', 1
-        elif type(instrument) == LISST:
-            baudrate, timeout = '9600', 10
-        elif type(instrument) == NMEA:
-            baudrate, timeout = '4800', 10
-        elif type(instrument) == TaraTSG:
-            baudrate, timeout = '9600', 3
+        if hasattr(instrument, 'default_serial_baudrate'):
+            baudrate = str(instrument.default_serial_baudrate)
+        if hasattr(instrument, 'default_serial_timeout'):
+            timeout = instrument.default_serial_timeout
         self.cb_baudrate.setCurrentIndex([self.cb_baudrate.itemText(i) for i in range(self.cb_baudrate.count())].index(baudrate))
         self.cb_bytesize.setCurrentIndex([self.cb_bytesize.itemText(i) for i in range(self.cb_bytesize.count())].index(bytesize))
         self.cb_parity.setCurrentIndex([self.cb_parity.itemText(i) for i in range(self.cb_parity.count())].index(parity))
