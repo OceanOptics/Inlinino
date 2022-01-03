@@ -589,6 +589,16 @@
       "log_path": "data",
       "plaque_file": "cfg/HBB8002_CalPlaque_20210719.mat",
       "temperature_file": "cfg/HBB8002_CalTemp_20210106.mat"
+    },
+    {
+      "module": "suna",
+      "manufacturer": "Sea-Bird Scientific",
+      "model": "Suna",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data",
+      "calibration_file": "/Users/nils/PycharmProjects/pySAS/pySAS/calibration_files/HLD250d.cal",
+      "serial_number": "0469"
     }
   ]
 }

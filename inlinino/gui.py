@@ -13,6 +13,7 @@ from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
+from inlinino.instruments.suna import Suna
 from inlinino.instruments.taratsg import TaraTSG
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
@@ -451,6 +452,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_log_directory.clicked.connect(self.act_browse_log_directory)
         if 'button_browse_device_file' in self.__dict__.keys():
             self.button_browse_device_file.clicked.connect(self.act_browse_device_file)
+        if 'button_browse_calibration_file' in self.__dict__.keys():
+            self.button_browse_calibration_file.clicked.connect(self.act_browse_calibration_file)
         if 'button_browse_ini_file' in self.__dict__.keys():
             self.button_browse_ini_file.clicked.connect(self.act_browse_ini_file)
         if 'button_browse_dcal_file' in self.__dict__.keys():
@@ -476,6 +479,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
             caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
+
+    def act_browse_calibration_file(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL *.tdf *.TDF)')
+        self.le_calibration_file.setText(file_name)
 
     def act_browse_ini_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
@@ -804,7 +812,7 @@ class App(QtGui.QApplication):
         self.splash_screen.close()
 
     def start(self, instrument_index=None):
-        if not instrument_index:
+        if not isinstance(instrument_index, int) or instrument_index > len(CFG.instruments):
             logger.debug('Startup Dialog')
             self.startup_dialog.show()
             act = self.startup_dialog.exec_()
@@ -827,7 +835,7 @@ class App(QtGui.QApplication):
         instrument_name = CFG.instruments[instrument_index]['model'] + ' ' \
                           + CFG.instruments[instrument_index]['serial_number']
         instrument_module_name = CFG.instruments[instrument_index]['module']
-        logger.debug('Loading instrument ' + instrument_name)
+        logger.debug('Loading instrument [' + str(instrument_index) + '] ' + instrument_name)
         instrument_loaded = False
         while not instrument_loaded:
             try:
@@ -843,6 +851,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
                     self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'suna':
+                    self.main_window.init_instrument(Suna(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
                     self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:
@@ -853,7 +863,7 @@ class App(QtGui.QApplication):
                 raise e
                 logger.warning('Unable to load instrument.')
                 logger.warning(e)
-                self.closeAllWindows()  # ACS, HyperBB, and LISST are opening pyqtgraph windows
+                self.closeAllWindows()  # ACS, HyperBB, LISST, and Suna are opening pyqtgraph windows
                 # Dialog Box
                 setup_dialog = DialogInstrumentSetup(instrument_index)
                 setup_dialog.show()

@@ -8,7 +8,9 @@ inlinino = App([])
 if len(sys.argv) == 2:
     try:
         inlinino.start(int(sys.argv[1]))
-    except ValueError:
+    except ValueError as e:
+        # raise e
         logging.critical('Invalid arguments.')
+        logging.debug(e)
 else:
     inlinino.start()
