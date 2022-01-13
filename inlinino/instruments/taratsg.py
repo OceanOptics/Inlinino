@@ -32,9 +32,12 @@ class TaraTSG(Instrument):
 
     def parse(self, packet):
         foo = packet.split(b',')
-        bar = [0.0] * 5
-        for i in range(5):
-            bar[i] = float(foo[i].split(b'=')[1])
+        bar = [float('nan')] * 5
+        for i in range(min(5, len(foo))):
+            if b'=' in foo[i]:
+                bar[i] = float(foo[i].split(b'=')[1])
+            else:
+                bar[i] = float(foo[i])
         return bar
 
     def handle_data(self, data, timestamp):
