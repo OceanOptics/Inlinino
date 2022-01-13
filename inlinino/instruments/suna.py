@@ -17,7 +17,7 @@ class Suna(Instrument):
     def __init__(self, cfg_id, signal, *args, **kwargs):
         # Suna specific
         self.df_maker = None
-        self.wavelength = [c for c in range(self.N_CHANNELS)]  # TODO Get wavelengths registration from calibration file
+        self.wavelength = [c for c in range(self.N_CHANNELS)]
 
         # Init Graphic for real time spectrum visualization
         # TODO Refactor code and move it to GUI
@@ -35,8 +35,7 @@ class Suna(Instrument):
         self._plot.addItem(self._plot_curve_light)
         self._plot.addItem(self._plot_curve_dark)
         # Decoration
-        self._plot.setLabel('bottom', 'Channel', units='(#)')
-        # self._plot.setLabel('bottom', 'Wavelength' , units='nm')  # TODO Display wavelengths instead of channel number
+        self._plot.setLabel('bottom', 'Channel', units='#')
         self._plot.setLabel('left', 'Signal', units='counts')
         # self.m_plot.setYRange(0, 5)
         self._plot.setMouseEnabled(x=False, y=True)
@@ -58,9 +57,7 @@ class Suna(Instrument):
                                                'Internal Temp. (ºC)']
 
         # Display only selected variables
-        self.plugin_active_timeseries_variables_selected = [
-            'Light Frm Nitrate', 'Light Frm abs(254)', 'Light Frm abs(350)',
-            'Dark Frm Nitrate', 'Dark Frm abs(254)', 'Dark Frm abs(350)']
+        self.plugin_active_timeseries_variables_selected = ['Frm Nitrate', 'Frm abs(254)', 'Frm abs(350)']
 
     def setup(self, cfg):
         # TODO Load device file to retrieve wavelength registration, 0 spectrum, and tdf
@@ -111,18 +108,23 @@ class Suna(Instrument):
 
     def register_wavelengths(self, calibration_filename):
         # Read polynomial coefficients for wavelength calculation from pixel value
-        c = [0.] * 5
-        with open(calibration_filename, 'r') as f:
-            for l in f:
-                if l[:2] == '/*':  # Comment
-                    continue
-                elif l[0] == 'C':
-                    c[int(l[1])] = float(l.split(' ')[1])
-        x = np.arange(1, self.N_CHANNELS+1)
-        self.wavelength = c[0] + c[1] * x + c[2] * x**2 + c[3] * x**3 + c[4] * x**4
+        try:
+            c = [0.] * 5
+            with open(calibration_filename, 'r') as f:
+                for l in f:
+                    if l[:2] == '/*':  # Comment
+                        continue
+                    elif l[0] == 'C':
+                        c[int(l[1])] = float(l.split(' ')[1])
+            x = np.arange(1, self.N_CHANNELS+1)
+            self.wavelength = c[0] + c[1] * x + c[2] * x**2 + c[3] * x**3 + c[4] * x**4
+            self._plot.setLabel('bottom', 'Wavelength', units='nm')
+        except:
+            self.logger.warning('Error registering wavelengths.')
         if not np.all(np.diff(self.wavelength)):  # some wavelengths are identical
             self.logger.warning('Invalid wavelength registration.')
             self.wavelength = [c for c in range(self.N_CHANNELS)]
+            self._plot.setLabel('bottom', 'Channel', units='#')
 
     def parse(self, packet):
         try:
@@ -134,20 +136,17 @@ class Suna(Instrument):
             self.logger.debug(packet + self._terminator)
 
     def handle_data(self, raw, timestamp):
-        ts_data = [raw.nitrate, raw.absorbance_254, raw.absorbance_350]
         if 'L' in raw.header:    # Light (SATSLF)
             # Update plots
-            self.signal.new_data.emit(ts_data + [float('nan')] * 3, timestamp)
+            self.signal.new_data.emit([raw.nitrate, raw.absorbance_254, raw.absorbance_350], timestamp)
             self._plot_curve_light.setData(np.array(self.wavelength),
                                            np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]))
             # Update Auxiliary Data Plugin
             self.signal.new_aux_data.emit(['%.2f' % raw.nitrate, '%.4f' % raw.absorbance_254,
                                            '%.4f' % raw.absorbance_350, '%.1f' % raw.int_temp])
         elif 'D' in raw.header:  # Dark (SATSDF)
-            # Update plots
-            self.signal.new_data.emit([float('nan')] * 3 + ts_data, timestamp)
-            self._plot_curve_dark.setData(self.wavelength,
-                                          np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]))
+            pass
+            # Do NOT Update plots
             # Do NOT update auxiliary data
         else:
             self.logger.info(f'Unknown data frame: {raw.header}')
