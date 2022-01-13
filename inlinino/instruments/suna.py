@@ -64,11 +64,16 @@ class Suna(Instrument):
 
     def setup(self, cfg):
         # TODO Load device file to retrieve wavelength registration, 0 spectrum, and tdf
+        # Set ACS specific attributes
+        if 'calibration_file' not in cfg.keys():
+            raise ValueError('Missing field calibration file')
+        self.register_wavelengths(cfg['calibration_file'])
         # Overload cfg with Suna specific parameters
         cfg['variable_names'] = ['header', 'suna_date', 'suna_time',
                                  'nitrate', 'nitrogen_in_nitrate', 'absorbance_254', 'absorbance_350', 'bromide_trace',
                                  'spectrum_average', 'dark_value_used_for_fit', 'int_time_factor',
-                                *[f'channel_{k}' for k in range(self.N_CHANNELS)],
+                                # *[f'uv_{wl:.2f}' for wl in self.wavelength],  # Need valid identifier
+                                 *[f'channel_{k}' for k in range(self.N_CHANNELS)],
                                  'int_temp', 'spec_temp', 'lamp_temp', 'lamp_time', 'rel_humid',
                                  'main_volt', 'lamp_volt', 'int_vol', 'main_current',
                                  'fit_aux1', 'fit_aux2', 'fit_base1', 'fit_base2', 'fit_rmse',
@@ -103,6 +108,21 @@ class Suna(Instrument):
         min_wl, max_wl = min(self.wavelength), max(self.wavelength)
         self._plot.setXRange(min_wl, max_wl)
         self._plot.setLimits(minXRange=min_wl, maxXRange=max_wl)
+
+    def register_wavelengths(self, calibration_filename):
+        # Read polynomial coefficients for wavelength calculation from pixel value
+        c = [0.] * 5
+        with open(calibration_filename, 'r') as f:
+            for l in f:
+                if l[:2] == '/*':  # Comment
+                    continue
+                elif l[0] == 'C':
+                    c[int(l[1])] = float(l.split(' ')[1])
+        x = np.arange(1, self.N_CHANNELS+1)
+        self.wavelength = c[0] + c[1] * x + c[2] * x**2 + c[3] * x**3 + c[4] * x**4
+        if not np.all(np.diff(self.wavelength)):  # some wavelengths are identical
+            self.logger.warning('Invalid wavelength registration.')
+            self.wavelength = [c for c in range(self.N_CHANNELS)]
 
     def parse(self, packet):
         try:
@@ -176,8 +196,8 @@ class Suna(Instrument):
 # Parameters to set (different from default)
 #   set opermode continous   # Non default value
 #   set operctrl samples
-#   set drksmpls 1
-#   set lgtsmpls 10
+#   set drksmpls 1           # Set at 2 on Suna 1504
+#   set lgtsmpls 10          # Set at 58 on Suna 1504
 #   set drkavers 1
 #   set lgtavers 1
 

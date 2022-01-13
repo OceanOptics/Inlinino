@@ -597,7 +597,7 @@
       "log_raw": true,
       "log_products": true,
       "log_path": "data",
-      "calibration_file": "/Users/nils/PycharmProjects/pySAS/pySAS/calibration_files/HLD250d.cal",
+      "calibration_file": "cfg/SUNA_1504/ZCoefDat.cal",
       "serial_number": "0469"
     }
   ]

@@ -482,7 +482,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_browse_calibration_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL *.tdf *.TDF)')
+            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')  # *.tdf *.TDF
         self.le_calibration_file.setText(file_name)
 
     def act_browse_ini_file(self):
