@@ -115,7 +115,6 @@ class Instrument:
             self.variable_types = cfg['variable_types']
         # User Interface
         # self.manufacturer = cfg['manufacturer']
-
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
         self.signal.status_update.emit()

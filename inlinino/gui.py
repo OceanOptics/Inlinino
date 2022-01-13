@@ -431,6 +431,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         getattr(self, 'le_' + k).setText(', '.join([str(vv) for vv in v]))
                     else:
                         getattr(self, 'le_' + k).setText(v)
+                elif hasattr(self, 'te_' + k):
+                    if isinstance(v, list):
+                        getattr(self, 'te_' + k).setPlainText(',\n'.join([str(vv) for vv in v]))
+                    else:
+                        getattr(self, 'te_' + k).setPlainText(v)
                 elif hasattr(self, 'combobox_' + k):
                     if v:
                         getattr(self, 'combobox_' + k).setCurrentIndex(0)
@@ -527,8 +532,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 # Apply special formatting to specific variables
                 try:
                     if 'variable_' in field_name:
-                        value = value.split(',')
-                        value = [v.strip() for v in value]
+                        value = [v.strip() for v in value.split(',')]
                         if 'variable_columns' in field_name:
                             value = [int(x) for x in value]
                     elif field_name in ['terminator', 'separator']:
@@ -537,6 +541,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         value = value.strip().encode(self.ENCODING).decode('unicode_escape').encode(self.ENCODING)
                     else:
                         value.strip()
+                except:
+                    self.notification('Unable to parse special variable: ' + field_pretty_name, sys.exc_info()[0])
+                    return
+                self.cfg[field_name] = value
+            elif field_prefix == 'te':
+                value = getattr(self, f).toPlainText()
+                try:
+                    value = [v.strip() for v in value.split(',')]
                 except:
                     self.notification('Unable to parse special variable: ' + field_pretty_name, sys.exc_info()[0])
                     return
@@ -556,28 +568,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             return
         # Check fields specific to modules
         if self.cfg['module'] == 'generic':
-            variable_keys = [v for v in self.cfg.keys() if 'variable_' in v]
-            if variable_keys:
-                # Check length
-                n = len(self.cfg['variable_names'])
-                for k in variable_keys:
-                    if n != len(self.cfg[k]):
-                        self.notification('Inconsistent length. Variable Names, Variable Units, Variable Columns,'
-                                          'Variable Types, and Variable Precision must have the same number of elements '
-                                          'separated by commas.')
-                        return
-                # Check type
-                for v in self.cfg['variable_types']:
-                    if v not in ['int', 'float']:
-                        self.notification('Invalid variable type')
-                        return
-                # Check precision
-                if 'variable_precision' in self.cfg:
-                    for v in self.cfg['variable_precision']:
-                        if v[0] != '%' and v[-1] not in ['d', 'f']:
-                            self.notification('Invalid variable precision. '
-                                              'Expect type specific formatting (e.g. %d or %.3f) separated by commas.')
-                            return
+            if not self.check_variables_pass():
+                return
             if not self.cfg['log_raw'] and not self.cfg['log_products']:
                 self.notification('Invalid logger configuration. '
                                   'At least one logger must be ON (to either log raw or parsed data).')
@@ -620,6 +612,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if not self.cfg['channels_enabled']:
                 self.notification('At least one channel must be enabled.', 'Nothing to log if no channels are enabled.')
                 return
+            if not self.check_variables_pass():
+                return
             if 'log_raw' not in self.cfg.keys():
                 self.cfg['log_raw'] = False
             if 'log_products' not in self.cfg.keys():
@@ -632,6 +626,32 @@ class DialogInstrumentSetup(QtGui.QDialog):
             CFG.instruments[self.cfg_index] = self.cfg.copy()
         CFG.write()
         self.accept()
+
+    def check_variables_pass(self):
+        variable_keys = [v for v in self.cfg.keys() if 'variable_' in v]
+        if variable_keys:
+            # Check length
+            n = len(self.cfg['variable_names'])
+            for k in variable_keys:
+                if n != len(self.cfg[k]):
+                    self.notification('Inconsistent length. Variable Names, Variable Units, Variable Columns,'
+                                      'Variable Types, and Variable Precision must have the same number of elements '
+                                      'separated by commas.')
+                    return False
+            # Check type
+            if 'variable_types' in self.cfg:
+                for v in self.cfg['variable_types']:
+                    if v not in ['int', 'float']:
+                        self.notification('Invalid variable type')
+                        return False
+            # Check precision
+            if 'variable_precision' in self.cfg:
+                for v in self.cfg['variable_precision']:
+                    if v[0] != '%' and v[-1] not in ['d', 'f']:
+                        self.notification('Invalid variable precision. '
+                                          'Expect type specific formatting (e.g. %d or %.3f) separated by commas.')
+                        return False
+        return True
 
     @staticmethod
     def notification(message, details=None):

@@ -598,7 +598,40 @@
       "log_products": true,
       "log_path": "data",
       "calibration_file": "cfg/SUNA_1504/ZCoefDat.cal",
-      "serial_number": "0469"
+      "serial_number": "1504"
+    },
+    {
+      "module": "dataq",
+      "manufacturer": "WetLabs",
+      "model": "WS3S&CST",
+      "serial_number": " ",
+      "log_path": "data",
+      "variable_names": [
+        "chl",
+        "tr",
+        "c"
+      ],
+      "variable_units": [
+        "ug/L",
+        "no units",
+        "1/m"
+      ],
+      "variable_precision": [
+        "%.3f",
+        "%.3f",
+        "%.5f"
+      ],
+      "channels_enabled": [
+        0,
+        1
+      ],
+      "log_raw": false,
+      "log_products": true,
+      "variable_equations": [
+        "5.6 * (c[1] - 0.068)",
+        "(c[2] - 0.058)/(4.665-0.058)",
+        "-1/0.25 * np.log((c[2] - 0.058)/(4.665-0.058))"
+      ]
     }
   ]
 }

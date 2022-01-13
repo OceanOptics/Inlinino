@@ -1,3 +1,5 @@
+import numpy as np  # Needed to compute advanced products
+
 from inlinino.instruments import Instrument
 from time import time, sleep
 
@@ -18,6 +20,7 @@ class DATAQ(Instrument):
     def __init__(self, cfg_id, signal, *args, **kwargs):
         # DATAQ Specific attributes
         self.channels_enabled = [0, 1, 2 ,3]
+        self.variable_equations = []
 
         super().__init__(cfg_id, signal, *args, **kwargs)
 
@@ -31,21 +34,25 @@ class DATAQ(Instrument):
             raise ValueError('Missing field channels enabled')
         self.channels_enabled = cfg['channels_enabled']
         # Overload cfg with DATAQ specific parameters
-        if 'channels_names' not in cfg.keys():
-            cfg['variable_names'] = ['C%d' % (c+1) for c in self.channels_enabled]  # Add one to match channels label
-        cfg['variable_units'] = ['V'] * len(self.channels_enabled)
-        cfg['variable_precision'] = ['%.3f'] * len(self.channels_enabled)
+        cfg['variable_names'] = ['C%d' % (c+1) for c in self.channels_enabled] + \
+                                (cfg['variable_names'] if 'variable_names' in cfg.keys() else [])
+        cfg['variable_units'] = ['V'] * len(self.channels_enabled) + \
+                                (cfg['variable_units'] if 'variable_units' in cfg.keys() else [])
+        cfg['variable_precision'] = ['%.3f'] * len(self.channels_enabled) + \
+                                    (cfg['variable_precision'] if 'variable_precision' in cfg.keys() else [])
+        cfg['variable_equations'] = ['c[%d]' % (c+1) for c in self.channels_enabled] + \
+                                    (cfg['variable_equations'] if 'variable_equations' in cfg.keys() else [])
         cfg['terminator'] = b'\r'
         cfg['separator'] = b','
         # Set standard configuration and check cfg input
         super().setup(cfg)
-
-    # def open(self, port=None, baudrate=115200, bytesize=8, parity='N', stopbits=1, timeout=1):
-    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+        # Update DATAQ specific attributes after cfg checks
+        self.variable_equations = cfg['variable_equations']
 
     def close(self, *args, **kwargs):
         if self.alive:
             self.send_cmd('stop')
+            sleep(self._interface.timeout)
         super().close(*args, **kwargs)
 
     def send_cmd(self, command):
@@ -99,4 +106,9 @@ class DATAQ(Instrument):
         self.send_cmd("start")
 
     def parse(self, packet):
-        return [float(v) for v in packet.split(self.separator)]
+        # Get voltage from each channel
+        c = [float('nan')] * 5
+        for i, v in zip(self.channels_enabled, packet.split(self.separator)):
+            c[i+1] = float(v)  # Shift channels by 1 so that index starts at 1 instead of 0
+        # Compute Products
+        return [eval(eq, {'c': c, 'np': np}) for eq in self.variable_equations]
