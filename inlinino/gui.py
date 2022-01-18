@@ -304,7 +304,8 @@ class MainWindow(QtGui.QMainWindow):
             if hasattr(self.instrument, 'plugin_active_timeseries_variables_selected'):
                 legend = self.instrument.plugin_active_timeseries_variables_selected
             else:
-                legend = self.instrument.variable_names
+                legend = [f"{name} ({units})" for name, units in
+                          zip(self.instrument.variable_names, self.instrument.variable_units)]
             for i in range(len(data)):
                 self.timeseries_widget.plotItem.addItem(
                     pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),

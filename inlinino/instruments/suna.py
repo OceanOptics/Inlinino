@@ -53,11 +53,11 @@ class Suna(Instrument):
 
         # Auxiliary Data Plugin
         self.plugin_aux_data = True
-        self.plugin_aux_data_variable_names = ['Nitrate (µM)', 'Absorbance(254)', 'Absorbance(350)',
+        self.plugin_aux_data_variable_names = ['Nitrate (µM)', 'Absorbance(254) (Au)', 'Absorbance(350) (Au)',
                                                'Internal Temp. (ºC)']
 
         # Display only selected variables
-        self.plugin_active_timeseries_variables_selected = ['Frm Nitrate', 'Frm abs(254)', 'Frm abs(350)']
+        self.plugin_active_timeseries_variables_selected = ['Nitrate (µM)', 'A(254) (Au)', 'A(350) (Au)']
 
     def setup(self, cfg):
         # TODO Load device file to retrieve wavelength registration, 0 spectrum, and tdf
@@ -145,8 +145,9 @@ class Suna(Instrument):
             self.signal.new_aux_data.emit(['%.2f' % raw.nitrate, '%.4f' % raw.absorbance_254,
                                            '%.4f' % raw.absorbance_350, '%.1f' % raw.int_temp])
         elif 'D' in raw.header:  # Dark (SATSDF)
-            pass
-            # Do NOT Update plots
+            # Update spectrum plot
+            self._plot_curve_dark.setData(self.wavelength,
+                                          np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]))
             # Do NOT update auxiliary data
         else:
             self.logger.info(f'Unknown data frame: {raw.header}')
