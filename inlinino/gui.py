@@ -13,7 +13,7 @@ from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
-from inlinino.instruments.suna import Suna
+from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
 from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
@@ -872,8 +872,10 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
                     self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
-                elif instrument_module_name == 'suna':
-                    self.main_window.init_instrument(Suna(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'sunav2':
+                    self.main_window.init_instrument(SunaV2(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'sunav1':
+                    self.main_window.init_instrument(SunaV1(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
                     self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:
