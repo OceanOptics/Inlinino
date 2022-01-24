@@ -122,7 +122,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def init_instrument(self, instrument):
         self.instrument = instrument
-        self.label_instrument_name.setText(self.instrument.name)
+        self.label_instrument_name.setText(self.instrument.short_name)
         self.instrument.signal.status_update.connect(self.on_status_update)
         self.instrument.signal.packet_received.connect(self.on_packet_received)
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
@@ -179,7 +179,7 @@ class MainWindow(QtGui.QMainWindow):
         setup_dialog.show()
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
-            self.label_instrument_name.setText(self.instrument.name)
+            self.label_instrument_name.setText(self.instrument.short_name)
 
     def act_instrument_interface(self):
         if self.instrument.alive:
@@ -245,12 +245,14 @@ class MainWindow(QtGui.QMainWindow):
                 self.button_log.setToolTip('Stop logging data')
             else:
                 self.label_status.setText('Connected')
+                self.setWindowTitle(f'Inlinino: {self.instrument.name} [{self.instrument.interface_name}]')
                 self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #ff9e17;')
                 # Orange: #ff9e17 (darker) #ffc12f (lighter)
                 self.button_log.setText('Start')
                 self.button_log.setToolTip('Start logging data')
         else:
             self.label_status.setText('Disconnected')
+            self.setWindowTitle(f'Inlinino: {self.instrument.name}')
             self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #e0463e;')
             # Red: #e0463e (darker) #5cd9ef (lighter)  #f92670 (pyQtGraph)
             self.button_serial.setText('Open')
