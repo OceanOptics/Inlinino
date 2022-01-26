@@ -161,7 +161,7 @@ class MainWindow(QtGui.QMainWindow):
         self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
         self.timeseries_widget.plotItem.setLabel('left', 'Signal')
         self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
-        self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
+        # self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
         self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
         self.timeseries_widget.plotItem.showGrid(x=False, y=True)
         self.timeseries_widget.plotItem.enableAutoRange(x=True, y=True)
