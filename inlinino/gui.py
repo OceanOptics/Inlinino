@@ -1,3 +1,5 @@
+import zipfile
+
 import serial
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
 from PyQt5 import QtMultimedia
@@ -6,16 +8,18 @@ import sys, os, glob
 import logging
 from time import time, gmtime, strftime
 from serial.tools.list_ports import comports as list_serial_comports
-from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
+from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES, COLOR_SET
 from inlinino.instruments import Instrument, SerialInterface, SocketInterface, InterfaceException
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
+from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
 from pyACS.acs import ACS as ACSParser
+import pySatlantic.instrument as pySat
 from inlinino.instruments.lisst import LISSTParser
 import numpy as np
 from math import floor
@@ -42,16 +46,7 @@ def seconds_to_strmmss(seconds):
 class MainWindow(QtGui.QMainWindow):
     BACKGROUND_COLOR = '#F8F8F2'
     FOREGROUND_COLOR = '#26292C'
-    PEN_COLORS = ['#1f77b4',  # muted blue
-                  '#2ca02c',  # cooked asparagus green
-                  '#ff7f0e',  # safety orange
-                  '#d62728',  # brick red
-                  '#9467bd',  # muted purple
-                  '#8c564b',  # chestnut brown
-                  '#e377c2',  # raspberry yogurt pink
-                  '#7f7f7f',  # middle gray
-                  '#bcbd22',  # curry yellow-green
-                  '#17becf']  # blue-teal
+    PEN_COLORS = COLOR_SET
     BUFFER_LENGTH = 240
     MAX_PLOT_REFRESH_RATE = 4   # Hz
 
@@ -154,6 +149,11 @@ class MainWindow(QtGui.QMainWindow):
                 if v in self.instrument.plugin_active_timeseries_variables_selected:
                     check_box.setChecked(True)
                 self.group_box_active_timeseries_variables_scroll_area_content_layout.addWidget(check_box)
+            # Delete extra spacer to allow channels plugin to expand
+            for i in reversed(range(self.dock_widget_layout.count())):
+                if isinstance(self.dock_widget_layout.itemAt(i).spacerItem(), QtWidgets.QSpacerItem):
+                    self.dock_widget_layout.removeItem(self.dock_widget_layout.itemAt(i))
+                    break
 
     def init_timeseries_plot(self):
         self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem(utcOffset=0)}, enableMenu=False)
@@ -437,6 +437,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.cfg_index = -1
             self.cfg = {'module': template}
             uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + template + '.ui'), self)
+            # Add specific fields
+            if hasattr(self, 'scroll_area_layout_immersed'):
+                self.tdf_files = []
         elif isinstance(template, int):
             # Load from preconfigured instrument
             self.create = False
@@ -472,6 +475,16 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         self.combobox_interface.setCurrentIndex(0)
                     elif self.cfg['interface'] == 'socket':
                         self.combobox_interface.setCurrentIndex(1)
+            if hasattr(self, 'scroll_area_layout_immersed'):
+                if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
+                    self.tdf_files = self.cfg['tdf_files']
+                    for f, i in zip(self.tdf_files, self.cfg['immersed']):
+                        widget = QtWidgets.QCheckBox(os.path.basename(f))
+                        if i:
+                            widget.setChecked(True)
+                        self.scroll_area_layout_immersed.addWidget(widget)
+                else:
+                    self.tdf_files = []
         else:
             raise ValueError('Invalid instance type for template.')
         if 'button_browse_log_directory' in self.__dict__.keys():
@@ -480,6 +493,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_device_file.clicked.connect(self.act_browse_device_file)
         if 'button_browse_calibration_file' in self.__dict__.keys():
             self.button_browse_calibration_file.clicked.connect(self.act_browse_calibration_file)
+        if 'button_browse_tdf_files' in self.__dict__.keys():
+            self.button_browse_tdf_files.clicked.connect(self.act_browse_tdf_files)
         if 'button_browse_ini_file' in self.__dict__.keys():
             self.button_browse_ini_file.clicked.connect(self.act_browse_ini_file)
         if 'button_browse_dcal_file' in self.__dict__.keys():
@@ -506,10 +521,36 @@ class DialogInstrumentSetup(QtGui.QDialog):
             caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
 
-    def act_browse_calibration_file(self):
+    def act_browse_calibration_file(self):  # Specific to Suna
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')  # *.tdf *.TDF
+            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')
         self.le_calibration_file.setText(file_name)
+
+    def act_browse_tdf_files(self):  # sip, cal, or tdf
+        file_names, selected_filter = QtGui.QFileDialog.getOpenFileNames(
+            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL *.tdf *.TDF *.sip)')
+        # Check if sip file
+        is_sip = False
+        for f in file_names:
+            if os.path.splitext(f)[1].lower() == '.sip':
+                is_sip = True
+                break
+        if len(file_names) > 1 and is_sip:
+            self.notification('Accept one .sip file OR multiple .cal and .tdf files.')
+            return
+        # Empty current files for immersed selection
+        for i in reversed(range(self.scroll_area_layout_immersed.count())):
+            self.scroll_area_layout_immersed.itemAt(i).widget().setParent(None)
+        # Update selection of immersed files
+        if is_sip:
+            self.tdf_files = file_names[0]
+            file_names = [f for f in zipfile.ZipFile(self.tdf_files, 'r').namelist()
+                          if os.path.splitext(f)[1].lower() in pySat.Parser.VALID_CAL_EXTENSIONS
+                          and os.path.basename(f)[0] != '.']
+        else:
+            self.tdf_files = file_names
+        for f in file_names:
+            self.scroll_area_layout_immersed.addWidget(QtWidgets.QCheckBox(os.path.basename(f)))
 
     def act_browse_ini_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
@@ -584,6 +625,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 empty_fields.pop(empty_fields.index(f))
             except ValueError:
                 pass
+        if hasattr(self, 'tdf_files'):
+            if len(self.tdf_files) == 0:
+                empty_fields.append('Calibration or Telemetry Definition File(s)')
+        if hasattr(self, 'scroll_area_layout_immersed'):
+            if self.scroll_area_layout_immersed.count() == 0:
+                empty_fields.append('Empty .sip file.')
         if empty_fields:
             self.notification('Fill required fields.', '\n'.join(empty_fields))
             return
@@ -639,6 +686,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = False
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'satlantic':
+            self.cfg['tdf_files'] = self.tdf_files
+            self.cfg['immersed'] = [bool(self.scroll_area_layout_immersed.itemAt(i).widget().checkState())
+                                    for i in range(self.scroll_area_layout_immersed.count())]
         # Update global instrument cfg
         if self.create:
             CFG.instruments.append(self.cfg)
@@ -892,10 +943,12 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
                     self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
-                elif instrument_module_name == 'sunav2':
-                    self.main_window.init_instrument(SunaV2(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'satlantic':
+                    self.main_window.init_instrument(Satlantic(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'sunav1':
                     self.main_window.init_instrument(SunaV1(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'sunav2':
+                    self.main_window.init_instrument(SunaV2(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
                     self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:

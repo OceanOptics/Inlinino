@@ -91,13 +91,7 @@ class Instrument:
                 if n != len(cfg[k]):
                     raise ValueError('%s invalid length' % k)
         # Communication Interface (for retro-compatibility: default interface is serial)
-        if 'interface' in cfg.keys():
-            if cfg['interface'] == 'serial':
-                self._interface = SerialInterface()
-            elif cfg['interface'] == 'socket':
-                self._interface = SocketInterface()
-            else:
-                raise ValueError(f'Invalid communication interface {cfg["interface"]}')
+        self.setup_interface(cfg)
         self._terminator = cfg['terminator']
         # Logger
         self.model = cfg['model']
@@ -112,7 +106,7 @@ class Instrument:
             self._log_prod = Log(log_cfg, self.signal.status_update)
         else:
             self.log_update_cfg(log_cfg)
-        self._log_active = False
+        self._log_active = False  # TODO check if needed as set when instrument is closed
         self.log_raw_enabled = cfg['log_raw']
         self.log_prod_enabled = cfg['log_products']
         # Simple parser
@@ -127,6 +121,15 @@ class Instrument:
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
         self.signal.status_update.emit()
+
+    def setup_interface(self, cfg):
+        if 'interface' in cfg.keys():
+            if cfg['interface'] == 'serial':
+                self._interface = SerialInterface()
+            elif cfg['interface'] == 'socket':
+                self._interface = SocketInterface()
+            else:
+                raise ValueError(f'Invalid communication interface {cfg["interface"]}')
 
     def open(self, **kwargs):
         if not self.alive:
@@ -179,7 +182,7 @@ class Instrument:
                             self.signal.alarm.emit(False)
                     except Exception as e:
                         self.logger.warning(e)
-                        # raise e
+                        raise e
                 else:
                     if data_received is not None and \
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
@@ -204,17 +207,17 @@ class Instrument:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning('Incomplete packet or Incorrect variable column requested.')
                 self.logger.debug(packet)
-                # raise
+                raise
             except ValueError:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning('Instrument or parser configuration incorrect.')
                 self.logger.debug(packet)
-                # raise
+                raise
             except Exception as e:
                 self.signal.packet_corrupted.emit()
                 self.logger.warning(e)
                 self.logger.debug(packet)
-                # raise e
+                raise e
 
     def handle_packet(self, packet, timestamp):
         self.signal.packet_received.emit()
