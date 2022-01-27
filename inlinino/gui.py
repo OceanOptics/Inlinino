@@ -122,7 +122,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def init_instrument(self, instrument):
         self.instrument = instrument
-        self.label_instrument_name.setText(self.instrument.name)
+        self.label_instrument_name.setText(self.instrument.short_name)
         self.instrument.signal.status_update.connect(self.on_status_update)
         self.instrument.signal.packet_received.connect(self.on_packet_received)
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
@@ -179,7 +179,7 @@ class MainWindow(QtGui.QMainWindow):
         setup_dialog.show()
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
-            self.label_instrument_name.setText(self.instrument.name)
+            self.label_instrument_name.setText(self.instrument.short_name)
 
     def act_instrument_interface(self):
         if self.instrument.alive:
@@ -245,12 +245,14 @@ class MainWindow(QtGui.QMainWindow):
                 self.button_log.setToolTip('Stop logging data')
             else:
                 self.label_status.setText('Connected')
+                self.setWindowTitle(f'Inlinino: {self.instrument.name} [{self.instrument.interface_name}]')
                 self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #ff9e17;')
                 # Orange: #ff9e17 (darker) #ffc12f (lighter)
                 self.button_log.setText('Start')
                 self.button_log.setToolTip('Start logging data')
         else:
             self.label_status.setText('Disconnected')
+            self.setWindowTitle(f'Inlinino: {self.instrument.name}')
             self.label_instrument_name.setStyleSheet('font: 24pt;\ncolor: #e0463e;')
             # Red: #e0463e (darker) #5cd9ef (lighter)  #f92670 (pyQtGraph)
             self.button_serial.setText('Open')
@@ -387,13 +389,15 @@ class DialogStartUp(QtGui.QDialog):
     def __init__(self):
         super(DialogStartUp, self).__init__()
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'startup.ui'), self)
-        instruments_to_load = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"] for i in CFG.instruments]
+        instruments_configured = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"] for i in CFG.instruments]
         # self.instruments_to_setup = [i[6:-3] for i in sorted(os.listdir(PATH_TO_RESOURCES)) if i[-3:] == '.ui' and i[:6] == 'setup_']
         self.instruments_to_setup = [os.path.basename(i)[6:-3] for i in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'setup_*.ui')))]
-        self.combo_box_instrument_to_load.addItems(instruments_to_load)
+        self.combo_box_instrument_to_load.addItems(instruments_configured)
         self.combo_box_instrument_to_setup.addItems(self.instruments_to_setup)
+        self.combo_box_instrument_to_delete.addItems(instruments_configured)
         self.button_load.clicked.connect(self.act_load_instrument)
         self.button_setup.clicked.connect(self.act_setup_instrument)
+        self.button_delete.clicked.connect(self.act_delete_instrument)
         self.selection_index = None
 
     def act_load_instrument(self):
@@ -403,6 +407,22 @@ class DialogStartUp(QtGui.QDialog):
     def act_setup_instrument(self):
         self.selection_index = self.combo_box_instrument_to_setup.currentIndex()
         self.done(self.SETUP_INSTRUMENT)
+
+    def act_delete_instrument(self):
+        index = self.combo_box_instrument_to_delete.currentIndex()
+        instrument = self.combo_box_instrument_to_delete.currentText()
+        msg = QtGui.QMessageBox(self)
+        msg.setIcon(QtGui.QMessageBox.Warning)
+        msg.setWindowTitle(f"Inlinino: Delete {instrument}")
+        msg.setText(f"Are you sure to delete instrument: {instrument} ?")
+        msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+        msg.setDefaultButton(QtGui.QMessageBox.No)
+        if msg.exec_() == QtGui.QMessageBox.Yes:
+            del CFG.instruments[index]
+            CFG.write()
+            self.combo_box_instrument_to_load.removeItem(index)
+            self.combo_box_instrument_to_delete.removeItem(index)
+            logger.warning(f"Deleted instrument [{index}] {instrument}")
 
 
 class DialogInstrumentSetup(QtGui.QDialog):

@@ -61,6 +61,15 @@ class Instrument:
         return self.model + ' ' + self.serial_number
 
     @property
+    def short_name(self) -> str:
+        name = self.model + ' ' + self.serial_number
+        return name if len(name) < 14 else self.model[0:5].strip() + ' ... ' + self.serial_number[0:5].strip()
+
+    @property
+    def interface_name(self) -> str:
+        return self._interface.name
+
+    @property
     def bare_log_prefix(self) -> str:
         return self.model + self.serial_number
 
@@ -302,6 +311,10 @@ class Interface:
     def timeout(self) -> int:
         return self._timeout
 
+    @property
+    def name(self) -> str:
+        raise NotImplementedError
+
     def open(self, **kwargs):
         pass
 
@@ -334,6 +347,13 @@ class SerialInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._serial.timeout
+
+    @property
+    def name(self) -> str:
+        if self.is_open:
+            return f'com:{self._serial.port}'
+        else:
+            return f'com'
 
     def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=2):
         if port is None:
@@ -382,6 +402,14 @@ class SocketInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._socket.gettimeout()
+
+    @property
+    def name(self) -> str:
+        if self.is_open:
+            ip, port = self._socket.getsockname()
+            return f'socket:{port}'
+        else:
+            return f'socket'
 
     def open(self, ip, port, timeout=1):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
