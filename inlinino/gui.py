@@ -549,7 +549,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 value = getattr(self, f).text()
                 if not value:
                     empty_fields.append(field_pretty_name)
-                    continue
+                    # continue  Need to be removed for DataQ with optional products
                 # Apply special formatting to specific variables
                 try:
                     if 'variable_' in field_name:
@@ -584,6 +584,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 empty_fields.pop(empty_fields.index(f))
             except ValueError:
                 pass
+        if self.cfg['module'] == 'dataq':
+            # Remove fields from products
+            f2rm = [f for f in empty_fields if f.startswith('Variable')]
+            for f in f2rm:
+                del empty_fields[empty_fields.index(f)]
         if empty_fields:
             self.notification('Fill required fields.', '\n'.join(empty_fields))
             return
@@ -627,7 +632,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'dataq':
             self.cfg['channels_enabled'] = []
-            for c in range(4):
+            for c in range(8):
                 if getattr(self, 'checkbox_channel%d_enabled' % (c+1)).isChecked():
                     self.cfg['channels_enabled'].append(c)
             if not self.cfg['channels_enabled']:
@@ -667,11 +672,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         return False
             # Check precision
             if 'variable_precision' in self.cfg:
-                for v in self.cfg['variable_precision']:
-                    if v[0] != '%' and v[-1] not in ['d', 'f']:
-                        self.notification('Invalid variable precision. '
-                                          'Expect type specific formatting (e.g. %d or %.3f) separated by commas.')
-                        return False
+                if not (len(self.cfg['variable_precision']) == 1 and self.cfg['variable_precision'][0] == ''):
+                    for v in self.cfg['variable_precision']:
+                        if v[0] != '%' and v[-1] not in ['d', 'f']:
+                            self.notification('Invalid variable precision. '
+                                              'Expect type specific formatting (e.g. %d or %.3f) separated by commas.')
+                            return False
         return True
 
     @staticmethod

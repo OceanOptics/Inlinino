@@ -11,7 +11,7 @@ class DATAQ(Instrument):
     0x0002 = Analog channel 2, ±10 V range
     0x0003 = Analog channel 3, ±10 V range
     """
-    SLIST = [0x0000, 0x0001, 0x0002, 0x0003]
+    SLIST = [0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007]
     REQUIRED_CFG_FIELDS = ['channels_enabled',
                            'model', 'serial_number', 'module',
                            'log_path', 'log_raw', 'log_products',
@@ -19,7 +19,7 @@ class DATAQ(Instrument):
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
         # DATAQ Specific attributes
-        self.channels_enabled = [0, 1, 2 ,3]
+        self.channels_enabled = [0, 1, 2, 3, 4, 5, 6, 7]
         self.variable_equations = []
 
         super().__init__(cfg_id, signal, *args, **kwargs)
@@ -107,7 +107,7 @@ class DATAQ(Instrument):
 
     def parse(self, packet):
         # Get voltage from each channel
-        c = [float('nan')] * 5
+        c = [float('nan')] * 9
         for i, v in zip(self.channels_enabled, packet.split(self.separator)):
             c[i+1] = float(v)  # Shift channels by 1 so that index starts at 1 instead of 0
         # Compute Products
