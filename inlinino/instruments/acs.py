@@ -17,58 +17,30 @@ class ACS(Instrument):
                            'variable_names', 'variable_units', 'variable_precision']
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
+        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
         # ACS Specific attributes
         self._parser = None
         self._timestamp_flag_out_T_cal = 0
-
-        # Init Graphic for real time spectrum visualization
-        # TODO Refactor code and move it to GUI
-        # Set Color mode
-        pg.setConfigOption('background', '#F8F8F2')
-        pg.setConfigOption('foreground', '#26292C')
-        self._pw = pg.plot(enableMenu=False)
-        self._pw.setWindowTitle('ACS Spectrum')
-        self._plot = self._pw.plotItem
-        self._plot.addLegend()
-        # Init Curve Items
-        self._plot_curve_c = pg.PlotCurveItem(pen=pg.mkPen(color='#1f77b4', width=2), name='c')
-        self._plot_curve_a = pg.PlotCurveItem(pen=pg.mkPen(color='#2ca02c', width=2), name='a')
-        # Add item to plot
-        self._plot.addItem(self._plot_curve_c)
-        self._plot.addItem(self._plot_curve_a)
-        # Decoration
-        self._plot.setLabel('bottom', 'Wavelength' , units='nm')
-        self._plot.setLabel('left', 'Signal', units='m<sup>-1</sup>')
-        # self.m_plot.setYRange(0, 5)
-        self._plot.setMouseEnabled(x=False, y=True)
-        self._plot.showGrid(x=True, y=True)
-        self._plot.enableAutoRange(x=True, y=True)
-        self._plot.getAxis('left').enableAutoSIPrefix(False)
-
-        super().__init__(cfg_id, signal, *args, **kwargs)
-
-        # Default serial communication parameters
+        # Default serial communication parameters (needs to be before setup)
         self.default_serial_baudrate = 115200
         self.default_serial_timeout = 1
-
-        # Auxiliary Data Plugin
+        # Init Auxiliary Data Plugin
         self.plugin_aux_data = True
         self.plugin_aux_data_variable_names = ['Internal Temp. (ºC)', 'External Temp. (ºC)', 'Outside Cal Range']
-
-        # Select Channels to Plot Plugin
+        # Init Channels to Plot Plugin
         self.plugin_active_timeseries_variables = True
-        self.plugin_active_timeseries_variables_names = ['c(%s)' % x for x in self._parser.lambda_c] + \
-                                                        ['a(%s)' % x for x in self._parser.lambda_a]
+        self.plugin_active_timeseries_variables_names = []
         self.plugin_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
-        self.active_timeseries_c_wavelengths = np.zeros(len(self._parser.lambda_c), dtype=bool)
-        self.active_timeseries_a_wavelengths = np.zeros(len(self._parser.lambda_a), dtype=bool)
-        for wl in [532]:
-            channel_name = 'c(%s)' % self._parser.lambda_c[np.argmin(np.abs(self._parser.lambda_c - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
-        for wl in [532, 676]:
-            channel_name = 'a(%s)' % self._parser.lambda_a[np.argmin(np.abs(self._parser.lambda_a - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+        self.active_timeseries_c_wavelengths = None
+        self.active_timeseries_a_wavelengths = None
+        # Init Spectrum Plot Plugin
+        self.spectrum_plot_enabled = True
+        self.spectrum_plot_axis_labels = dict(y_label_name='c or a', y_label_units='m<sup>-1</sup>')
+        self.spectrum_plot_trace_names = ['c', 'a']
+        self.spectrum_plot_x_values = []
+        # Setup
+        self.init_setup()
 
     def setup(self, cfg):
         # Set ACS specific attributes
@@ -87,17 +59,20 @@ class ACS(Instrument):
         cfg['terminator'] = self.REGISTRATION_BYTES
         # Set standard configuration and check cfg input
         super().setup(cfg, LogBinary)
-        # Update Plot config
-        min_lambda = min(min(self._parser.lambda_c), min(self._parser.lambda_a))
-        max_lambda = max(max(self._parser.lambda_c), max(self._parser.lambda_a))
-        self._plot.setXRange(min_lambda, max_lambda)
-        self._plot.setLimits(minXRange=min_lambda, maxXRange=max_lambda)
-
-    # def open(self, port=None, baudrate=None, bytesize=8, parity='N', stopbits=1, timeout=1):
-    #     if baudrate is None:
-    #         # Get default baudrate from device file via parser
-    #         baudrate = self._parser.baudrate  # Default 115200
-    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+        # Update wavelengths for Spectrum Plot (plot is updated after the initial instrument setup or button click)
+        self.spectrum_plot_x_values = [self._parser.lambda_c, self._parser.lambda_a]
+        # Update Active Timeseries Variables
+        self.plugin_active_timeseries_variables_names = ['c(%s)' % x for x in self._parser.lambda_c] + \
+                                                        ['a(%s)' % x for x in self._parser.lambda_a]
+        self.plugin_active_timeseries_variables_selected = []
+        self.active_timeseries_c_wavelengths = np.zeros(len(self._parser.lambda_c), dtype=bool)
+        self.active_timeseries_a_wavelengths = np.zeros(len(self._parser.lambda_a), dtype=bool)
+        for wl in [532]:
+            channel_name = 'c(%s)' % self._parser.lambda_c[np.argmin(np.abs(self._parser.lambda_c - wl))]
+            self.udpate_active_timeseries_variables(channel_name, True)
+        for wl in [532, 676]:
+            channel_name = 'a(%s)' % self._parser.lambda_a[np.argmin(np.abs(self._parser.lambda_a - wl))]
+            self.udpate_active_timeseries_variables(channel_name, True)
 
     def data_received(self, data, timestamp):
         self._buffer.extend(data)
@@ -133,9 +108,9 @@ class ACS(Instrument):
         # Update timeseries plot
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                self.signal.new_data.emit(np.concatenate((data[1].c[self.active_timeseries_c_wavelengths],
-                                                          data[1].a[self.active_timeseries_a_wavelengths])),
-                                          timestamp)
+                self.signal.new_ts_data.emit(np.concatenate((data[1].c[self.active_timeseries_c_wavelengths],
+                                                             data[1].a[self.active_timeseries_a_wavelengths])),
+                                             timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -145,10 +120,7 @@ class ACS(Instrument):
                                        '%.2f' % data[1].external_temperature,
                                        '%s' % data[1].flag_outside_calibration_range])
         # Update spectrum plot
-        sel = np.logical_not(np.logical_or(np.isinf(data[1].c), np.isnan(data[1].c)))
-        self._plot_curve_c.setData(self._parser.lambda_c[sel], data[1].c[sel])
-        sel = np.logical_not(np.logical_or(np.isinf(data[1].a), np.isnan(data[1].a)))
-        self._plot_curve_a.setData(self._parser.lambda_a[sel], data[1].a[sel])
+        self.signal.new_spectrum_data.emit([data[1].c, data[1].a])
         # Flag outside temperature calibration range
         if data[1].flag_outside_calibration_range and time() - self._timestamp_flag_out_T_cal > 120:
             self._timestamp_flag_out_T_cal = time()

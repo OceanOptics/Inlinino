@@ -45,55 +45,35 @@ class SunaV2(Instrument):
                       float, float, float, float, int]
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
-        # Suna specific
+        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+        # Suna Specific Attributes
         self.df_maker = None
         self.wavelength = np.array([c for c in range(self.N_CHANNELS)])
-
-        # Init Graphic for real time spectrum visualization
-        # TODO Refactor code and move it to GUI
-        # Set Color mode
-        pg.setConfigOption('background', '#F8F8F2')
-        pg.setConfigOption('foreground', '#26292C')
-        self._pw = pg.plot(enableMenu=False)
-        self._pw.setWindowTitle('Suna Spectra')
-        self._plot = self._pw.plotItem
-        self._plot.addLegend()
-        # Init Curve Items
-        self._plot_curve_light = pg.PlotCurveItem(pen=pg.mkPen(color='#1f77b4', width=2), name='light')
-        self._plot_curve_dark = pg.PlotCurveItem(pen=pg.mkPen(color='#2ca02c', width=2), name='dark')
-        # Add item to plot
-        self._plot.addItem(self._plot_curve_light)
-        self._plot.addItem(self._plot_curve_dark)
-        # Decoration
-        self._plot.setLabel('bottom', 'Channel', units='#')
-        self._plot.setLabel('left', 'Signal', units='counts')
-        # self.m_plot.setYRange(0, 5)
-        self._plot.setMouseEnabled(x=False, y=True)
-        self._plot.showGrid(x=True, y=True)
-        self._plot.enableAutoRange(x=True, y=True)
-        self._plot.getAxis('left').enableAutoSIPrefix(False)
-
-        super().__init__(cfg_id, signal, *args, **kwargs)
-
         # Default serial communication parameters
         #   8 bit, no parity, 1 stop bit, no flow control
         self.default_serial_baudrate = 57600
         self.default_serial_timeout = 5
         #   frame_format: FULL_ASCII (others mode: NONE, FULL_BINARY, REDUCED_BINARY, CONCENTRATION_ASCII)
-
         # Auxiliary Data Plugin
         self.plugin_aux_data = True
         self.plugin_aux_data_variable_names = self.get_aux_names()
-
         # Display only selected variables
         self.plugin_active_timeseries_variables_selected = self.get_ts_names()
+        # Init Spectrum Plot Plugin
+        self.spectrum_plot_enabled = True
+        self.spectrum_plot_axis_labels = dict(x_label_name='Channel', x_label_units='(#)',
+                                              y_label_name='Signal', y_label_units='counts')
+        self.spectrum_plot_trace_names = ['light', 'dark']
+        self.spectrum_plot_x_values = [self.wavelength, self.wavelength]
+        # Setup
+        self.init_setup()
 
     def setup(self, cfg):
         # TODO Load device file to retrieve wavelength registration, 0 spectrum, and tdf
         # Set ACS specific attributes
         if 'calibration_file' not in cfg.keys():
             raise ValueError('Missing field calibration file')
-        self.register_wavelengths(cfg['calibration_file'])
+        self.register_wavelengths(cfg['calibration_file'])  # Which updates spectrum plots parameters
         # Overload cfg with Suna specific parameters
         cfg['variable_names'] = self.VARIABLE_NAMES
         cfg['variable_units'] = self.VARIABLE_UNITS
@@ -104,10 +84,6 @@ class SunaV2(Instrument):
         super().setup(cfg)
         # Suna Specific named tuple maker
         self.df_maker = namedtuple('SunaDataFrame', self.variable_names)
-        # Update Plot config
-        min_wl, max_wl = min(self.wavelength), max(self.wavelength)
-        self._plot.setXRange(min_wl, max_wl)
-        self._plot.setLimits(minXRange=min_wl, maxXRange=max_wl)
 
     def register_wavelengths(self, calibration_filename):
         # Read polynomial coefficients for wavelength calculation from pixel value
@@ -121,13 +97,16 @@ class SunaV2(Instrument):
                         c[int(l[1])] = float(l.split(' ')[1])
             x = np.arange(1, self.N_CHANNELS+1)
             self.wavelength = c[0] + c[1] * x + c[2] * x**2 + c[3] * x**3 + c[4] * x**4
-            self._plot.setLabel('bottom', 'Wavelength', units='nm')
+            self.spectrum_plot_axis_labels['x_label_name'] = 'Wavelength'
+            self.spectrum_plot_axis_labels['x_label_units'] = 'nm'
         except:
             self.logger.warning('Error registering wavelengths.')
         if not np.all(np.diff(self.wavelength)):  # some wavelengths are identical
             self.logger.warning('Invalid wavelength registration.')
             self.wavelength = np.array([c for c in range(self.N_CHANNELS)])
-            self._plot.setLabel('bottom', 'Channel', units='#')
+            self.spectrum_plot_axis_labels['x_label_name'] = 'Channel'
+            self.spectrum_plot_axis_labels['x_label_units'] = '#'
+        self.spectrum_plot_x_values = [self.wavelength, self.wavelength]
 
     def parse(self, packet):
         try:
@@ -141,15 +120,13 @@ class SunaV2(Instrument):
     def handle_data(self, raw, timestamp):
         if 'L' in raw.header:    # Light (SATSLF)
             # Update plots
-            self.signal.new_data.emit(self.get_ts(raw), timestamp)
-            self._plot_curve_light.setData(self.wavelength,
-                                           np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]))
+            self.signal.new_ts_data.emit(self.get_ts(raw), timestamp)
+            self.signal.new_spectrum_data.emit([np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]), None])
             # Update Auxiliary Data Plugin
             self.signal.new_aux_data.emit(self.get_aux(raw))
         elif 'D' in raw.header:  # Dark (SATSDF)
             # Update spectrum plot
-            self._plot_curve_dark.setData(self.wavelength,
-                                          np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]))
+            self.signal.new_spectrum_data.emit([None, np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX])])
             # Do NOT update auxiliary data
         else:
             self.logger.info(f'Unknown data frame: {raw.header}')

@@ -7,7 +7,6 @@ from time import strftime, gmtime
 from collections import namedtuple
 
 import numpy as np
-import pyqtgraph as pg
 import pySatlantic.instrument as pySat
 
 from inlinino import COLOR_SET, __version__
@@ -26,42 +25,27 @@ class Satlantic(Instrument):
     KEYS_TO_IGNORE = ['CRLF_TERMINATOR', 'TERMINATOR']
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
+        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+        # Instrument Specific Attributes
         self._parser = None
-
-        # Init Core Variable Graphic
-        pg.setConfigOption('background', '#F8F8F2')
-        pg.setConfigOption('foreground', '#26292C')
-        self._pw = pg.plot(enableMenu=False)
-        self._pw.setWindowTitle('Satlantic Spectrum')
-        self._plot = self._pw.plotItem
-        self._plot.addLegend()
-        self._plot.setLabel('bottom', 'Wavelength', units='nm')
-        self._plot.setLabel('left', 'Signal', units='SI')
-        self._plot.setMouseEnabled(x=False, y=True)
-        self._plot.showGrid(x=True, y=True)
-        self._plot.enableAutoRange(x=True, y=True)
-        self._plot.getAxis('left').enableAutoSIPrefix(False)
-        self._plot_curves = {}
-        self.wavelengths = {}
-
         # Default serial communication parameters
         self.default_serial_baudrate = 57600
         self.default_serial_timeout = 5
-
         # Init Channels to Plot Plugin
+        self.plugin_active_timeseries_variables = True
         self.plugin_active_timeseries_variables_names = []
         self.plugin_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
         self.active_timeseries_variables = {}  # dict of each frame header
-
-        super().__init__(cfg_id, signal, *args, **kwargs)
-
-        # Satlantic Custom Auxiliary Data Plugin
-        # TODO Separate Window
-
-        # Enable Channels to Plot Plugin (needs to be after parent class)
-        self.plugin_active_timeseries_variables = True
-
+        # Init Spectrum Plot Plugin
+        self.spectrum_plot_enabled = True
+        self.spectrum_plot_axis_labels = {}
+        self.spectrum_plot_trace_names = []
+        self.spectrum_plot_x_values = []
+        self.frame_headers = []
+        # TODO Init Satlantic Auxiliary Data Plugin
+        # Setup
+        self.init_setup()
 
     def setup(self, cfg):
         self.logger.debug('Setup')
@@ -118,26 +102,18 @@ class Satlantic(Instrument):
         self._log_prod = ProdLogger(logger_cfg, self._parser.cal)
         self.log_raw_enabled = True
         self.log_prod_enabled = cfg['log_products']
-        # Update Core Variables Plot
-        self._plot.clear()  # Remove all items (past frame headers)
-        self._plot_curves = {}
-        min_lambda, max_lambda = None, None
+        # Update variable for Spectrum Plot
+        #   updated with signal.status_update.emit()
+        #   not thread safe but instrument is turned off in this function so acceptable
+        self.spectrum_plot_trace_names = []
+        self.spectrum_plot_x_values = []
+        self.frame_headers = []
         for i, (head, cal) in enumerate(self._parser.cal.items()):
             if cal.core_variables:
-                wl = [float(cal.id[i]) for i in cal.core_variables]
-                self.wavelengths[head] = wl
-                min_lambda = min(min_lambda, min(wl)) if min_lambda is not None else min(wl)
-                max_lambda = max(max_lambda, max(wl)) if max_lambda is not None else max(wl)
-                self._plot_curves[head] = pg.PlotCurveItem(
-                    pen=pg.mkPen(color=COLOR_SET[i % len(COLOR_SET)], width=2),
-                    name=head
-                )
-                self._plot.addItem(self._plot_curves[head])
-        # TODO if no core variables do not display core_variable figure
-        min_lambda = 0 if min_lambda is None else min_lambda
-        max_lambda = 1 if max_lambda is None else max_lambda
-        self._plot.setXRange(min_lambda, max_lambda)
-        self._plot.setLimits(minXRange=min_lambda, maxXRange=max_lambda)
+                self.spectrum_plot_trace_names.append(f'{head} {cal.core_groupname}')  # TODO Add Units
+                self.spectrum_plot_x_values.append(np.array([float(cal.id[i]) for i in cal.core_variables]))
+                self.frame_headers.append(head)
+        # TODO if no core variables disable spectrum plot widget
         # Update Active Timeseries Variables
         self.plugin_active_timeseries_variables_names = []
         self.active_timeseries_variables = []
@@ -148,8 +124,8 @@ class Satlantic(Instrument):
                 idx = cal.core_variables[int(len(cal.core_variables)/2)]
                 self.plugin_active_timeseries_variables_selected.append(f'{head}_{cal.key[idx]}')
                 self.active_timeseries_variables.append((head, cal.core_groupname, idx))
-        # Update User Interface
-        self.signal.status_update.emit()
+        # Update User Interface (include spectrum plot)
+        self.signal.status_update.emit()  # Doesn't run on initial setup because signals are not connected
 
     def data_received(self, data: bytearray, timestamp: float):
         self._buffer.extend(data)
@@ -186,17 +162,17 @@ class Satlantic(Instrument):
                         ts_data.append(data.frame[key][idx] if key == core_groupname else data.frame[key])
                     else:
                         ts_data.append(float('nan'))
-                self.signal.new_data.emit(ts_data, timestamp)
+                self.signal.new_ts_data.emit(ts_data, timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update timeseries plot')
-        # Update Core Variable Plot
+        # Update Spectrum Plot
         if self._parser.cal[data.frame_header].core_variables:
-            self._plot_curves[data.frame_header].setData(
-                self.wavelengths[data.frame_header],
-                data.frame[self._parser.cal[data.frame_header].core_groupname]
-            )
+            self.signal.new_spectrum_data.emit([
+                data.frame[self._parser.cal[data.frame_header].core_groupname] if data.frame_header == h else None
+                for h in self.frame_headers
+            ])
         # Log Calibrated Data
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)
@@ -226,7 +202,7 @@ class Satlantic(Instrument):
         if self._parser.cal[frame_header].core_variables and \
                 key.startswith(self._parser.cal[frame_header].core_groupname):
             key, wl = key.split('_')
-            idx = self.wavelengths[frame_header].index(float(wl))
+            idx = np.where(self.spectrum_plot_x_values[self.frame_headers.index(frame_header)] == float(wl))[0][0]
         return frame_header, key, idx
 
 
