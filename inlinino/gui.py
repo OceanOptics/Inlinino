@@ -205,7 +205,7 @@ class MainWindow(QtGui.QMainWindow):
     @staticmethod
     def create_spectrum_plot_widget(x_label_name='Wavelength', x_label_units='nm',
                                     y_label_name='Signal', y_label_units=''):
-        widget = pg.PlotWidget(enableMenu=False)
+        widget = pg.PlotWidget(enableMenu=True)
         widget.plotItem.setLabel('bottom', x_label_name, units=x_label_units)
         widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
         widget.plotItem.setLabel('left', y_label_name, units=y_label_units)

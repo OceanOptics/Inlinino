@@ -255,7 +255,7 @@ class ProdLogger:
             # Set Frame Keys
             keys, core, precision = [], [], []
             first_flag = True
-            for k, t in zip(v.key, v.data_type):
+            for k, t, f in zip(v.key, v.data_type, v.fit_type):
                 if v.core_variables and k.startswith(v.core_groupname):
                     if first_flag:
                         first_flag = False
@@ -265,9 +265,10 @@ class ProdLogger:
                 elif k not in Satlantic.KEYS_TO_IGNORE:
                     keys.append(k)
                     core.append(False)
-                    if t in ['AI', 'BU', 'BS']:
+                    # TODO Compute Precision Required from calibration file using fit_type
+                    if t in ['AI', 'BU', 'BS'] and f in ['NONE', 'COUNT']:
                         precision.append('%d')
-                    elif t in ['AF', 'AF16', 'BD', 'BF']:
+                    elif t in ['AF', 'AF16', 'BD', 'BF', 'AI', 'BU', 'BS']:  # Any fit type
                         precision.append('%.5f')
                     elif t == 'AS':
                         precision.append('%s')
