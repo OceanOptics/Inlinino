@@ -14,7 +14,17 @@
    <string>Inlinino</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout"/>
+   <layout class="QVBoxLayout" name="central_widget_layout">
+    <property name="spacing">
+     <number>12</number>
+    </property>
+    <property name="topMargin">
+     <number>12</number>
+    </property>
+    <property name="rightMargin">
+     <number>12</number>
+    </property>
+   </layout>
   </widget>
   <widget class="QDockWidget" name="dock_widget_primary">
    <property name="sizePolicy">
@@ -392,7 +402,7 @@
     <bool>false</bool>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="allowedAreas">
     <set>Qt::LeftDockWidgetArea|Qt::RightDockWidgetArea</set>
@@ -403,36 +413,31 @@
    <widget class="QWidget" name="dock_widget_secondary_layout">
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
-      <widget class="QGroupBox" name="group_box_instrument_controls">
+      <widget class="QGroupBox" name="group_box_metadata">
        <property name="title">
-        <string>Instrument Controls</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_10">
-          <property name="text">
-           <string>TextLabel</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QPushButton" name="pushButton">
-          <property name="text">
-           <string>PushButton</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="group_box_secondary_auxiliary_data">
-       <property name="title">
-        <string>Auxiliary Data</string>
+        <string>Metadata</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
-         <widget class="QTreeWidget" name="tree_widget_auxiliary_data">
+         <widget class="QTreeWidget" name="tree_widget_metadata">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="sizeAdjustPolicy">
+           <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
+          </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::NoSelection</enum>
+          </property>
+          <attribute name="headerVisible">
+           <bool>false</bool>
+          </attribute>
           <column>
            <property name="text">
             <string>Key</string>
@@ -443,56 +448,7 @@
             <string>Values</string>
            </property>
           </column>
-          <item>
-           <property name="text">
-            <string>SATHDR</string>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-           <item>
-            <property name="text">
-             <string>TILT</string>
-            </property>
-            <property name="text">
-             <string>-10</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>PITCH</string>
-            </property>
-            <property name="text">
-             <string>5</string>
-            </property>
-           </item>
-          </item>
-          <item>
-           <property name="text">
-            <string>SATYZD</string>
-           </property>
-           <item>
-            <property name="text">
-             <string>Jouec</string>
-            </property>
-            <property name="text">
-             <string>10</string>
-            </property>
-           </item>
-          </item>
          </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="group_box_terminal">
-       <property name="title">
-        <string>Terminal</string>
-       </property>
-       <layout class="QVBoxLayout" name="verticalLayout_4">
-        <item>
-         <widget class="QPlainTextEdit" name="plain_text_edit_terminal"/>
         </item>
        </layout>
       </widget>

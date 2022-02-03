@@ -128,8 +128,8 @@ class ACS(Instrument):
         # Log parsed data
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write([data[0],  # Instrument timestamp
-                                  np.array2string(data[1].c, max_line_width=np.inf),  # pre-format np.array
-                                  np.array2string(data[1].a, max_line_width=np.inf),  # pre-format np.array
+                                  np.array2string(data[1].c, threshold=np.inf, max_line_width=np.inf),  # pre-format np.array
+                                  np.array2string(data[1].a, threshold=np.inf, max_line_width=np.inf),  # pre-format np.array
                                   data[1].internal_temperature, data[1].external_temperature,
                                   data[1].flag_outside_calibration_range], timestamp)
             if not self.log_raw_enabled:

@@ -98,7 +98,7 @@ class LISST(Instrument):
         # Log raw beta and calibrated aux
         if self.log_prod_enabled and self._log_active:
             # np arrays must be pre-formated to be written
-            data[0] = np.array2string(data[0], max_line_width=np.inf)
+            data[0] = np.array2string(data[0], threshold=np.inf, max_line_width=np.inf)
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()

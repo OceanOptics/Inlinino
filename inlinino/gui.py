@@ -38,6 +38,7 @@ class InstrumentSignals(QtCore.QObject):
     new_ts_data = QtCore.pyqtSignal(object, float)
     new_spectrum_data = QtCore.pyqtSignal(list)
     new_aux_data = QtCore.pyqtSignal(list)
+    new_meta_data = QtCore.pyqtSignal(list)
     alarm = QtCore.pyqtSignal(bool)
 
 
@@ -59,6 +60,7 @@ class MainWindow(QtGui.QMainWindow):
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'main.ui'), self)
         # Graphical Adjustments
         self.dock_widget_primary.setTitleBarWidget(QtGui.QWidget(None))
+        self.dock_widget_secondary.setTitleBarWidget(QtGui.QWidget(None))
         self.label_app_version.setText('Inlinino v' + __version__)
         # Set Colors
         palette = QtGui.QPalette()
@@ -171,7 +173,19 @@ class MainWindow(QtGui.QMainWindow):
         self.centralwidget.layout().addWidget(self.timeseries_plot_widget)
 
         # Set Secondary Dock Widget
-        if not self.instrument.secondary_dock_widget_enabled:
+        if self.instrument.secondary_dock_widget_enabled:
+            self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
+            self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
+            # if not self.instrument.plugin_controls_enabled:
+                # self.group_box_instrument_controls.setParent(None)
+            if self.instrument.plugin_metadata_enabled:
+                self.instrument.signal.new_meta_data.connect(self.on_new_meta_data)
+                self.set_metadata_widget()
+            else:
+                self.group_box_metadata.setParent(None)
+            # if not self.instrument.plugin_terminal_enabled:
+                # self.group_box_terminal.setParent(None)
+        else:
             self.dock_widget_secondary.setParent(None)
 
     @staticmethod
@@ -196,7 +210,7 @@ class MainWindow(QtGui.QMainWindow):
         widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
         widget.plotItem.setLabel('left', y_label_name, units=y_label_units)
         widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
-        widget.plotItem.setMouseEnabled(x=False, y=True)
+        widget.plotItem.setMouseEnabled(x=True, y=True)
         widget.plotItem.showGrid(x=True, y=True)
         widget.plotItem.enableAutoRange(x=True, y=True)
         widget.plotItem.addLegend()
@@ -216,6 +230,19 @@ class MainWindow(QtGui.QMainWindow):
         self.spectrum_plot_widget.setXRange(min_x, max_x)
         self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
 
+    def set_metadata_widget(self):
+        items = []
+        for key, values in self.instrument.plugin_metadata_keys:
+            item = QtWidgets.QTreeWidgetItem([key, '0'])
+            for value in values:
+                item.addChild(QtWidgets.QTreeWidgetItem([value, ' ']))
+            items.append(item)
+        self.tree_widget_metadata.addTopLevelItems(items)
+        self.tree_widget_metadata.resizeColumnToContents(0)
+        self.tree_widget_metadata.setColumnWidth(1,20)  # Needed to prevent expanding too much on first show
+        self.tree_widget_metadata.expandAll()
+        self.tree_widget_metadata.show()
+
     def set_clock(self):
         zulu = gmtime(time())
         self.label_clock.setText(strftime('%H:%M:%S', zulu) + ' UTC')
@@ -230,6 +257,8 @@ class MainWindow(QtGui.QMainWindow):
             self.label_instrument_name.setText(self.instrument.short_name)
             if self.instrument.spectrum_plot_enabled:
                 self.set_spectrum_plot_widget()
+            if self.instrument.plugin_metadata_enabled:
+                self.set_metadata_widget()
 
     def act_instrument_interface(self):
         if self.instrument.alive:
@@ -318,6 +347,8 @@ class MainWindow(QtGui.QMainWindow):
         self.label_packets_logged.setText(str(self.packets_logged))
         self.packets_corrupted = 0
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
+        if self.instrument.plugin_metadata_enabled:
+            self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
 
     @QtCore.pyqtSlot()
     def on_packet_received(self):
@@ -411,6 +442,18 @@ class MainWindow(QtGui.QMainWindow):
         if self.instrument.plugin_aux_data:
             for i, v in enumerate(data):
                 self.plugin_aux_data_variable_values[i].setText(str(v))
+
+    @QtCore.pyqtSlot(list)
+    def on_new_meta_data(self, data):
+        if not self.instrument.plugin_metadata_enabled:
+            return
+        root = self.tree_widget_metadata.invisibleRootItem()
+        for parent_idx, (parent_value, child_values) in enumerate(data):
+            if parent_value is not None:
+                root.child(parent_idx).setText(1, str(parent_value))
+            if child_values is not None:
+                for child_idx, child_value in enumerate(child_values):
+                    root.child(parent_idx).child(child_idx).setText(1, str(child_value))
 
     @QtCore.pyqtSlot(int)
     def on_active_timeseries_variables_update(self, state):

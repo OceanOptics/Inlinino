@@ -23,13 +23,16 @@ class Satlantic(Instrument):
                            'log_path', 'log_products',
                            'tdf_files', 'immersed']
     KEYS_TO_IGNORE = ['CRLF_TERMINATOR', 'TERMINATOR']
+    KEYS_TO_NOT_DISPLAY = KEYS_TO_IGNORE + ['DATEFIELD', 'TIMEFIELD', 'CHECK_SUM']
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
         super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
+        self.frame_headers_idx = []
         # Default serial communication parameters
-        self.default_serial_baudrate = 57600
+        self._max_buffer_length = 2**18  # Need larger buffer for HyperNAV
+        self.default_serial_baudrate = 115200  # for HyperNAV
         self.default_serial_timeout = 5
         # Init Channels to Plot Plugin
         self.plugin_active_timeseries_variables = True
@@ -42,8 +45,14 @@ class Satlantic(Instrument):
         self.spectrum_plot_axis_labels = {}
         self.spectrum_plot_trace_names = []
         self.spectrum_plot_x_values = []
-        self.frame_headers = []
-        # TODO Init Satlantic Auxiliary Data Plugin
+        # Init Secondary Dock
+        self.secondary_dock_widget_enabled = True
+        self.plugin_controls_enabled = False
+        self.plugin_metadata_enabled = True
+        self.plugin_terminal_enabled = False
+        # Init Metadata Data Plugin
+        self.plugin_metadata_keys = []
+        self.plugin_metadata_frame_counters = []
         # Setup
         self.init_setup()
 
@@ -107,12 +116,12 @@ class Satlantic(Instrument):
         #   not thread safe but instrument is turned off in this function so acceptable
         self.spectrum_plot_trace_names = []
         self.spectrum_plot_x_values = []
-        self.frame_headers = []
+        self.frame_headers_idx = {}
         for i, (head, cal) in enumerate(self._parser.cal.items()):
             if cal.core_variables:
                 self.spectrum_plot_trace_names.append(f'{head} {cal.core_groupname}')  # TODO Add Units
                 self.spectrum_plot_x_values.append(np.array([float(cal.id[i]) for i in cal.core_variables]))
-                self.frame_headers.append(head)
+                self.frame_headers_idx[head] = i
         # TODO if no core variables disable spectrum plot widget
         # Update Active Timeseries Variables
         self.plugin_active_timeseries_variables_names = []
@@ -124,6 +133,16 @@ class Satlantic(Instrument):
                 idx = cal.core_variables[int(len(cal.core_variables)/2)]
                 self.plugin_active_timeseries_variables_selected.append(f'{head}_{cal.key[idx]}')
                 self.active_timeseries_variables.append((head, cal.core_groupname, idx))
+        # Update Metadata Plugin
+        self.plugin_metadata_keys = []
+        self.plugin_metadata_frame_counters = []
+        for head, cal in self._parser.cal.items():
+            if cal.core_variables:
+                fields = [cal.key[i] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
+            else:
+                fields = [k for k in cal.key if k not in self.KEYS_TO_NOT_DISPLAY]
+            self.plugin_metadata_keys.append((head, fields))
+            self.plugin_metadata_frame_counters.append(0)
         # Update User Interface (include spectrum plot)
         self.signal.status_update.emit()  # Doesn't run on initial setup because signals are not connected
 
@@ -151,28 +170,35 @@ class Satlantic(Instrument):
         return PacketMaker(data, packet.frame_header)
 
     def handle_data(self, data: PacketMaker, timestamp: float):
-        # TODO Update auxiliaries
+        cal = self._parser.cal[data.frame_header]
+        # Update Metadata Plugin
+        metadata = [(None, None)] * len(self.frame_headers_idx)
+        idx = self.frame_headers_idx[data.frame_header]
+        self.plugin_metadata_frame_counters[idx] += 1
+        if cal.core_variables:
+            values = [data.frame[cal.key[i]] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
+        else:
+            values = [data.frame[k] for k in cal.key if k not in self.KEYS_TO_NOT_DISPLAY]
+        metadata[idx] = (self.plugin_metadata_frame_counters[idx], values)
+        self.signal.new_meta_data.emit(metadata)
         # Update Timeseries
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                core_groupname = self._parser.cal[data.frame_header].core_groupname
-                ts_data = []
-                for frame_header, key, idx in self.active_timeseries_variables:
+                core_groupname = cal.core_groupname
+                ts_data = [float('nan')] * len(self.active_timeseries_variables)
+                for i, (frame_header, key, idx) in enumerate(self.active_timeseries_variables):
                     if frame_header == data.frame_header:
-                        ts_data.append(data.frame[key][idx] if key == core_groupname else data.frame[key])
-                    else:
-                        ts_data.append(float('nan'))
+                        ts_data[i] = data.frame[key][idx] if key == core_groupname else data.frame[key]
                 self.signal.new_ts_data.emit(ts_data, timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update timeseries plot')
         # Update Spectrum Plot
-        if self._parser.cal[data.frame_header].core_variables:
-            self.signal.new_spectrum_data.emit([
-                data.frame[self._parser.cal[data.frame_header].core_groupname] if data.frame_header == h else None
-                for h in self.frame_headers
-            ])
+        if cal.core_variables:
+            spectrum_data = [None] * len(self.frame_headers_idx)
+            spectrum_data[self.frame_headers_idx[data.frame_header]] = data.frame[cal.core_groupname]
+            self.signal.new_spectrum_data.emit(spectrum_data)
         # Log Calibrated Data
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)
@@ -202,7 +228,7 @@ class Satlantic(Instrument):
         if self._parser.cal[frame_header].core_variables and \
                 key.startswith(self._parser.cal[frame_header].core_groupname):
             key, wl = key.split('_')
-            idx = np.where(self.spectrum_plot_x_values[self.frame_headers.index(frame_header)] == float(wl))[0][0]
+            idx = np.where(self.spectrum_plot_x_values[self.frame_headers_idx[frame_header]] == float(wl))[0][0]
         return frame_header, key, idx
 
 
@@ -274,7 +300,7 @@ class ProdLogger:
         data = []
         for k, c in zip(self._frame_keys[packet.frame_header], self._frame_core_var[packet.frame_header]):
             if c:
-                data.append(np.array2string(packet.frame[k], separator=', ', max_line_width=np.inf)[1:-1])
+                data.append(np.array2string(packet.frame[k], separator=', ', threshold=np.inf, max_line_width=np.inf)[1:-1])
             else:
                 data.append(packet.frame[k])
         # values = packet.frame.values()  # Assume dictionary keep order which isn't the case with older python version
