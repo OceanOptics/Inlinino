@@ -54,6 +54,7 @@ class Instrument:
         self.plugin_active_timeseries_variables = False
         self.spectrum_plot_enabled = False
         self.secondary_dock_widget_enabled = False
+        self.plugin_metadata_enabled = False
 
         # Load cfg
         self.cfg_id = cfg_id

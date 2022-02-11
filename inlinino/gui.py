@@ -237,6 +237,7 @@ class MainWindow(QtGui.QMainWindow):
             for value in values:
                 item.addChild(QtWidgets.QTreeWidgetItem([value, ' ']))
             items.append(item)
+        self.tree_widget_metadata.clear()
         self.tree_widget_metadata.addTopLevelItems(items)
         self.tree_widget_metadata.resizeColumnToContents(0)
         self.tree_widget_metadata.setColumnWidth(1,20)  # Needed to prevent expanding too much on first show
@@ -868,7 +869,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
-        self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
+        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
             p_name = str(p.device)
