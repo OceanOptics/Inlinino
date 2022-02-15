@@ -121,6 +121,8 @@ class MainWindow(QtGui.QMainWindow):
         # Plugins variables
         self.plugin_aux_data_variable_names = []
         self.plugin_aux_data_variable_values = []
+        self.plugin_active_timeseries_variables_model = None
+        self.plugin_active_timeseries_variables_filter_proxy_model = None
 
     def init_instrument(self, instrument):
         self.instrument = instrument
@@ -149,13 +151,20 @@ class MainWindow(QtGui.QMainWindow):
         # Select Channels To Plot Plugin
         self.group_box_active_timeseries_variables.setVisible(self.instrument.plugin_active_timeseries_variables)
         if self.instrument.plugin_active_timeseries_variables:
-            # Set sel channels check_box
-            for v in self.instrument.plugin_active_timeseries_variables_names:
-                check_box = QtWidgets.QCheckBox(v)
-                check_box.stateChanged.connect(self.on_active_timeseries_variables_update)
-                if v in self.instrument.plugin_active_timeseries_variables_selected:
-                    check_box.setChecked(True)
-                self.group_box_active_timeseries_variables_scroll_area_content_layout.addWidget(check_box)
+            # Set Data Model & Filter Proxy Model
+            self.plugin_active_timeseries_variables_model = QtGui.QStandardItemModel()
+            self.plugin_active_timeseries_variables_filter_proxy_model = QtCore.QSortFilterProxyModel()
+            self.plugin_active_timeseries_variables_filter_proxy_model.setSourceModel(self.plugin_active_timeseries_variables_model)
+            self.plugin_active_timeseries_variables_filter_proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
+            # Connect Search Field to Filter Proxy Model
+            self.le_active_timeseries_variables_search.textChanged.connect(
+                self.plugin_active_timeseries_variables_filter_proxy_model.setFilterRegExp)
+            # Add Data Filter Proxy Model to List View
+            self.list_view_active_timeseries_variables.setModel(
+                self.plugin_active_timeseries_variables_filter_proxy_model)
+            self.list_view_active_timeseries_variables.clicked.connect(self.on_active_timeseries_variables_update)
+            # Add variables to data model
+            self.set_active_timeseries_variables()
             # Delete extra spacer to allow channels plugin to expand
             for i in reversed(range(self.dw_primary_layout.count())):
                 if isinstance(self.dw_primary_layout.itemAt(i).spacerItem(), QtWidgets.QSpacerItem):
@@ -216,6 +225,21 @@ class MainWindow(QtGui.QMainWindow):
         widget.plotItem.addLegend()
         return widget
 
+    def set_active_timeseries_variables(self):
+        # Clear Past Variables
+        self.plugin_active_timeseries_variables_model.clear()
+        # Set Current Variables
+        for v in self.instrument.plugin_active_timeseries_variables_names:
+            item = QtGui.QStandardItem(v)
+            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            if v in self.instrument.plugin_active_timeseries_variables_selected:
+                item.setData(QtCore.QVariant(QtCore.Qt.Checked), QtCore.Qt.CheckStateRole)
+            else:
+                item.setData(QtCore.QVariant(QtCore.Qt.Unchecked), QtCore.Qt.CheckStateRole)
+            self.plugin_active_timeseries_variables_model.appendRow(item)
+        # Clear Search field
+        self.le_active_timeseries_variables_search.setText('')
+
     def set_spectrum_plot_widget(self):
         self.spectrum_plot_widget.clear()  # Remove all items (past frame headers)
         min_x, max_x = None, None
@@ -256,6 +280,8 @@ class MainWindow(QtGui.QMainWindow):
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
             self.label_instrument_name.setText(self.instrument.short_name)
+            if self.instrument.plugin_active_timeseries_variables:
+                self.set_active_timeseries_variables()
             if self.instrument.spectrum_plot_enabled:
                 self.set_spectrum_plot_widget()
             if self.instrument.plugin_metadata_enabled:
@@ -350,6 +376,10 @@ class MainWindow(QtGui.QMainWindow):
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
         if self.instrument.plugin_metadata_enabled:
             self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
+            root = self.tree_widget_metadata.invisibleRootItem()
+            for parent_idx, counter in enumerate(self.instrument.plugin_metadata_frame_counters):
+                if root.child(parent_idx) is not None:
+                    root.child(parent_idx).setText(1, str(counter))
 
     @QtCore.pyqtSlot()
     def on_packet_received(self):
@@ -427,7 +457,7 @@ class MainWindow(QtGui.QMainWindow):
         if time() - self.last_spectrum_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
             return
         for i, y in enumerate(data):
-            if y is None:
+            if y is None or i > len(self.instrument.spectrum_plot_x_values):
                 continue
             x = self.instrument.spectrum_plot_x_values[i]
             # Replace NaN and Inf by interpolated values
@@ -450,16 +480,22 @@ class MainWindow(QtGui.QMainWindow):
             return
         root = self.tree_widget_metadata.invisibleRootItem()
         for parent_idx, (parent_value, child_values) in enumerate(data):
+            if root.child(parent_idx) is None:
+                continue
             if parent_value is not None:
                 root.child(parent_idx).setText(1, str(parent_value))
             if child_values is not None:
                 for child_idx, child_value in enumerate(child_values):
                     root.child(parent_idx).child(child_idx).setText(1, str(child_value))
 
-    @QtCore.pyqtSlot(int)
-    def on_active_timeseries_variables_update(self, state):
+    @QtCore.pyqtSlot(QtCore.QModelIndex)
+    def on_active_timeseries_variables_update(self, proxy_index):
+        source_index = self.plugin_active_timeseries_variables_filter_proxy_model.mapToSource(proxy_index).row()
         if self.instrument.plugin_active_timeseries_variables:
-            self.instrument.udpate_active_timeseries_variables(self.sender().text(), state)
+            self.instrument.udpate_active_timeseries_variables(
+                self.plugin_active_timeseries_variables_model.item(source_index).text(),
+                bool(self.plugin_active_timeseries_variables_model.item(source_index).checkState())
+            )
 
     @QtCore.pyqtSlot(bool)
     def on_data_timeout(self, active):
@@ -598,6 +634,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         if i:
                             widget.setChecked(True)
                         self.scroll_area_layout_immersed.addWidget(widget)
+                    self.scroll_area_layout_immersed.addItem(
+                        QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
                 else:
                     self.tdf_files = []
         else:
@@ -655,7 +693,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
             return
         # Empty current files for immersed selection
         for i in reversed(range(self.scroll_area_layout_immersed.count())):
-            self.scroll_area_layout_immersed.itemAt(i).widget().setParent(None)
+            item = self.scroll_area_layout_immersed.itemAt(i)
+            if type(item) == QtGui.QWidgetItem:
+                item.widget().setParent(None)
+            elif type(item) == QtGui.QLayoutItem:
+                item.layout().setParent(None)
         # Update selection of immersed files
         if is_sip:
             self.tdf_files = file_names[0]
@@ -666,6 +708,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.tdf_files = file_names
         for f in file_names:
             self.scroll_area_layout_immersed.addWidget(QtWidgets.QCheckBox(os.path.basename(f)))
+        self.scroll_area_layout_immersed.addItem(
+            QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
 
     def act_browse_ini_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
@@ -808,8 +852,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'satlantic':
             self.cfg['tdf_files'] = self.tdf_files
-            self.cfg['immersed'] = [bool(self.scroll_area_layout_immersed.itemAt(i).widget().checkState())
-                                    for i in range(self.scroll_area_layout_immersed.count())]
+            self.cfg['immersed'] = []
+            for i in range(self.scroll_area_layout_immersed.count()):
+                item = self.scroll_area_layout_immersed.itemAt(i)
+                if type(item) == QtGui.QWidgetItem:
+                    self.cfg['immersed'].append(bool(item.widget().checkState()))
         # Update global instrument cfg
         if self.create:
             CFG.instruments.append(self.cfg)

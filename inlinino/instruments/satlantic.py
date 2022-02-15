@@ -128,11 +128,20 @@ class Satlantic(Instrument):
         self.active_timeseries_variables = []
         for head, cal in self._parser.cal.items():
             self.plugin_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
-            # Append middle core variable to timeseries
-            if cal.core_variables:
-                idx = cal.core_variables[int(len(cal.core_variables)/2)]
-                self.plugin_active_timeseries_variables_selected.append(f'{head}_{cal.key[idx]}')
-                self.active_timeseries_variables.append((head, cal.core_groupname, idx))
+            # Append middle core variable to timeseries if instruments with few wavelength
+            if cal.core_variables and len(cal.core_variables) < 500:
+                varnames = [f'{head}_{cal.key[cal.core_variables[int(len(cal.core_variables)/2)]]}']
+            elif cal.core_variables and 'D' not in head:  # Likely light frame from HyperNAV
+                wl_idx = np.argmin(np.abs(self.spectrum_plot_x_values[self.frame_headers_idx[head]] - 490))
+                varnames = [f'{head}_{cal.key[cal.core_variables[wl_idx]]}']
+                for k in cal.key:
+                    if 'PRES' in k:
+                        varnames.append(f'{head}_{k}')
+            else:
+                continue
+            for varname in varnames:
+                self.plugin_active_timeseries_variables_selected.append(varname)
+                self.active_timeseries_variables.append(self.active_timeseries_unpack_variable_name(varname))
         # Update Metadata Plugin
         self.plugin_metadata_keys = []
         self.plugin_metadata_frame_counters = []

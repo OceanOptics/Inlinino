@@ -196,7 +196,7 @@
    <item>
     <widget class="QGroupBox" name="groupBox_2">
      <property name="title">
-      <string>Calibration and/or Telemetry Deginition File(s)</string>
+      <string>Calibration and/or Telemetry Definition File(s)</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
