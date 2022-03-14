@@ -1,0 +1,48 @@
+# Satlantic model # OCR-504 ICSW s/n 0398 SATNET
+# Wet Labs Inc. / 2015-7065 / 
+#############################################################################################################################################################
+# Calibration History
+# Date       |Operator |SW Version |Rev |Type |Light Data   |Dark Data   |Lamp         |Target       |Immersion Param  |Distance  | Comments
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------
+# 2015-12-09 |jsherman |1.9.15_194 |A   |ED   |DI4398fa3-0398_2015-12-09_10-35-00_raw |DI4398da3-0398_2015-12-09_10-31-37_raw |F1315        |             |Custom           |50.0      | Initial Calibration
+
+
+
+INSTRUMENT SATDI4 '' 6 AS 0 NONE
+SN 0398 '' 4 AS 0 NONE
+
+# Time since commencement of normal operation
+TIMER NONE 'sec' 10 AF 0 COUNT
+
+# Sample Delay
+DELAY SAMPLE 'ms' 2 BS 0 COUNT
+
+# Wavelength Data
+
+ED 379.83 'uW/cm^2/nm' 4 BU 1 OPTIC2
+2147523086.7	1.70894981139e-007	1.161
+
+ED 489.85 'uW/cm^2/nm' 4 BU 1 OPTIC2
+2147396665.9	2.12330329901e-007	1.365
+
+ED 589.86 'uW/cm^2/nm' 4 BU 1 OPTIC2
+2147266861.7	2.18748576677e-007	1.354
+
+PAR NONE 'uMol/m^2/sec' 4 BU 1 OPTIC2
+2148023450.6	3.67792965391e-006	1.359
+
+# In-head ancillary measurements
+VS NONE 'Volts' 2 BU 1 POLYU
+0 0.03
+
+TEMP PCB 'Celsius' 2 BU 1 POLYU
+-50.0 0.5
+
+# Frame Counter (Data Integrity)
+FRAME COUNTER '' 1 BU 0 COUNT
+
+# Check Sum (Data Integrity)
+CHECK SUM '' 1 BU 0 COUNT
+
+# Frame Terminator
+CRLF TERMINATOR '' 2 BU 0 NONE

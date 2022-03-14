@@ -160,10 +160,14 @@ class Satlantic(Instrument):
         packet = True
         while packet:
             packet, frame_header, self._buffer, unknown_bytes = self._parser.find_frame(self._buffer)
+            if not packet and frame_header is None and not self._buffer and unknown_bytes:
+                # No frame header found in data but need to keep data in buffer as more might be coming in
+                self._buffer = unknown_bytes
+                break
             if unknown_bytes:
                 # Log bytes in raw files
                 if self.log_raw_enabled and self._log_active:
-                    self._log_raw.write(unknown_bytes)
+                    self._log_raw.write(PacketMaker(unknown_bytes, None), timestamp)
             if packet:
                 self.handle_packet(PacketMaker(packet, frame_header), timestamp)
 
