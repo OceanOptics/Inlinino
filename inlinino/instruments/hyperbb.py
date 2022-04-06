@@ -111,7 +111,7 @@ class HyperBB(Instrument):
         self._plot_curve.setData(self._parser.wavelength, self.signal_reconstructed)
         # Log data as received
         if self.log_prod_enabled and self._log_active:
-            self._log_prod.write(raw, timestamp)
+            self._log_prod.write(bb, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 

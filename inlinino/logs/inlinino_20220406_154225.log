@@ -1,0 +1,16 @@
+2022-04-06 11:42:25,646 DEBUG    [CFG]  Reading configuration.
+2022-04-06 11:42:27,404 DEBUG    [GUI]  Startup Dialog
+2022-04-06 11:43:06,771 INFO     [CFG]  Writing configuration.
+2022-04-06 11:43:06,795 DEBUG    [GUI]  Loading instrument [-1] HyperBB 8009
+2022-04-06 11:43:06,857 DEBUG    [HyperBB]  Setup
+2022-04-06 11:43:06,860 DEBUG    [HyperBB]  Init loggers
+2022-04-06 11:43:33,885 DEBUG    [HyperBB]  Update loggers configuration
+2022-04-06 11:43:33,885 DEBUG    [LogText]  Update configuration
+2022-04-06 11:43:33,888 DEBUG    [Log]  Update configuration
+2022-04-06 11:43:33,894 DEBUG    [GUI]  Start logging
+2022-04-06 11:43:34,310 INFO     [LogText]  Open file HyperBB8009_20220406_154334.raw
+2022-04-06 11:43:34,315 INFO     [Log]  Open file HyperBB8009_20220406_154334.csv
+2022-04-06 11:45:31,146 DEBUG    [GUI]  Stop logging
+2022-04-06 11:45:31,149 DEBUG    [LogText]  Close file HyperBB8009_20220406_154334.raw
+2022-04-06 11:45:31,153 DEBUG    [Log]  Close file HyperBB8009_20220406_154334.csv
+2022-04-06 11:46:11,758 DEBUG    [GUI]  Disconnect instrument
