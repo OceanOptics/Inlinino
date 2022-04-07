@@ -148,13 +148,11 @@ class MetaHyperBBParser(type):
         cls.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
                                'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
                                'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
-                               'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']#,
-                               #'beta_u', 'bb']
+                               'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']
         cls.FRAME_TYPES = [int, int, str, str, int, int, int, int, int,
                            float, float, float, float, float, float, float,
                            float, float, float, float, float, float, float,
-                           float, float, float, float, float, int, int]#,
-                           #float, float]
+                           float, float, float, float, float, int, int]
         # FRAME_PRECISIONS = ['%d', '%d', '%s', '%s', '%d', '%d', '%d', '%d', '%d',
         #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
         #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
