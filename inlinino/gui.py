@@ -313,6 +313,7 @@ class MainWindow(QtGui.QMainWindow):
                     pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
                                      name=legend[i])
                 )
+                
         # Update buffers
         self._buffer_timestamp.extend(timestamp)
         for i in range(len(data)):

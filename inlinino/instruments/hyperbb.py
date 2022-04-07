@@ -86,7 +86,7 @@ class HyperBB(Instrument):
         return self._parser.parse(packet)
 
     def handle_data(self, raw, timestamp):
-        bb, wl, gain, net_ref_zero_flag = self._parser.calibrate(np.array([raw], dtype=float))
+        bb, wl, gain, net_ref_zero_flag, beta_u = self._parser.calibrate(np.array([raw], dtype=float))
         signal = np.empty(len(self._parser.wavelength)) * np.nan
         try:
             sel = self._parser.wavelength == int(wl)
@@ -111,10 +111,7 @@ class HyperBB(Instrument):
         self._plot_curve.setData(self._parser.wavelength, self.signal_reconstructed)
         # Log data as received
         if self.log_prod_enabled and self._log_active:
-            self._log_prod.write(np.append(raw,bb), timestamp)
-            print(bb)
-            print(raw)
-            print(np.append(raw,bb))
+            self._log_prod.writebb(raw, timestamp, beta_u, bb)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
@@ -140,11 +137,13 @@ class MetaHyperBBParser(type):
         cls.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
                                'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
                                'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
-                               'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']
+                               'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']#,
+                               #'beta_u', 'bb']
         cls.FRAME_TYPES = [int, int, str, str, int, int, int, int, int,
                            float, float, float, float, float, float, float,
                            float, float, float, float, float, float, float,
-                           float, float, float, float, float, int, int]
+                           float, float, float, float, float, int, int]#,
+                           #float, float]
         # FRAME_PRECISIONS = ['%d', '%d', '%s', '%s', '%d', '%d', '%d', '%d', '%d',
         #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
         #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
@@ -290,7 +289,7 @@ class HyperBBParser(metaclass=MetaHyperBBParser):
         # Calculate backscattering
         bb = 2 * np.pi * self.Xp * beta_u
         
-        return bb, wl, gain, net_ref_zero_flag
+        return bb, wl, gain, net_ref_zero_flag, beta_u
 
 
 if __name__ == "__main__":
