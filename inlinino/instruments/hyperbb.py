@@ -111,7 +111,18 @@ class HyperBB(Instrument):
         self._plot_curve.setData(self._parser.wavelength, self.signal_reconstructed)
         # Log data as received
         if self.log_prod_enabled and self._log_active:
-            self._log_prod.writebb(raw, timestamp, beta_u, bb)
+            # Update logger configuration
+            self._log_prod.variable_names = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
+                                   'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
+                                   'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
+                                   'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance',
+                                   'beta_u', 'bb']
+            self._log_prod.variable_precision = []
+            self._log_prod.write(np.concatenate((raw,beta_u,bb)), timestamp)
+            if not self.log_raw_enabled:
+                self.signal.packet_logged.emit()
+        elif self._log_active:
+            self._log_prod.write(raw, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 

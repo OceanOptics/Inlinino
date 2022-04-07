@@ -106,47 +106,7 @@ class Log:
         else:
             self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
                              ', ' + ', '.join(str(d) for d in data) + '\n')    
-    
-    def _smart_openbb(self, timestamp, beta_u, bb):
-        # Open file if necessary
-        if self._file.closed or \
-                gmtime(self._file_timestamp).tm_mday != gmtime(timestamp).tm_mday or \
-                timestamp - self._file_timestamp >= self.file_length:
-            # Close previous file if open
-            if not self._file.closed:
-                self.close()
-            # Create new file
-            self.set_filename(timestamp)
-            # Create File
-            # TODO add exception in case can't open file
-            # TODO specify number of bytes in buffer depending on instrument
-            self._file = open(os.path.join(self.path, self.filename), self.FILE_MODE)
-            self.__logger.info('Open file %s' % self.filename)
-            # Write header
-            if self.variable_names:
-                self._file.write('time, ' + ', '.join(x for x in self.variable_names) + ', beta_u, bb\n')
-                self._file.write('yyyy/mm/dd HH:MM:SS.fff, ' + ', '.join(x for x in self.variable_units) + ', , \n')
-            # Time file open
-            self._file_timestamp = timestamp
-            if self.signal_new_file:
-                self.signal_new_file.emit()
-            
-    def writebb(self, data, timestamp, beta_u, bb):
-        """
-        Write data to file
-        :param data: list of values
-        :param timestamp: date and time associated with the data frame
-        :return:
-        """
-        self._smart_openbb(timestamp, beta_u, bb)
-        data = np.concatenate((data,beta_u,bb))
-        #if self.variable_precision:
-        #    self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-        #                     ', ' + ', '.join(p % d for p, d in zip(self.variable_precision, data)) + '\n')
-        #else:
-        self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-                             ', ' + ', '.join(str(d) for d in data) + '\n')
-
+  
     def close(self):
         if not self._file.closed:
             self._file.close()
