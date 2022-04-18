@@ -21,17 +21,11 @@ Download Inlinino code.
     unzip master.zip
     cd Inlinino-master
  
-To install Inlinino (tested with python 3.8 only, should work with neweer python versions):
+To install Inlinino (tested with python 3.8 only, should work with newer python versions):
 
     pip install -r requirements.txt
 
-Installing in a conda virtual environment.
-
-    conda create --name inlinino python=3.8
-    source activate inlinino
-    pip install -e .
-
-Inlinino can then be started from the folder containing inlinino, or anywhere if install in conda environment.
+Inlinino can then be started from the folder containing inlinino's source code with.
 
     python -m inlinino
 
