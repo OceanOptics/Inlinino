@@ -21,13 +21,17 @@ Download Inlinino code.
     unzip master.zip
     cd Inlinino-master
  
-We recommend setting Inlinino in a virtual environment (e.g. miniconda). To set up a new python virtual environment with conda and install Inlinino:
+To install Inlinino (tested with python 3.8 only, should work with neweer python versions):
+
+    pip install -r requirements.txt
+
+Installing in a conda virtual environment.
 
     conda create --name inlinino python=3.8
     source activate inlinino
     pip install -e .
 
-Inlinino can then be started with the following commands.
+Inlinino can then be started from the folder containing inlinino, or anywhere if install in conda environment.
 
     python -m inlinino
 

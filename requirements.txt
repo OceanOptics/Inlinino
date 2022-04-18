@@ -1,0 +1,10 @@
+pyserial>=3.4
+pyqt5>=5.15
+pyqtgraph==0.12.1
+colorama
+numpy
+scipy
+pyacs
+pysatlantic
+pynmea2>=1.18.0
+setuptools

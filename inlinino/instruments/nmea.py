@@ -66,7 +66,7 @@ class NMEA(Instrument):
 
     def handle_data(self, data, timestamp):
         if np.any(self.active_timeseries_variables):
-            self.signal.new_data.emit(np.array(data)[self.active_timeseries_variables], timestamp)
+            self.signal.new_ts_data.emit(np.array(data)[self.active_timeseries_variables], timestamp)
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:

@@ -14,50 +14,30 @@ class LISST(Instrument):
                            'variable_names', 'variable_units', 'variable_precision']
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
+        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+        # Instrument Specific attributes
         self._parser = None
-
-        # Init Graphic for real time spectrum visualization
-        # TODO Refactor code and move it to GUI
-        # Set Color mode
-        pg.setConfigOption('background', '#F8F8F2')
-        pg.setConfigOption('foreground', '#26292C')
-        self._pw = pg.plot(enableMenu=False)
-        self._pw.setWindowTitle('LISST Spectrum')
-        self._plot = self._pw.plotItem
-        self._plot.setLogMode(x=True)
-        # Init Curve Items
-        self._plot_curve = pg.PlotCurveItem(pen=pg.mkPen(color='#d62728', width=2))
-        # Add item to plot
-        self._plot.addItem(self._plot_curve)
-        # Decoration
-        self._plot.setLabel('bottom', 'Angles', units='degrees')
-        self._plot.setLabel('left', 'Beta', units='1/m/sr')
-        self._plot.setMouseEnabled(x=False, y=True)
-        self._plot.showGrid(x=True, y=True)
-        self._plot.enableAutoRange(x=True, y=True)
-        self._plot.getAxis('left').enableAutoSIPrefix(False)
-        self._plot.getAxis('bottom').enableAutoSIPrefix(False)
-        super().__init__(cfg_id, signal, *args, **kwargs)
-
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 10
-
-        # Auxiliary Data Plugin
+        # Init Auxiliary Data Plugin
         self.plugin_aux_data = True
-        self.plugin_aux_data_variables_selected = [0, 3, 5]
-        self.plugin_aux_data_variable_names = [self._parser.aux_labels[i] + ' (' + self._parser.aux_units[i] + ')' \
-                                               for i in self.plugin_aux_data_variables_selected]
-
-        # Select Channels to Plot Plugin
+        self.plugin_aux_data_variables_selected = []
+        self.plugin_aux_data_variable_names = []
+        # Init Channels to Plot Plugin
         self.plugin_active_timeseries_variables = True
-        self.plugin_active_timeseries_variables_names = ['beta(%.5f)' % x for x in self._parser.angles]
+        self.plugin_active_timeseries_variables_names = []
         self.plugin_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
-        self.active_timeseries_angles = np.zeros(len(self._parser.angles), dtype=bool)
-        for theta in [0.08, 0.32, 1.28, 5.12]:
-            channel_name = 'beta(%.5f)' % self._parser.angles[np.argmin(np.abs(self._parser.angles - theta))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+        self.active_timeseries_angles = None
+        # Init Spectrum Plot Plugin
+        self.spectrum_plot_enabled = True
+        self.spectrum_plot_axis_labels = dict(x_label_name='log10(theta)', x_label_units='',
+                                              y_label_name='beta', y_label_units='1/m/sr')
+        self.spectrum_plot_trace_names = ['beta']
+        self.spectrum_plot_x_values = []
+        # Setup
+        self.init_setup()
 
     def setup(self, cfg):
         # Set LISST specific attributes
@@ -83,13 +63,18 @@ class LISST(Instrument):
         self._log_raw.registration = self._terminator.decode(self._parser.ENCODING, self._parser.UNICODE_HANDLING)
         self._log_raw.terminator = ''  # Remove terminator
         self._log_raw.variable_names = []  # Disable header in raw file
-        # Update plot with config
-        self._plot.setXRange(np.log10(np.min(self._parser.angles)), np.log10(np.max(self._parser.angles)))
-        self._plot.setLimits(minXRange=np.log10(np.min(self._parser.angles)),
-                             maxXRange=np.log10(np.max(self._parser.angles)))
-
-    # def open(self, port=None, baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=10):
-    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+        # Update wavelengths for Spectrum Plot (plot is updated after the initial instrument setup or button click)
+        self.spectrum_plot_x_values = [np.log10(self._parser.angles)]
+        # Update Active Timeseries Variables
+        self.plugin_active_timeseries_variables_names = ['beta(%.5f)' % x for x in self._parser.angles]
+        self.active_timeseries_angles = np.zeros(len(self._parser.angles), dtype=bool)
+        for theta in [0.08, 0.32, 1.28, 5.12]:
+            channel_name = 'beta(%.5f)' % self._parser.angles[np.argmin(np.abs(self._parser.angles - theta))]
+            self.udpate_active_timeseries_variables(channel_name, True)
+        # Update Auxiliary Plugin
+        self.plugin_aux_data_variables_selected = [0, 3, 5]
+        self.plugin_aux_data_variable_names = [self._parser.aux_labels[i] + ' (' + self._parser.aux_units[i] + ')'
+                                               for i in self.plugin_aux_data_variables_selected]
 
     def parse(self, packet):
         return (self._parser.unpack_packet(packet),)
@@ -103,17 +88,17 @@ class LISST(Instrument):
         # Update plots
         if self.active_timeseries_variables_lock.acquire(timeout=0.5):
             try:
-                self.signal.new_data.emit(beta[self.active_timeseries_angles], timestamp)
+                self.signal.new_ts_data.emit(beta[self.active_timeseries_angles], timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update timeseries plot')
         self.signal.new_aux_data.emit(self.format_aux_data([data[i+1] for i in self.plugin_aux_data_variables_selected]))
-        self._plot_curve.setData(np.log10(self._parser.angles), beta)
+        self.signal.new_spectrum_data.emit([beta])
         # Log raw beta and calibrated aux
         if self.log_prod_enabled and self._log_active:
             # np arrays must be pre-formated to be written
-            data[0] = np.array2string(data[0], max_line_width=np.inf)
+            data[0] = np.array2string(data[0], threshold=np.inf, max_line_width=np.inf)
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()

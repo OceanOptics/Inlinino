@@ -116,3 +116,16 @@ class RingBuffer:
 
     def __str__(self):
         return str(self.data)
+
+
+# Set Constant(s)
+COLOR_SET = ['#1f77b4',  # muted blue
+             '#2ca02c',  # cooked asparagus green
+             '#ff7f0e',  # safety orange
+             '#d62728',  # brick red
+             '#9467bd',  # muted purple
+             '#8c564b',  # chestnut brown
+             '#e377c2',  # raspberry yogurt pink
+             '#7f7f7f',  # middle gray
+             '#bcbd22',  # curry yellow-green
+             '#17becf']  # blue-teal

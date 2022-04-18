@@ -1,24 +1,31 @@
+import os
+import sys
+import glob
+import logging
+import zipfile
+from math import floor
+from time import time, gmtime, strftime
+
 import serial
+from serial.tools.list_ports import comports as list_serial_comports
+import numpy as np
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
 from PyQt5 import QtMultimedia
-import pyqtgraph as pg
-import sys, os, glob
-import logging
-from time import time, gmtime, strftime
-from serial.tools.list_ports import comports as list_serial_comports
-from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES
+from pyACS.acs import ACS as ACSParser
+import pySatlantic.instrument as pySat
+
+from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES, COLOR_SET
 from inlinino.instruments import Instrument, SerialInterface, SocketInterface, InterfaceException
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
+from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
-from pyACS.acs import ACS as ACSParser
 from inlinino.instruments.lisst import LISSTParser
-import numpy as np
-from math import floor
 
 logger = logging.getLogger('GUI')
 
@@ -28,8 +35,10 @@ class InstrumentSignals(QtCore.QObject):
     packet_received = QtCore.pyqtSignal()
     packet_corrupted = QtCore.pyqtSignal()
     packet_logged = QtCore.pyqtSignal()
-    new_data = QtCore.pyqtSignal(object, float)
+    new_ts_data = QtCore.pyqtSignal(object, float)
+    new_spectrum_data = QtCore.pyqtSignal(list)
     new_aux_data = QtCore.pyqtSignal(list)
+    new_meta_data = QtCore.pyqtSignal(list)
     alarm = QtCore.pyqtSignal(bool)
 
 
@@ -42,16 +51,7 @@ def seconds_to_strmmss(seconds):
 class MainWindow(QtGui.QMainWindow):
     BACKGROUND_COLOR = '#F8F8F2'
     FOREGROUND_COLOR = '#26292C'
-    PEN_COLORS = ['#1f77b4',  # muted blue
-                  '#2ca02c',  # cooked asparagus green
-                  '#ff7f0e',  # safety orange
-                  '#d62728',  # brick red
-                  '#9467bd',  # muted purple
-                  '#8c564b',  # chestnut brown
-                  '#e377c2',  # raspberry yogurt pink
-                  '#7f7f7f',  # middle gray
-                  '#bcbd22',  # curry yellow-green
-                  '#17becf']  # blue-teal
+    PEN_COLORS = COLOR_SET
     BUFFER_LENGTH = 240
     MAX_PLOT_REFRESH_RATE = 4   # Hz
 
@@ -59,7 +59,8 @@ class MainWindow(QtGui.QMainWindow):
         super(MainWindow, self).__init__()
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'main.ui'), self)
         # Graphical Adjustments
-        self.dock_widget.setTitleBarWidget(QtGui.QWidget(None))
+        self.dock_widget_primary.setTitleBarWidget(QtGui.QWidget(None))
+        self.dock_widget_secondary.setTitleBarWidget(QtGui.QWidget(None))
         self.label_app_version.setText('Inlinino v' + __version__)
         # Set Colors
         palette = QtGui.QPalette()
@@ -72,9 +73,10 @@ class MainWindow(QtGui.QMainWindow):
         # pg.setConfigOption('antialias', True)  # Lines are drawn with smooth edges at the cost of reduced performance
         self._buffer_timestamp = None
         self._buffer_data = []
-        self.last_plot_refresh = time()
-        self.timeseries_widget = None
-        self.init_timeseries_plot()
+        self.last_timeseries_plot_refresh = time()
+        self.timeseries_plot_widget = None
+        self.last_spectrum_plot_refresh = time()
+        self.spectrum_plot_widget = None
         # Set instrument
         if instrument:
             self.init_instrument(instrument)
@@ -89,7 +91,7 @@ class MainWindow(QtGui.QMainWindow):
         self.button_setup.clicked.connect(self.act_instrument_setup)
         self.button_serial.clicked.connect(self.act_instrument_interface)
         self.button_log.clicked.connect(self.act_instrument_log)
-        self.button_figure_clear.clicked.connect(self.act_clear_timeseries_plot)
+        self.button_figure_clear.clicked.connect(self.act_clear_plots)
         # Set clock
         self.signal_clock = QtCore.QTimer()
         self.signal_clock.timeout.connect(self.set_clock)
@@ -119,6 +121,8 @@ class MainWindow(QtGui.QMainWindow):
         # Plugins variables
         self.plugin_aux_data_variable_names = []
         self.plugin_aux_data_variable_values = []
+        self.plugin_active_timeseries_variables_model = None
+        self.plugin_active_timeseries_variables_filter_proxy_model = None
 
     def init_instrument(self, instrument):
         self.instrument = instrument
@@ -127,9 +131,9 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.packet_received.connect(self.on_packet_received)
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
         self.instrument.signal.packet_logged.connect(self.on_packet_logged)
-        self.instrument.signal.new_data.connect(self.on_new_data)
+        self.instrument.signal.new_ts_data.connect(self.on_new_ts_data)
         self.instrument.signal.alarm.connect(self.on_data_timeout)
-        self.on_status_update()  # Need to be run as on instrument setup the signals were not connected
+        self.on_status_update()  # Run now as didn't run with instrument.setup because signal was not connected
 
         # Set Plugins specific to instrument
         # Auxiliary Data Plugin
@@ -147,26 +151,122 @@ class MainWindow(QtGui.QMainWindow):
         # Select Channels To Plot Plugin
         self.group_box_active_timeseries_variables.setVisible(self.instrument.plugin_active_timeseries_variables)
         if self.instrument.plugin_active_timeseries_variables:
-            # Set sel channels check_box
-            for v in self.instrument.plugin_active_timeseries_variables_names:
-                check_box = QtWidgets.QCheckBox(v)
-                check_box.stateChanged.connect(self.on_active_timeseries_variables_update)
-                if v in self.instrument.plugin_active_timeseries_variables_selected:
-                    check_box.setChecked(True)
-                self.group_box_active_timeseries_variables_scroll_area_content_layout.addWidget(check_box)
+            # Set Data Model & Filter Proxy Model
+            self.plugin_active_timeseries_variables_model = QtGui.QStandardItemModel()
+            self.plugin_active_timeseries_variables_filter_proxy_model = QtCore.QSortFilterProxyModel()
+            self.plugin_active_timeseries_variables_filter_proxy_model.setSourceModel(self.plugin_active_timeseries_variables_model)
+            self.plugin_active_timeseries_variables_filter_proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
+            # Connect Search Field to Filter Proxy Model
+            self.le_active_timeseries_variables_search.textChanged.connect(
+                self.plugin_active_timeseries_variables_filter_proxy_model.setFilterRegExp)
+            # Add Data Filter Proxy Model to List View
+            self.list_view_active_timeseries_variables.setModel(
+                self.plugin_active_timeseries_variables_filter_proxy_model)
+            self.list_view_active_timeseries_variables.clicked.connect(self.on_active_timeseries_variables_update)
+            # Add variables to data model
+            self.set_active_timeseries_variables()
+            # Delete extra spacer to allow channels plugin to expand
+            for i in reversed(range(self.dw_primary_layout.count())):
+                if isinstance(self.dw_primary_layout.itemAt(i).spacerItem(), QtWidgets.QSpacerItem):
+                    self.dw_primary_layout.removeItem(self.dw_primary_layout.itemAt(i))
+                    break
 
-    def init_timeseries_plot(self):
-        self.timeseries_widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem(utcOffset=0)}, enableMenu=False)
-        self.timeseries_widget.plotItem.setLabel('bottom', 'Time ', units='UTC')
-        self.timeseries_widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
-        self.timeseries_widget.plotItem.setLabel('left', 'Signal')
-        self.timeseries_widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
-        # self.timeseries_widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
-        self.timeseries_widget.plotItem.setMouseEnabled(x=False, y=True)
-        self.timeseries_widget.plotItem.showGrid(x=False, y=True)
-        self.timeseries_widget.plotItem.enableAutoRange(x=True, y=True)
-        self.timeseries_widget.plotItem.addLegend()
-        self.setCentralWidget(self.timeseries_widget)
+        # Set Central Widget with Plot(s)
+        if self.instrument.spectrum_plot_enabled:
+            if self.spectrum_plot_widget is None:
+                self.spectrum_plot_widget = self.create_spectrum_plot_widget(**self.instrument.spectrum_plot_axis_labels)
+            self.centralwidget.layout().addWidget(self.spectrum_plot_widget)
+            self.set_spectrum_plot_widget()
+            self.instrument.signal.new_spectrum_data.connect(self.on_new_spectrum_data)
+        self.timeseries_plot_widget = self.create_timeseries_plot_widget()
+        self.centralwidget.layout().addWidget(self.timeseries_plot_widget)
+
+        # Set Secondary Dock Widget
+        if self.instrument.secondary_dock_widget_enabled:
+            self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
+            self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
+            # if not self.instrument.plugin_controls_enabled:
+                # self.group_box_instrument_controls.setParent(None)
+            if self.instrument.plugin_metadata_enabled:
+                self.instrument.signal.new_meta_data.connect(self.on_new_meta_data)
+                self.set_metadata_widget()
+            else:
+                self.group_box_metadata.setParent(None)
+            # if not self.instrument.plugin_terminal_enabled:
+                # self.group_box_terminal.setParent(None)
+        else:
+            self.dock_widget_secondary.setParent(None)
+
+    @staticmethod
+    def create_timeseries_plot_widget():
+        widget = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem(utcOffset=0)}, enableMenu=False)
+        widget.plotItem.setLabel('bottom', 'Time ', units='UTC')
+        widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
+        widget.plotItem.setLabel('left', 'Signal')
+        widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
+        # widget.plotItem.setLimits(minYRange=0, maxYRange=4500)  # In version 0.9.9
+        widget.plotItem.setMouseEnabled(x=False, y=True)
+        widget.plotItem.showGrid(x=False, y=True)
+        widget.plotItem.enableAutoRange(x=True, y=True)
+        widget.plotItem.addLegend()
+        return widget
+
+    @staticmethod
+    def create_spectrum_plot_widget(x_label_name='Wavelength', x_label_units='nm',
+                                    y_label_name='Signal', y_label_units=''):
+        widget = pg.PlotWidget(enableMenu=True)
+        widget.plotItem.setLabel('bottom', x_label_name, units=x_label_units)
+        widget.plotItem.getAxis('bottom').enableAutoSIPrefix(False)
+        widget.plotItem.setLabel('left', y_label_name, units=y_label_units)
+        widget.plotItem.getAxis('left').enableAutoSIPrefix(False)
+        widget.plotItem.setMouseEnabled(x=True, y=True)
+        widget.plotItem.showGrid(x=True, y=True)
+        widget.plotItem.enableAutoRange(x=True, y=True)
+        widget.plotItem.addLegend()
+        return widget
+
+    def set_active_timeseries_variables(self):
+        # Clear Past Variables
+        self.plugin_active_timeseries_variables_model.clear()
+        # Set Current Variables
+        for v in self.instrument.plugin_active_timeseries_variables_names:
+            item = QtGui.QStandardItem(v)
+            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            if v in self.instrument.plugin_active_timeseries_variables_selected:
+                item.setData(QtCore.QVariant(QtCore.Qt.Checked), QtCore.Qt.CheckStateRole)
+            else:
+                item.setData(QtCore.QVariant(QtCore.Qt.Unchecked), QtCore.Qt.CheckStateRole)
+            self.plugin_active_timeseries_variables_model.appendRow(item)
+        # Clear Search field
+        self.le_active_timeseries_variables_search.setText('')
+
+    def set_spectrum_plot_widget(self):
+        self.spectrum_plot_widget.clear()  # Remove all items (past frame headers)
+        min_x, max_x = None, None
+        for i, (name, x) in enumerate(zip(self.instrument.spectrum_plot_trace_names,
+                                          self.instrument.spectrum_plot_x_values)):
+                min_x = min(min_x, min(x)) if min_x is not None else min(x)
+                max_x = max(max_x, max(x)) if max_x is not None else max(x)
+                self.spectrum_plot_widget.addItem(pg.PlotCurveItem(
+                    pen=pg.mkPen(color=COLOR_SET[i % len(COLOR_SET)], width=2), name=name))
+        min_x = 0 if min_x is None else min_x
+        max_x = 1 if max_x is None else max_x
+        self.spectrum_plot_widget.setXRange(min_x, max_x)
+        self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
+
+    def set_metadata_widget(self):
+        items = []
+        for key, values in self.instrument.plugin_metadata_keys:
+            item = QtWidgets.QTreeWidgetItem([key, '0'])
+            for value in values:
+                item.addChild(QtWidgets.QTreeWidgetItem([value, ' ']))
+            items.append(item)
+        self.tree_widget_metadata.clear()
+        self.tree_widget_metadata.addTopLevelItems(items)
+        self.tree_widget_metadata.resizeColumnToContents(0)
+        self.tree_widget_metadata.setColumnWidth(1,20)  # Needed to prevent expanding too much on first show
+        self.tree_widget_metadata.expandAll()
+        self.tree_widget_metadata.show()
 
     def set_clock(self):
         zulu = gmtime(time())
@@ -180,6 +280,12 @@ class MainWindow(QtGui.QMainWindow):
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
             self.label_instrument_name.setText(self.instrument.short_name)
+            if self.instrument.plugin_active_timeseries_variables:
+                self.set_active_timeseries_variables()
+            if self.instrument.spectrum_plot_enabled:
+                self.set_spectrum_plot_widget()
+            if self.instrument.plugin_metadata_enabled:
+                self.set_metadata_widget()
 
     def act_instrument_interface(self):
         if self.instrument.alive:
@@ -218,10 +324,12 @@ class MainWindow(QtGui.QMainWindow):
                 logger.debug('Start logging')
                 self.instrument.log_start()
 
-    def act_clear_timeseries_plot(self):
+    def act_clear_plots(self):
         if len(self._buffer_data) > 0:
             # Send no data which reset buffers
-            self.instrument.signal.new_data.emit([], time())
+            self.instrument.signal.new_ts_data.emit([], time())
+        if self.instrument.spectrum_plot_enabled:
+            self.set_spectrum_plot_widget()
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
@@ -266,6 +374,12 @@ class MainWindow(QtGui.QMainWindow):
         self.label_packets_logged.setText(str(self.packets_logged))
         self.packets_corrupted = 0
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
+        if self.instrument.plugin_metadata_enabled:
+            self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
+            root = self.tree_widget_metadata.invisibleRootItem()
+            for parent_idx, counter in enumerate(self.instrument.plugin_metadata_frame_counters):
+                if root.child(parent_idx) is not None:
+                    root.child(parent_idx).setText(1, str(counter))
 
     @QtCore.pyqtSlot()
     def on_packet_received(self):
@@ -295,13 +409,17 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot(list, float)
     @QtCore.pyqtSlot(np.ndarray, float)
-    def on_new_data(self, data, timestamp):
+    def on_new_ts_data(self, data, timestamp):
         if len(self._buffer_data) != len(data):
             # Init buffers
             self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
             self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
-            # Init Plot (need to do so when number of curve changes)
-            self.init_timeseries_plot()
+            # Re-initialize Plot (need to do so when number of curve changes)
+            # TODO FIX HERE for multiple plots
+            self.timeseries_plot_widget.clear()
+            # new_plot_widget = self.create_timeseries_plot_widget()
+            # self.centralwidget.layout().replaceWidget(self.timeseries_plot_widget, new_plot_widget)
+            # self.timeseries_plot_widget = new_plot_widget
             # Init curves
             if hasattr(self.instrument, 'plugin_active_timeseries_variables_selected'):
                 legend = self.instrument.plugin_active_timeseries_variables_selected
@@ -309,7 +427,7 @@ class MainWindow(QtGui.QMainWindow):
                 legend = [f"{name} ({units})" for name, units in
                           zip(self.instrument.variable_names, self.instrument.variable_units)]
             for i in range(len(data)):
-                self.timeseries_widget.plotItem.addItem(
+                self.timeseries_plot_widget.plotItem.addItem(
                     pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
                                      name=legend[i])
                 )
@@ -317,9 +435,8 @@ class MainWindow(QtGui.QMainWindow):
         self._buffer_timestamp.extend(timestamp)
         for i in range(len(data)):
             self._buffer_data[i].extend(data[i])
-        # TODO Update real-time figure (depend on instrument type)
         # Update timeseries figure
-        if time() - self.last_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
+        if time() - self.last_timeseries_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
             return
         timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)  # Not used anymore
         for i in range(len(data)):
@@ -331,9 +448,25 @@ class MainWindow(QtGui.QMainWindow):
                 sel = np.logical_not(nsel)
                 y[nsel] = np.interp(x[nsel], x[sel], y[sel])
                 # self.timeseries_widget.plotItem.items[i].setData(y, connect="finite")
-                self.timeseries_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
-        self.timeseries_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
-        self.last_plot_refresh = time()
+                self.timeseries_plot_widget.plotItem.items[i].setData(timestamp[sel], y[sel], connect="finite")
+        self.timeseries_plot_widget.plotItem.enableAutoRange(x=True)  # Needed as somehow the user disable sometimes
+        self.last_timeseries_plot_refresh = time()
+
+    @QtCore.pyqtSlot(list)
+    def on_new_spectrum_data(self, data):
+        if time() - self.last_spectrum_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
+            return
+        for i, y in enumerate(data):
+            if y is None or i > len(self.instrument.spectrum_plot_x_values):
+                continue
+            x = self.instrument.spectrum_plot_x_values[i]
+            # Replace NaN and Inf by interpolated values
+            nsel = np.logical_or(np.isinf(y), np.isnan(y))
+            sel = np.logical_not(nsel)
+            y[nsel] = np.interp(x[nsel], x[sel], y[sel])
+            # TODO Check with real instrument if really need trick above
+            self.spectrum_plot_widget.plotItem.items[i].setData(x, y, connect="finite")
+        self.last_spectrum_plot_refresh = time()
 
     @QtCore.pyqtSlot(list)
     def on_new_aux_data(self, data):
@@ -341,10 +474,28 @@ class MainWindow(QtGui.QMainWindow):
             for i, v in enumerate(data):
                 self.plugin_aux_data_variable_values[i].setText(str(v))
 
-    @QtCore.pyqtSlot(int)
-    def on_active_timeseries_variables_update(self, state):
+    @QtCore.pyqtSlot(list)
+    def on_new_meta_data(self, data):
+        if not self.instrument.plugin_metadata_enabled:
+            return
+        root = self.tree_widget_metadata.invisibleRootItem()
+        for parent_idx, (parent_value, child_values) in enumerate(data):
+            if root.child(parent_idx) is None:
+                continue
+            if parent_value is not None:
+                root.child(parent_idx).setText(1, str(parent_value))
+            if child_values is not None:
+                for child_idx, child_value in enumerate(child_values):
+                    root.child(parent_idx).child(child_idx).setText(1, str(child_value))
+
+    @QtCore.pyqtSlot(QtCore.QModelIndex)
+    def on_active_timeseries_variables_update(self, proxy_index):
+        source_index = self.plugin_active_timeseries_variables_filter_proxy_model.mapToSource(proxy_index).row()
         if self.instrument.plugin_active_timeseries_variables:
-            self.instrument.udpate_active_timeseries_variables(self.sender().text(), state)
+            self.instrument.udpate_active_timeseries_variables(
+                self.plugin_active_timeseries_variables_model.item(source_index).text(),
+                bool(self.plugin_active_timeseries_variables_model.item(source_index).checkState())
+            )
 
     @QtCore.pyqtSlot(bool)
     def on_data_timeout(self, active):
@@ -437,6 +588,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.cfg_index = -1
             self.cfg = {'module': template}
             uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + template + '.ui'), self)
+            # Add specific fields
+            if hasattr(self, 'scroll_area_layout_immersed'):
+                self.tdf_files = []
         elif isinstance(template, int):
             # Load from preconfigured instrument
             self.create = False
@@ -472,6 +626,18 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         self.combobox_interface.setCurrentIndex(0)
                     elif self.cfg['interface'] == 'socket':
                         self.combobox_interface.setCurrentIndex(1)
+            if hasattr(self, 'scroll_area_layout_immersed'):
+                if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
+                    self.tdf_files = self.cfg['tdf_files']
+                    for f, i in zip(self.tdf_files, self.cfg['immersed']):
+                        widget = QtWidgets.QCheckBox(os.path.basename(f))
+                        if i:
+                            widget.setChecked(True)
+                        self.scroll_area_layout_immersed.addWidget(widget)
+                    self.scroll_area_layout_immersed.addItem(
+                        QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
+                else:
+                    self.tdf_files = []
         else:
             raise ValueError('Invalid instance type for template.')
         if 'button_browse_log_directory' in self.__dict__.keys():
@@ -480,6 +646,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_device_file.clicked.connect(self.act_browse_device_file)
         if 'button_browse_calibration_file' in self.__dict__.keys():
             self.button_browse_calibration_file.clicked.connect(self.act_browse_calibration_file)
+        if 'button_browse_tdf_files' in self.__dict__.keys():
+            self.button_browse_tdf_files.clicked.connect(self.act_browse_tdf_files)
         if 'button_browse_ini_file' in self.__dict__.keys():
             self.button_browse_ini_file.clicked.connect(self.act_browse_ini_file)
         if 'button_browse_dcal_file' in self.__dict__.keys():
@@ -506,10 +674,42 @@ class DialogInstrumentSetup(QtGui.QDialog):
             caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
 
-    def act_browse_calibration_file(self):
+    def act_browse_calibration_file(self):  # Specific to Suna
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')  # *.tdf *.TDF
+            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')
         self.le_calibration_file.setText(file_name)
+
+    def act_browse_tdf_files(self):  # sip, cal, or tdf
+        file_names, selected_filter = QtGui.QFileDialog.getOpenFileNames(
+            caption='Choose calibration file', filter='Calibration File (*.cal *.CAL *.tdf *.TDF *.sip)')
+        # Check if sip file
+        is_sip = False
+        for f in file_names:
+            if os.path.splitext(f)[1].lower() == '.sip':
+                is_sip = True
+                break
+        if len(file_names) > 1 and is_sip:
+            self.notification('Accept one .sip file OR multiple .cal and .tdf files.')
+            return
+        # Empty current files for immersed selection
+        for i in reversed(range(self.scroll_area_layout_immersed.count())):
+            item = self.scroll_area_layout_immersed.itemAt(i)
+            if type(item) == QtGui.QWidgetItem:
+                item.widget().setParent(None)
+            elif type(item) == QtGui.QLayoutItem:
+                item.layout().setParent(None)
+        # Update selection of immersed files
+        if is_sip:
+            self.tdf_files = file_names[0]
+            file_names = [f for f in zipfile.ZipFile(self.tdf_files, 'r').namelist()
+                          if os.path.splitext(f)[1].lower() in pySat.Parser.VALID_CAL_EXTENSIONS
+                          and os.path.basename(f)[0] != '.']
+        else:
+            self.tdf_files = file_names
+        for f in file_names:
+            self.scroll_area_layout_immersed.addWidget(QtWidgets.QCheckBox(os.path.basename(f)))
+        self.scroll_area_layout_immersed.addItem(
+            QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
 
     def act_browse_ini_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
@@ -589,6 +789,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
             f2rm = [f for f in empty_fields if f.startswith('Variable')]
             for f in f2rm:
                 del empty_fields[empty_fields.index(f)]
+        if hasattr(self, 'tdf_files'):
+            if len(self.tdf_files) == 0:
+                empty_fields.append('Calibration or Telemetry Definition File(s)')
+        if hasattr(self, 'scroll_area_layout_immersed'):
+            if self.scroll_area_layout_immersed.count() == 0:
+                empty_fields.append('Empty .sip file.')
         if empty_fields:
             self.notification('Fill required fields.', '\n'.join(empty_fields))
             return
@@ -644,6 +850,13 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = False
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'satlantic':
+            self.cfg['tdf_files'] = self.tdf_files
+            self.cfg['immersed'] = []
+            for i in range(self.scroll_area_layout_immersed.count()):
+                item = self.scroll_area_layout_immersed.itemAt(i)
+                if type(item) == QtGui.QWidgetItem:
+                    self.cfg['immersed'].append(bool(item.widget().checkState()))
         # Update global instrument cfg
         if self.create:
             CFG.instruments.append(self.cfg)
@@ -703,7 +916,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
-        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial'}))  # Debug macOS serial
+        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
             p_name = str(p.device)
@@ -854,6 +1067,7 @@ class App(QtGui.QApplication):
         QtGui.QApplication.__init__(self, *args)
         self.splash_screen = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
         self.splash_screen.show()
+        self.setWindowIcon(QtGui.QIcon(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
         self.main_window = MainWindow()
         self.startup_dialog = DialogStartUp()
         self.splash_screen.close()
@@ -898,10 +1112,12 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
                     self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
-                elif instrument_module_name == 'sunav2':
-                    self.main_window.init_instrument(SunaV2(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'satlantic':
+                    self.main_window.init_instrument(Satlantic(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'sunav1':
                     self.main_window.init_instrument(SunaV1(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'sunav2':
+                    self.main_window.init_instrument(SunaV2(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
                     self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
                 else:

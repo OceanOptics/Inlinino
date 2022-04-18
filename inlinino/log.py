@@ -14,6 +14,8 @@ class Log:
         # Load Config
         if 'filename_prefix' not in cfg.keys():
             cfg['filename_prefix'] = 'Inlinino'
+        if 'filename_suffix' not in cfg.keys():
+            cfg['filename_suffix'] = ''
         if 'path' not in cfg.keys():
             cfg['path'] = ''
         if 'length' not in cfg.keys():
@@ -30,6 +32,7 @@ class Log:
         # self.file_mode_binary = cfg['mode_binary']
         self.file_length = cfg['length'] * 60  # seconds
         self.filename_prefix = cfg['filename_prefix']
+        self.filename_suffix = cfg['filename_suffix']
         self.filename = None
         self.set_filename()
         self.path = cfg['path']
@@ -48,18 +51,19 @@ class Log:
         self.set_filename()
 
     def set_filename(self, timestamp=None):
+        suffix = '_' + self.filename_suffix if self.filename_suffix else ''
         if timestamp:
             if not os.path.exists(self.path):
                 os.makedirs(self.path)
             self.filename = self.filename_prefix + '_' + strftime('%Y%m%d_%H%M%S', gmtime(timestamp)) + \
-                            '.' + self.FILE_EXT
-            suffix = 0
+                            suffix + '.' + self.FILE_EXT
+            suffix_id = 0
             while os.path.exists(os.path.join(self.path, self.filename)):
                 self.filename = self.filename_prefix + '_' + strftime('%Y%m%d_%H%M%S', gmtime(timestamp)) + \
-                                '_' + str(suffix) + '.' + self.FILE_EXT
-                suffix += 1
+                                '_' + str(suffix_id) + suffix + '.' + self.FILE_EXT
+                suffix_id += 1
         else:
-            self.filename = self.filename_prefix + '_<date>_<time>' + '.' + self.FILE_EXT
+            self.filename = self.filename_prefix + '_<date>_<time>' + suffix + '.' + self.FILE_EXT
 
     def write_header(self):
         if self.variable_names:
@@ -126,16 +130,19 @@ class LogBinary(Log):
     def write_header(self):
         pass
 
+    @staticmethod
+    def format_timestamp(timestamp):
+        return pack('!d', timestamp)
+
     def write(self, data, timestamp=None):
         if timestamp:
             self._smart_open(timestamp)
-            self._file.write(data + pack('!d', timestamp))
+            self._file.write(data + self.format_timestamp(timestamp))
         else:
             # Open file only if doesn't exist (keep in same file as previous bytes logged)
             if self._file.closed:
                 self.open(time())
             self._file.write(data)
-        # TODO Test unpacking (especially for ACS and HyperSAS)
 
 
 class LogText(Log):

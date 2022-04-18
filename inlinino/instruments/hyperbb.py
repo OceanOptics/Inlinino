@@ -15,53 +15,30 @@ class HyperBB(Instrument):
                            'variable_names', 'variable_units', 'variable_precision']
 
     def __init__(self, cfg_id, signal, *args, **kwargs):
+        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+        # Instrument Specific Attributes
         self._parser = None
         self.signal_reconstructed = None
-
-        # Init Graphic for real time spectrum visualization
-        # TODO Refactor code and move it to GUI
-        # Set Color mode
-        pg.setConfigOption('background', '#F8F8F2')
-        pg.setConfigOption('foreground', '#26292C')
-        self._pw = pg.plot(enableMenu=False)
-        self._pw.setWindowTitle('HyperBB Spectrum')
-        self._plot = self._pw.plotItem
-        # Init Curve Items
-        self._plot_curve = pg.PlotCurveItem(pen=pg.mkPen(color='#7f7f7f', width=2))
-        # Add item to plot
-        self._plot.addItem(self._plot_curve)
-        # Decoration
-        self._plot.setLabel('bottom', 'Wavelength', units='nm')
-        self._plot.setLabel('left', 'bb', units='1/m')
-        self._plot.setMouseEnabled(x=False, y=True)
-        self._plot.showGrid(x=True, y=True)
-        self._plot.enableAutoRange(x=True, y=True)
-        self._plot.getAxis('left').enableAutoSIPrefix(False)
-        self._plot.getAxis('bottom').enableAutoSIPrefix(False)
-
-        super().__init__(cfg_id, signal, *args, **kwargs)
-
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 1
-
-        # Set wavelength range
-        self._plot.setXRange(np.min(self._parser.wavelength), np.max(self._parser.wavelength))
-        self._plot.setLimits(minXRange=np.min(self._parser.wavelength), maxXRange=np.max(self._parser.wavelength))
-
-        # Auxiliary Data Plugin
+        # Init Auxiliary Data Plugin
         self.plugin_aux_data = True
-        self.plugin_aux_data_variable_names = ['Scan WL. (nm)', 'Gain', 'LED Temp. (ºC)', 'Water Temp. (ºC)', 'Pressure (dBar)', 'Ref Zero Flag']
-
+        self.plugin_aux_data_variable_names = ['Scan WL. (nm)', 'Gain', 'LED Temp. (ºC)', 'Water Temp. (ºC)',
+                                               'Pressure (dBar)', 'Ref Zero Flag']
         # Select Channels to Plot Plugin
         self.plugin_active_timeseries_variables = True
-        self.plugin_active_timeseries_variables_names = ['beta(%d)' % x for x in self._parser.wavelength]
+        self.plugin_active_timeseries_variables_names = []
         self.plugin_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
-        self.active_timeseries_wavelength = np.zeros(len(self._parser.wavelength), dtype=bool)
-        for wl in np.arange(450,700,50):
-            channel_name = 'beta(%d)' % self._parser.wavelength[np.argmin(np.abs(self._parser.wavelength - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+        self.active_timeseries_wavelength = None
+        # Init Spectrum Plot Plugin
+        self.spectrum_plot_enabled = True
+        self.spectrum_plot_axis_labels = dict(y_label_name='bb', y_label_units='m<sup>-1</sup>')
+        self.spectrum_plot_trace_names = ['bb']
+        self.spectrum_plot_x_values = []
+        # Setup
+        self.init_setup()
 
     def setup(self, cfg):
         # Set HyperBB specific attributes
@@ -78,9 +55,14 @@ class HyperBB(Instrument):
         cfg['terminator'] = b'\n'
         # Set standard configuration and check cfg input
         super().setup(cfg)
-
-    # def open(self, port=None, baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=10):
-    #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
+        # Update wavelengths for Spectrum Plot
+        self.spectrum_plot_x_values = [self._parser.wavelength]
+        # Update Active Timeseries Variables
+        self.plugin_active_timeseries_variables_names = ['beta(%d)' % x for x in self._parser.wavelength]
+        self.active_timeseries_wavelength = np.zeros(len(self._parser.wavelength), dtype=bool)
+        for wl in np.arange(450, 700, 50):
+            channel_name = 'beta(%d)' % self._parser.wavelength[np.argmin(np.abs(self._parser.wavelength - wl))]
+            self.udpate_active_timeseries_variables(channel_name, True)
 
     def parse(self, packet):
         return self._parser.parse(packet)
@@ -95,11 +77,10 @@ class HyperBB(Instrument):
         except ValueError:
             # Unknown wavelength
             pass
-
         # Update plots
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                self.signal.new_data.emit(signal[self.active_timeseries_wavelength], timestamp)
+                self.signal.new_ts_data.emit(signal[self.active_timeseries_wavelength], timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -108,7 +89,7 @@ class HyperBB(Instrument):
         self.signal.new_aux_data.emit([int(wl), gain, raw[self._parser.idx_LedTemp],
                                        raw[self._parser.idx_WaterTemp], raw[self._parser.idx_Depth],
                                        net_ref_zero_flag])
-        self._plot_curve.setData(self._parser.wavelength, self.signal_reconstructed)
+        self.signal.new_spectrum_data.emit([self.signal_reconstructed])
         # Log data as received
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(raw, timestamp)
@@ -294,5 +275,3 @@ if __name__ == "__main__":
     t_cal = '/Users/nils/Documents/Lab/Inlinino/development_ressources/HBB_SN8005_ShipDisk-2/MatlabProcessingSoftware/HBB_Cal_Temp_20210315_205506.mat'
 
     hbb = HyperBBParser(p_cal, t_cal)
-
-

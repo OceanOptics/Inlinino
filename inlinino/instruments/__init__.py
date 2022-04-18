@@ -17,7 +17,7 @@ class Instrument:
                            'variable_columns', 'variable_types', 'variable_names', 'variable_units', 'variable_precision']
     DATA_TIMEOUT = 60  # seconds
 
-    def __init__(self, cfg_id, signal=None):
+    def __init__(self, cfg_id, signal=None, setup=True):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Communication Interface
@@ -49,11 +49,19 @@ class Instrument:
         self.variable_names = None
         self.variable_units = None
         self.variable_displayed = None
+        # Plugins
         self.plugin_aux_data = False
         self.plugin_active_timeseries_variables = False
+        self.spectrum_plot_enabled = False
+        self.secondary_dock_widget_enabled = False
+        self.plugin_metadata_enabled = False
 
         # Load cfg
         self.cfg_id = cfg_id
+        if setup:
+            self.init_setup()
+
+    def init_setup(self):
         self.setup(CFG.instruments[self.cfg_id].copy())
 
     @property
@@ -91,13 +99,7 @@ class Instrument:
                 if n != len(cfg[k]):
                     raise ValueError('%s invalid length' % k)
         # Communication Interface (for retro-compatibility: default interface is serial)
-        if 'interface' in cfg.keys():
-            if cfg['interface'] == 'serial':
-                self._interface = SerialInterface()
-            elif cfg['interface'] == 'socket':
-                self._interface = SocketInterface()
-            else:
-                raise ValueError(f'Invalid communication interface {cfg["interface"]}')
+        self.setup_interface(cfg)
         self._terminator = cfg['terminator']
         # Logger
         self.model = cfg['model']
@@ -112,7 +114,7 @@ class Instrument:
             self._log_prod = Log(log_cfg, self.signal.status_update)
         else:
             self.log_update_cfg(log_cfg)
-        self._log_active = False
+        self._log_active = False  # Needed in case thread doesn't join during self.close()
         self.log_raw_enabled = cfg['log_raw']
         self.log_prod_enabled = cfg['log_products']
         # Simple parser
@@ -126,7 +128,16 @@ class Instrument:
         # self.manufacturer = cfg['manufacturer']
         self.variable_names = cfg['variable_names']
         self.variable_units = cfg['variable_units']
-        self.signal.status_update.emit()
+        self.signal.status_update.emit()  # Doesn't run on initial setup because signals are not connected
+
+    def setup_interface(self, cfg):
+        if 'interface' in cfg.keys():
+            if cfg['interface'] == 'serial':
+                self._interface = SerialInterface()
+            elif cfg['interface'] == 'socket':
+                self._interface = SocketInterface()
+            else:
+                raise ValueError(f'Invalid communication interface {cfg["interface"]}')
 
     def open(self, **kwargs):
         if not self.alive:
@@ -227,7 +238,7 @@ class Instrument:
             self.handle_data(data, timestamp)
 
     def handle_data(self, data, timestamp):
-        self.signal.new_data.emit(data, timestamp)
+        self.signal.new_ts_data.emit(data, timestamp)
         if self.log_prod_enabled and self._log_active:
             self._log_prod.write(data, timestamp)
             if not self.log_raw_enabled:
