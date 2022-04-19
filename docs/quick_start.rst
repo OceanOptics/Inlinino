@@ -52,11 +52,18 @@ To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Wind
     ======================================  ============================
       Instrument type                         Instrument supported
     ======================================  ============================
-       :ref:`acs<qs-setup-acs>`              WET Labs AC-S or AC-9
-       :ref:`dataq<qs-setup-dataq>`          DATAQ DI-1100
-       :ref:`generic<qs-setup-generic>`      | Any sensor outputting simple ascii frame
-                                             | (e.g. :ref:`WET Labs ECO-Triplets<qs-figure-setup-generic-bb3>`, Satlantic PAR, SeaBird TSG)
+       :ref:`acs<qs-setup-acs>`              WET Labs AC-S
+       :ref:`dataq<qs-setup-dataq>`          | DATAQ DI-1100
+                                             | (Data Acquisition Interface for analog sensors)
+       hyperbb                               Sequoia HyperBB
        :ref:`lisst<qs-setup-lisst>`          Sequoia LISST
+       nmea                                  Read & Parse NMEA over Serial or UDP
+       ontrack                               | Ontrack Control Systems ADU100
+                                             | (supports Flow control, Flowmeter, & DAQ for Analog sensors)
+       satlantic                             Satlantic Instruments (requires Instrument's Telemetry Definition or Calibration Files)
+       suna                                  Satlantic Suna V1 and V2
+       :ref:`generic<qs-setup-generic>`      | Any sensor outputting simple ascii frame
+                                             | (e.g. :ref:`WET Labs ECO-Triplets<qs-figure-setup-generic-bb3>`, BioSpherical PAR, SeaBird TSG)
     ======================================  ============================
 
 .. _qs-figure-startup:
