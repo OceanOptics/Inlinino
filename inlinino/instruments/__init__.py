@@ -1,7 +1,12 @@
+import platform
 import socket
-import serial
 from threading import Thread
 from time import time
+
+import serial
+import usb.core
+import hid
+
 from inlinino.log import Log, LogText
 from inlinino import CFG
 import logging
@@ -14,7 +19,8 @@ class Instrument:
 
     REQUIRED_CFG_FIELDS = ['model', 'serial_number', 'module', 'separator', 'terminator',
                            'log_path', 'log_raw', 'log_products',
-                           'variable_columns', 'variable_types', 'variable_names', 'variable_units', 'variable_precision']
+                           'variable_columns', 'variable_types',
+                           'variable_names', 'variable_units', 'variable_precision']
     DATA_TIMEOUT = 60  # seconds
 
     def __init__(self, cfg_id, signal=None, setup=True):
@@ -136,6 +142,10 @@ class Instrument:
                 self._interface = SerialInterface()
             elif cfg['interface'] == 'socket':
                 self._interface = SocketInterface()
+            elif cfg['interface'] == 'usb-hid':
+                self._interface = USBHIDInterface()
+            elif cfg['interface'] == 'usb':
+                self._interface = USBInterface()
             else:
                 raise ValueError(f'Invalid communication interface {cfg["interface"]}')
 
@@ -310,17 +320,13 @@ class InterfaceException(Exception):
 
 
 class Interface:
-    def __init__(self):
-        self._is_open = False
-        self._timeout = 1
-
     @property
     def is_open(self) -> bool:
-        return self._is_open
+        raise NotImplementedError
 
     @property
     def timeout(self) -> int:
-        return self._timeout
+        raise NotImplementedError
 
     @property
     def name(self) -> str:
@@ -330,11 +336,11 @@ class Interface:
         pass
 
     def init(self):
-        # typically run once after connection is openned
+        # Typically, run once after connection is opened
         pass
 
     def stop(self):
-        # typically run once before closing connection
+        # Typically, run once before closing connection
         pass
 
     def close(self):
@@ -407,8 +413,12 @@ class SerialInterface(Interface):
 
 class SocketInterface(Interface):
     def __init__(self):
-        super().__init__()
         self._socket = None
+        self._is_open = False
+
+    @property
+    def is_open(self) -> bool:
+        return self._is_open
 
     @property
     def timeout(self) -> int:
@@ -440,3 +450,101 @@ class SocketInterface(Interface):
     def write(self, data):
         self._socket.send(data)
 
+
+class USBInterface(Interface):
+    def __init__(self):
+        self._device: usb.core.Device = None
+        self._timeout = 200  # ms
+        self._linux_kernel_drive_was_active = False
+        self.read_endpoint, self.read_size, self.write_endpoint = None, 1, None
+
+    @property
+    def is_open(self) -> bool:
+        if self._device is None:
+            return False
+        return True
+
+    @property
+    def timeout(self) -> int:
+        return self._timeout / 1000  # in seconds
+
+    @property
+    def name(self) -> str:
+        if self.is_open:
+            return f'usb:{self._device.serial_number}'
+        else:
+            return f'usb'
+
+    def open(self, vendor_id, product_id):
+        self._device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+        if self.is_open:
+            # Special case for linux
+            if platform.system() == 'Linux':
+                if self._device.is_kernel_driver_active(0) is True:
+                    # tell the kernel to detach
+                    self._device.detach_kernel_driver(0)
+                    self._linux_kernel_drive_was_active = True
+            self._device.reset()
+            # Set active configuration
+            self._device.set_configuration()
+            # Claim interface 0
+            usb.util.claim_interface(self._device, 0)
+        else:
+            raise InterfaceException('USB device not found. Please ensure it is connected.')
+
+    def close(self):
+        if self.is_open:
+            usb.util.release_interface(self._device, 0)
+            if self._linux_kernel_drive_was_active:
+                self._device.attach_kernel_driver(0)
+            self._device = None
+
+    def read(self):
+        return self._device.read(self.read_endpoint, self.read_size, timeout=self._timeout)
+
+    def write(self, data):
+        return self._device.write(self.write_endpoint, data, timeout=self._timeout)
+
+
+class USBHIDInterface(Interface):
+    def __init__(self):
+        self._device = hid.device()
+        self._is_open = False
+        self._timeout = 200  # ms
+
+    @property
+    def is_open(self) -> bool:
+        return self._is_open
+
+    @property
+    def timeout(self) -> int:
+        return self._timeout / 1000  # in seconds
+
+    @property
+    def name(self) -> str:
+        if self.is_open:
+            return f'usb-hid:{self._device.get_serial_number_string()}'
+        else:
+            return f'usb-hid'
+
+    def open(self, vendor_id, product_id):
+        try:
+            self._device = hid.device()
+            self._device.open(vendor_id, product_id)
+            self._is_open = True
+        except (IOError, RuntimeError, OSError) as e:
+            self._is_open = False
+            raise InterfaceException(e)
+
+    def close(self):
+        if self.is_open:
+            try:
+                self._device.close()
+            finally:
+                self._is_open = False
+
+    def read(self):
+        return self._device.read(self.read_size)
+
+    def write(self, data):
+        return self._device.write(data.encode(), timeout=self._timeout)

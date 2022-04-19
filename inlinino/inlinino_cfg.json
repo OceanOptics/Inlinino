@@ -655,6 +655,28 @@
         true,
         true
       ]
+    },
+    {
+      "module": "ontrack",
+      "manufacturer": "Ontrack",
+      "model": "ADU100",
+      "serial_number": "B02694",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data",
+      "relay_enabled": true,
+      "event_counter_channels_enabled": [
+        0
+      ],
+      "event_counter_k_factors": [
+        1381
+      ],
+      "analog_channels_enabled": [
+        2
+      ],
+      "analog_channels_gains": [
+        2
+      ]
     }
   ]
 }

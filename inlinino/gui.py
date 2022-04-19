@@ -16,12 +16,14 @@ from pyACS.acs import ACS as ACSParser
 import pySatlantic.instrument as pySat
 
 from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES, COLOR_SET
-from inlinino.instruments import Instrument, SerialInterface, SocketInterface, InterfaceException
+from inlinino.instruments import Instrument, SerialInterface, SocketInterface, USBInterface, USBHIDInterface, \
+    InterfaceException
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
+from inlinino.instruments.ontrack import Ontrack, SWITCH_FORCE_ON, SWITCH_FORCE_OFF, SWITCH_HOURLY, SWITCH_INTERVAL
 from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
@@ -127,6 +129,10 @@ class MainWindow(QtGui.QMainWindow):
     def init_instrument(self, instrument):
         self.instrument = instrument
         self.label_instrument_name.setText(self.instrument.short_name)
+        if self.instrument.interface_name.startswith('socket'):
+            self.label_open_port.setText('Socket')
+        elif self.instrument.interface_name.startswith('usb'):
+            self.label_open_port.setText('USB Port')
         self.instrument.signal.status_update.connect(self.on_status_update)
         self.instrument.signal.packet_received.connect(self.on_packet_received)
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
@@ -185,15 +191,16 @@ class MainWindow(QtGui.QMainWindow):
         if self.instrument.secondary_dock_widget_enabled:
             self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
             self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
-            # if not self.instrument.plugin_controls_enabled:
-                # self.group_box_instrument_controls.setParent(None)
-            if self.instrument.plugin_metadata_enabled:
+            if hasattr(self.instrument, 'plugin_metadata_enabled') and self.instrument.plugin_metadata_enabled:
                 self.instrument.signal.new_meta_data.connect(self.on_new_meta_data)
                 self.set_metadata_widget()
             else:
                 self.group_box_metadata.setParent(None)
-            # if not self.instrument.plugin_terminal_enabled:
-                # self.group_box_terminal.setParent(None)
+            if hasattr(self.instrument, 'plugin_instrument_control_enabled') and \
+                    self.instrument.plugin_instrument_control_enabled:
+                self.set_instrument_control_widget()
+            else:
+                self.group_box_instrument_control.setParent(None)
         else:
             self.dock_widget_secondary.setParent(None)
 
@@ -268,6 +275,39 @@ class MainWindow(QtGui.QMainWindow):
         self.tree_widget_metadata.expandAll()
         self.tree_widget_metadata.show()
 
+    def set_instrument_control_widget(self):
+        self.radio_instrument_control_filter.clicked.connect(self.set_flow_control_switch_mode)
+        self.radio_instrument_control_total.clicked.connect(self.set_flow_control_switch_mode)
+        self.radio_instrument_control_hourly.clicked.connect(self.set_flow_control_switch_mode)
+        self.radio_instrument_control_interval.clicked.connect(self.set_flow_control_switch_mode)
+        self.spinbox_instrument_control_filter_start_every.valueChanged.connect(self.set_flow_control_switch_timing)
+        self.spinbox_instrument_control_filter_duration.valueChanged.connect(self.set_flow_control_switch_timing)
+
+    def set_flow_control_switch_mode(self):
+        if self.radio_instrument_control_filter.isChecked():
+            self.instrument.relay_mode = SWITCH_FORCE_ON
+            self.group_box_instrument_control_filter_schedule.setEnabled(False)
+        elif self.radio_instrument_control_total.isChecked():
+            self.instrument.relay_mode = SWITCH_FORCE_OFF
+            self.group_box_instrument_control_filter_schedule.setEnabled(False)
+        elif self.radio_instrument_control_hourly.isChecked():
+            self.instrument.relay_mode = SWITCH_HOURLY
+            self.group_box_instrument_control_filter_schedule.setEnabled(True)
+            self.label_instrument_control_filter_start_every.setText('Start at minute')
+            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_hourly_start_at)
+        elif self.radio_instrument_control_interval.isChecked():
+            self.instrument.relay_mode = SWITCH_INTERVAL
+            self.group_box_instrument_control_filter_schedule.setEnabled(True)
+            self.label_instrument_control_filter_start_every.setText('Every (min)')
+            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_interval_every)
+
+    def set_flow_control_switch_timing(self):
+        if self.radio_instrument_control_hourly.isChecked():
+            self.instrument.relay_hourly_start_at = self.spinbox_instrument_control_filter_start_every.value()
+        elif self.radio_instrument_control_interval.isChecked():
+            self.instrument.relay_interval_every = self.spinbox_instrument_control_filter_start_every.value()
+        self.instrument.relay_on_duration = self.spinbox_instrument_control_filter_duration.value()
+
     def set_clock(self):
         zulu = gmtime(time())
         self.label_clock.setText(strftime('%H:%M:%S', zulu) + ' UTC')
@@ -288,27 +328,44 @@ class MainWindow(QtGui.QMainWindow):
                 self.set_metadata_widget()
 
     def act_instrument_interface(self):
+        def error_dialog():
+            logger.warning(e)
+            QtGui.QMessageBox.warning(self, "Inlinino: Connect " + self.instrument.name,
+                                      'ERROR: Failed connecting ' + self.instrument.name + '. ' +
+                                      str(e),
+                                      QtGui.QMessageBox.Ok)
         if self.instrument.alive:
             logger.debug('Disconnect instrument')
             self.instrument.close()
         else:
-            if type(self.instrument._interface) == SerialInterface:
+            if issubclass(type(self.instrument._interface), SerialInterface):
                 dialog = DialogSerialConnection(self)
-            elif type(self.instrument._interface) == SocketInterface:
-                dialog = DialogSocketConnection(self)
-            dialog.show()
-            if dialog.exec_():
-                try:
-                    if type(self.instrument._interface) == SerialInterface:
+                dialog.show()
+                if dialog.exec_():
+                    try:
                         self.instrument.open(port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
-                                             parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
-                    elif type(self.instrument._interface) == SocketInterface:
+                                                 parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
+                    except InterfaceException as e:
+                        error_dialog()
+            elif issubclass(type(self.instrument._interface), SocketInterface):
+                dialog = DialogSocketConnection(self)
+                dialog.show()
+                if dialog.exec_():
+                    try:
                         self.instrument.open(ip=dialog.ip, port=dialog.port)
+                    except InterfaceException as e:
+                        error_dialog()
+            elif issubclass(type(self.instrument._interface), USBInterface) or \
+                    issubclass(type(self.instrument._interface), USBHIDInterface):
+                # No need for dialog as automatic
+                try:
+                    self.instrument.open()
                 except InterfaceException as e:
-                    QtGui.QMessageBox.warning(self, "Inlinino: Connect " + self.instrument.name,
-                                              'ERROR: Failed connecting ' + self.instrument.name + '. ' +
-                                              str(e),
-                                              QtGui.QMessageBox.Ok)
+                    error_dialog()
+            else:
+                logger.error('Interface not supported by GUI.')
+                return
+
 
     def act_instrument_log(self):
         if self.instrument.log_active():
@@ -620,6 +677,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if self.cfg['module'] == 'dataq':
                 for c in self.cfg['channels_enabled']:
                     getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
+            if self.cfg['module'] == 'ontrack':
+                self.checkbox_relay_enabled.setChecked(self.cfg['relay_enabled'])
+                for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
+                    getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
+                    getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)
+                for c, g in zip(self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains']):
+                    getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).setChecked(True)
+                    getattr(self, 'spinbox_analog_channel%d_gain' % (c)).setValue(g)
             if hasattr(self, 'combobox_interface'):
                 if 'interface' in self.cfg.keys():
                     if self.cfg['interface'] == 'serial':
@@ -836,6 +901,26 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = True
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'ontrack':
+            self.cfg['relay_enabled'] = self.checkbox_relay_enabled.isChecked()
+            self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors'] = [], []
+            for c in range(4):
+                if getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).isChecked():
+                    self.cfg['event_counter_channels_enabled'].append(c)
+                    k = getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).value()
+                    self.cfg['event_counter_k_factors'].append(k)
+            self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains'] = [], []
+            for c in range(3):
+                if getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).isChecked():
+                    self.cfg['analog_channels_enabled'].append(c)
+                    g = getattr(self, 'spinbox_analog_channel%d_gain' % (c)).value()
+                    self.cfg['analog_channels_gains'].append(g)
+            if not (self.cfg['relay_enabled'] or
+                    self.cfg['event_counter_channels_enabled'] or self.cfg['analog_channels_enabled']):
+                self.notification('At least one switch, one flowmeter, or one analog channel must be selected.')
+                return
+            if not (self.cfg['log_raw'] or self.cfg['log_products']):
+                self.notification('Warning: no data will be logged.')
         elif self.cfg['module'] == 'dataq':
             self.cfg['channels_enabled'] = []
             for c in range(8):
@@ -1112,6 +1197,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
                     self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
+                elif instrument_module_name == 'ontrack':
+                    self.main_window.init_instrument(Ontrack(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'satlantic':
                     self.main_window.init_instrument(Satlantic(instrument_index, InstrumentSignals()))
                 elif instrument_module_name == 'sunav1':
