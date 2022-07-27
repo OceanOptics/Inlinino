@@ -764,10 +764,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if f == 'combobox_interface':
                 self.cfg[field_name] = self.combobox_interface.currentText()
             elif field_prefix == 'le':
-                value = getattr(self, f).text()
+                value = getattr(self, f).text().strip()
                 if not value:
                     empty_fields.append(field_pretty_name)
-                    # continue  Need to be removed for DataQ with optional products
+                    continue
                 # Apply special formatting to specific variables
                 try:
                     if 'variable_' in field_name:
@@ -785,7 +785,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     return
                 self.cfg[field_name] = value
             elif field_prefix == 'te':
-                value = getattr(self, f).toPlainText()
+                value = getattr(self, f).toPlainText().strip()
+                if not value:
+                    empty_fields.append(field_pretty_name)
+                    continue
                 try:
                     value = [v.strip() for v in value.split(',')]
                 except:
@@ -797,16 +800,16 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg[field_name] = True
                 else:
                     self.cfg[field_name] = False
+        if self.cfg['module'] == 'dataq':
+            # Remove optional fields specific to dataq
+            f2rm = [f for f in empty_fields if f.startswith('Variable')]
+            for f in f2rm:
+                del empty_fields[empty_fields.index(f)]
         for f in self.OPTIONAL_FIELDS:
             try:
                 empty_fields.pop(empty_fields.index(f))
             except ValueError:
                 pass
-        if self.cfg['module'] == 'dataq':
-            # Remove fields from products
-            f2rm = [f for f in empty_fields if f.startswith('Variable')]
-            for f in f2rm:
-                del empty_fields[empty_fields.index(f)]
         if hasattr(self, 'tdf_files'):
             if len(self.tdf_files) == 0:
                 empty_fields.append('Calibration or Telemetry Definition File(s)')
@@ -994,6 +997,10 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
         if self.cfg['module'] == 'dataq':
             for c in self.cfg['channels_enabled']:
                 getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
+            # Handle legacy configuration
+            for k in [k for k in self.cfg.keys() if k.startswith('variable_')]:
+                if len(self.cfg[k]) == 1 and self.cfg[k][0] == '':
+                    del self.cfg[k]
         if self.cfg['module'] == 'ontrack':
             self.checkbox_relay_enabled.setChecked(self.cfg['relay_enabled'])
             for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
@@ -1035,18 +1042,19 @@ class DialogSerialConnection(QtGui.QDialog):
         # Update ports list
         self.ports = list_serial_comports()
         # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
+        ports_device = []
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
             p_name = str(p.device)
             if p.description is not None and p.description != 'n/a':
                 p_name += ' - ' + str(p.description)
             self.cb_port.addItem(p_name)
+            ports_device.append(p.device)
         # Set default values based on instrument
         if instrument.uuid in CFG.interfaces.keys():
             port = CFG.interfaces[instrument.uuid]
-            if port in [p.device for p in self.ports]:
-                self.cb_port.setCurrentIndex([self.cb_port.itemText(i)
-                                              for i in range(self.cb_port.count())].index(port))
+            if port in ports_device:
+                self.cb_port.setCurrentIndex(ports_device.index(port))
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if hasattr(instrument, 'default_serial_baudrate'):
             baudrate = str(instrument.default_serial_baudrate)

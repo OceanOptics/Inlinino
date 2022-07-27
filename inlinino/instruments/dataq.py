@@ -33,6 +33,10 @@ class DATAQ(Instrument):
         if 'channels_enabled' not in cfg.keys():
             raise ValueError('Missing field channels enabled')
         self.channels_enabled = cfg['channels_enabled']
+        # Handle legacy configuration
+        for k in [k for k in cfg.keys() if k.startswith('variable_')]:
+            if len(cfg[k]) == 1 and cfg[k][0] == '':
+                del cfg[k]
         # Overload cfg with DATAQ specific parameters
         cfg['variable_names'] = ['C%d' % (c+1) for c in self.channels_enabled] + \
                                 (cfg['variable_names'] if 'variable_names' in cfg.keys() else [])
