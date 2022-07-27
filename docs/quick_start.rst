@@ -20,7 +20,7 @@ Quick Start
 
     -darwin.zip">macOS</a>
 
-Inlinino is available for Windows and macOS, the packaged executable can be downloaded with the links below. Windows users will have to unzip the archive.
+Inlinino is available for Windows and macOS, the packaged executable can be downloaded with the links below. Windows users will have to unzip the archive. On some web browsers the link below must be copied and paste into a new tab to download the files.
 
     + |link-to-ftp|\ |release|\ |end-link-win|
     + |link-to-ftp|\ |release|\ |end-link-win7|
