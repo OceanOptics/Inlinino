@@ -23,7 +23,7 @@ class Instrument:
                            'variable_names', 'variable_units', 'variable_precision']
     DATA_TIMEOUT = 60  # seconds
 
-    def __init__(self, cfg_id, signal=None, setup=True):
+    def __init__(self, uuid, signal=None, setup=True):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Communication Interface
@@ -63,12 +63,12 @@ class Instrument:
         self.plugin_metadata_enabled = False
 
         # Load cfg
-        self.cfg_id = cfg_id
+        self.uuid = uuid
         if setup:
             self.init_setup()
 
     def init_setup(self):
-        self.setup(CFG.instruments[self.cfg_id].copy())
+        self.setup(CFG.instruments[self.uuid].copy())
 
     @property
     def name(self) -> str:

@@ -17,12 +17,12 @@ class DATAQ(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
+    def __init__(self, uuid, signal, *args, **kwargs):
         # DATAQ Specific attributes
         self.channels_enabled = [0, 1, 2, 3, 4, 5, 6, 7]
         self.variable_equations = []
 
-        super().__init__(cfg_id, signal, *args, **kwargs)
+        super().__init__(uuid, signal, *args, **kwargs)
 
         # Default serial communication parameters
         self.default_serial_baudrate = 115200

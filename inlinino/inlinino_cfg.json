@@ -1,6 +1,6 @@
 {
-  "instruments": [
-    {
+  "instruments": {
+    "8e73f2d6-0de7-11ed-b02c-acde48001122": {
       "manufacturer": "WetLabs",
       "model": "BB3",
       "serial_number": "349",
@@ -47,7 +47,7 @@
         "beta660"
       ]
     },
-    {
+    "8e73f4ca-0de7-11ed-b02c-acde48001122": {
       "manufacturer": "SeaBird",
       "model": "TSG",
       "serial_number": "0XX",
@@ -86,7 +86,7 @@
       "log_products": true,
       "log_path": "data"
     },
-    {
+    "8e73f524-0de7-11ed-b02c-acde48001122": {
       "manufacturer": "WetLabs",
       "model": "ACS",
       "serial_number": "301",
@@ -96,7 +96,7 @@
       "log_products": true,
       "log_path": "data"
     },
-    {
+    "8e73f560-0de7-11ed-b02c-acde48001122": {
       "manufacturer": "Sequoia",
       "model": "LISST",
       "serial_number": "1183",
@@ -109,7 +109,7 @@
       "log_products": true,
       "log_path": "data"
     },
-    {
+    "8e73f59c-0de7-11ed-b02c-acde48001122": {
       "module": "dataq",
       "manufacturer": "WetLabs",
       "model": "WSCD",
@@ -121,7 +121,7 @@
         2
       ]
     },
-    {
+    "8e73f5ce-0de7-11ed-b02c-acde48001122": {
       "module": "acs",
       "device_file": "cfg/acs091_20200217.dev",
       "log_path": "data",
@@ -131,7 +131,7 @@
       "log_raw": true,
       "log_products": true
     },
-    {
+    "8e73f600-0de7-11ed-b02c-acde48001122": {
       "module": "acs",
       "device_file": "cfg/acs057_20200129.dev",
       "log_path": "data",
@@ -141,7 +141,7 @@
       "log_raw": true,
       "log_products": true
     },
-    {
+    "8e73f63c-0de7-11ed-b02c-acde48001122": {
       "module": "acs",
       "device_file": "cfg/acs279_20180524.dev",
       "log_path": "data",
@@ -151,7 +151,7 @@
       "log_raw": true,
       "log_products": true
     },
-    {
+    "8e73f66e-0de7-11ed-b02c-acde48001122": {
       "module": "acs",
       "device_file": "cfg/acs111_20200918.dev",
       "log_path": "data",
@@ -161,7 +161,7 @@
       "log_raw": true,
       "log_products": true
     },
-    {
+    "8e73f6a0-0de7-11ed-b02c-acde48001122": {
       "module": "generic",
       "variable_names": [
         "rtd",
@@ -218,7 +218,7 @@
       "model": "TSG",
       "serial_number": "001"
     },
-    {
+    "8e73f6d2-0de7-11ed-b02c-acde48001122": {
       "module": "taratsg",
       "log_path": "data",
       "log_products": true,
@@ -227,7 +227,7 @@
       "model": "SBE38+45",
       "serial_number": "Tara"
     },
-    {
+    "8e73f704-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "interface": "socket",
       "variable_names": [
@@ -273,7 +273,7 @@
         "%.1f"
       ]
     },
-    {
+    "8e73f736-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "variable_names": [
         "datetime",
@@ -310,7 +310,7 @@
         "%.1f"
       ]
     },
-    {
+    "8e73f768-0de7-11ed-b02c-acde48001122": {
       "module": "hyperbb",
       "log_products": true,
       "log_raw": true,
@@ -321,7 +321,7 @@
       "plaque_file": "cfg/HBB8005_CalPlaque_20210315.mat",
       "temperature_file": "cfg/HBB8005_CalTemp_20210315.mat"
     },
-    {
+    "8e73f7a4-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "variable_names": [
         "datetime",
@@ -383,7 +383,7 @@
       "interface": "serial",
       "serial_number": "Tara"
     },
-    {
+    "8e73f7d6-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "variable_names": [
         "datetime",
@@ -445,7 +445,7 @@
       "interface": "socket",
       "serial_number": "Tara"
     },
-    {
+    "8e73f7fe-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "variable_names": [
         "datetime",
@@ -503,7 +503,7 @@
       "interface": "socket",
       "serial_number": "Tara"
     },
-    {
+    "8e73f830-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "variable_names": [
         "datetime",
@@ -553,7 +553,7 @@
       "interface": "socket",
       "serial_number": "Tara"
     },
-    {
+    "8e73f862-0de7-11ed-b02c-acde48001122": {
       "module": "nmea",
       "variable_names": [
         "wind_angle",
@@ -579,7 +579,7 @@
       "interface": "socket",
       "serial_number": "Tara"
     },
-    {
+    "8e73f894-0de7-11ed-b02c-acde48001122": {
       "module": "hyperbb",
       "manufacturer": "Sequoia",
       "model": "HyperBB",
@@ -590,7 +590,7 @@
       "plaque_file": "cfg/HBB8002_CalPlaque_20210719.mat",
       "temperature_file": "cfg/HBB8002_CalTemp_20210106.mat"
     },
-    {
+    "8e73f8c6-0de7-11ed-b02c-acde48001122": {
       "module": "sunav2",
       "manufacturer": "Sea-Bird Scientific",
       "model": "Suna",
@@ -600,7 +600,7 @@
       "calibration_file": "cfg/SUNA_1504/ZCoefDat.cal",
       "serial_number": "1504"
     },
-    {
+    "8e73f8f8-0de7-11ed-b02c-acde48001122": {
       "module": "dataq",
       "manufacturer": "WetLabs",
       "model": "WS3S&CST",
@@ -633,7 +633,7 @@
         "-1/0.25 * np.log((c[2] - 0.058)/(4.665-0.058))"
       ]
     },
-    {
+    "8e73f934-0de7-11ed-b02c-acde48001122": {
       "module": "satlantic",
       "manufacturer": "Satlantic",
       "model": "HyperNAV",
@@ -656,7 +656,7 @@
         true
       ]
     },
-    {
+    "8e73f966-0de7-11ed-b02c-acde48001122": {
       "module": "ontrack",
       "manufacturer": "Ontrack",
       "model": "ADU100",
@@ -677,6 +677,53 @@
       "analog_channels_gains": [
         2
       ]
+    },
+    "8953510c-0de7-11ed-b02c-acde48001122": {
+      "manufacturer": "WetLabs",
+      "model": "BB3",
+      "serial_number": "349",
+      "module": "generic",
+      "terminator": {
+        "__bytes__": "ascii",
+        "content": "\r\n"
+      },
+      "separator": {
+        "__bytes__": "ascii",
+        "content": "\t"
+      },
+      "variable_names": [
+        "beta470",
+        "beta532",
+        "beta660"
+      ],
+      "variable_units": [
+        "counts",
+        "counts",
+        "counts"
+      ],
+      "variable_columns": [
+        3,
+        5,
+        7
+      ],
+      "variable_types": [
+        "int",
+        "int",
+        "int"
+      ],
+      "variable_precision": [
+        "%d",
+        "%d",
+        "%d"
+      ],
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "variable_displayed": [
+        "beta470",
+        "beta532",
+        "beta660"
+      ]
     }
-  ]
+  }
 }

@@ -25,8 +25,8 @@ class Satlantic(Instrument):
     KEYS_TO_IGNORE = ['CRLF_TERMINATOR', 'TERMINATOR']
     KEYS_TO_NOT_DISPLAY = KEYS_TO_IGNORE + ['DATEFIELD', 'TIMEFIELD', 'CHECK_SUM']
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
-        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, signal, *args, **kwargs):
+        super().__init__(uuid, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
         self.frame_headers_idx = []

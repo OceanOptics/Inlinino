@@ -70,8 +70,8 @@ class Ontrack(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
-        super().__init__(cfg_id, signal, *args, setup=False, **kwargs)
+    def __init__(self, uuid, signal, *args, **kwargs):
+        super().__init__(uuid, signal, *args, setup=False, **kwargs)
         # Instrument Specific attributes
         # Relay
         self.relay_enabled = True

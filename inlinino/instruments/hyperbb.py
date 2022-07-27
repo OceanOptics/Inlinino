@@ -14,8 +14,8 @@ class HyperBB(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
-        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, signal, *args, **kwargs):
+        super().__init__(uuid, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
         self.signal_reconstructed = None

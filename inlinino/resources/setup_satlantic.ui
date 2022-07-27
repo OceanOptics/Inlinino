@@ -286,6 +286,12 @@
   <tabstop>le_manufacturer</tabstop>
   <tabstop>le_model</tabstop>
   <tabstop>le_serial_number</tabstop>
+  <tabstop>combobox_log_raw</tabstop>
+  <tabstop>combobox_log_products</tabstop>
+  <tabstop>le_log_path</tabstop>
+  <tabstop>button_browse_log_directory</tabstop>
+  <tabstop>button_browse_tdf_files</tabstop>
+  <tabstop>scrollArea</tabstop>
  </tabstops>
  <resources/>
  <connections>

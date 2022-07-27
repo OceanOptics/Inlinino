@@ -7,8 +7,8 @@ class TaraTSG(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
-        super().__init__(cfg_id, signal, *args, **kwargs)
+    def __init__(self, uuid, signal, *args, **kwargs):
+        super().__init__(uuid, signal, *args, **kwargs)
 
         # Default serial communication parameters
         self.default_serial_baudrate = 9600

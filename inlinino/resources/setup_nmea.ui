@@ -311,6 +311,20 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>le_manufacturer</tabstop>
+  <tabstop>le_model</tabstop>
+  <tabstop>le_serial_number</tabstop>
+  <tabstop>combobox_log_raw</tabstop>
+  <tabstop>combobox_log_products</tabstop>
+  <tabstop>le_log_path</tabstop>
+  <tabstop>button_browse_log_directory</tabstop>
+  <tabstop>combobox_interface</tabstop>
+  <tabstop>le_variable_names</tabstop>
+  <tabstop>le_variable_units</tabstop>
+  <tabstop>le_variable_types</tabstop>
+  <tabstop>le_variable_precision</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

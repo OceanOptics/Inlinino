@@ -189,6 +189,18 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>le_device_file</tabstop>
+  <tabstop>button_browse_device_file</tabstop>
+  <tabstop>le_ini_file</tabstop>
+  <tabstop>button_browse_ini_file</tabstop>
+  <tabstop>le_dcal_file</tabstop>
+  <tabstop>button_browse_dcal_file</tabstop>
+  <tabstop>le_zsc_file</tabstop>
+  <tabstop>button_browse_zsc_file</tabstop>
+  <tabstop>le_log_path</tabstop>
+  <tabstop>button_browse_log_directory</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

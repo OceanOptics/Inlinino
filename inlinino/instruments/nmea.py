@@ -9,11 +9,11 @@ class NMEA(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_types', 'variable_precision']
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
+    def __init__(self, uuid, signal, *args, **kwargs):
         self.active_timeseries_variables = []
         self.plugin_active_timeseries_variables_selected = list()
         self._unknown_nmea_sentence = []
-        super().__init__(cfg_id, signal, *args, **kwargs)
+        super().__init__(uuid, signal, *args, **kwargs)
 
         # Default serial communication parameters
         self.default_serial_baudrate = 4800

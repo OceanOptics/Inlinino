@@ -44,8 +44,8 @@ class SunaV2(Instrument):
                       float, float, float, float, float,
                       float, float, float, float, int]
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
-        super().__init__(cfg_id, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, signal, *args, **kwargs):
+        super().__init__(uuid, signal, setup=False, *args, **kwargs)
         # Suna Specific Attributes
         self.df_maker = None
         self.wavelength = np.array([c for c in range(self.N_CHANNELS)])
@@ -186,8 +186,8 @@ class SunaV1(SunaV2):
                       *[int] * N_CHANNELS,
                       int]
 
-    def __init__(self, cfg_id, signal, *args, **kwargs):
-        super().__init__(cfg_id, signal, *args, **kwargs)
+    def __init__(self, uuid, signal, *args, **kwargs):
+        super().__init__(uuid, signal, *args, **kwargs)
         # Default serial communication parameters different from V2
         self.default_serial_baudrate = 38400
 

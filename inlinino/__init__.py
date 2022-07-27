@@ -1,11 +1,13 @@
-import numpy as np
 import logging
 from logging.handlers import RotatingFileHandler
 from time import strftime, gmtime
 import json
 import sys
 import os
+import uuid
 import traceback
+
+import numpy as np
 
 
 __version__ = '2.8.1'
@@ -67,13 +69,25 @@ def as_bytes(dct):
 class Cfg:
     def __init__(self):
         self.__logger = logging.getLogger('CFG')
+        self.instruments = []
+        self.read()
+
+    def read(self):
         with open(PATH_TO_CFG_FILE) as file:
             self.__logger.debug('Reading configuration.')
             cfg = json.load(file, object_hook=as_bytes)
         if 'instruments' not in cfg.keys():
             self.__logger.critical('Unable to load instruments from configuration file.')
             sys.exit(-1)
-        self.instruments = cfg['instruments']
+        if isinstance(cfg['instruments'], list):
+            # Append UUID to Legacy format
+            d = dict()
+            for i in cfg['instruments']:
+                d[str(uuid.uuid1())] = i
+            self.instruments = d
+        else:
+            self.instruments = cfg['instruments']
+
 
     def write(self):
         self.__logger.info('Writing configuration.')

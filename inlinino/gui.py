@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import logging
+import uuid
 import zipfile
 from math import floor
 from time import time, gmtime, strftime
@@ -315,7 +316,7 @@ class MainWindow(QtGui.QMainWindow):
 
     def act_instrument_setup(self):
         logger.debug('Setup instrument')
-        setup_dialog = DialogInstrumentSetup(self.instrument.cfg_id, self)
+        setup_dialog = DialogInstrumentUpdate(self.instrument.uuid, self)
         setup_dialog.show()
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
@@ -597,7 +598,9 @@ class DialogStartUp(QtGui.QDialog):
     def __init__(self):
         super(DialogStartUp, self).__init__()
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'startup.ui'), self)
-        instruments_configured = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"] for i in CFG.instruments]
+        instruments_configured = [i["manufacturer"] + ' ' + i["model"] + ' ' + i["serial_number"]
+                                  for i in CFG.instruments.values()]
+        self.instrument_uuids = [k for k in CFG.instruments.keys()]
         # self.instruments_to_setup = [i[6:-3] for i in sorted(os.listdir(PATH_TO_RESOURCES)) if i[-3:] == '.ui' and i[:6] == 'setup_']
         self.instruments_to_setup = [os.path.basename(i)[6:-3] for i in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'setup_*.ui')))]
         self.combo_box_instrument_to_load.addItems(instruments_configured)
@@ -606,18 +609,19 @@ class DialogStartUp(QtGui.QDialog):
         self.button_load.clicked.connect(self.act_load_instrument)
         self.button_setup.clicked.connect(self.act_setup_instrument)
         self.button_delete.clicked.connect(self.act_delete_instrument)
-        self.selection_index = None
+        self.selected_uuid, self.selected_template = None, None
 
     def act_load_instrument(self):
-        self.selection_index = self.combo_box_instrument_to_load.currentIndex()
+        self.selected_uuid = self.instrument_uuids[self.combo_box_instrument_to_load.currentIndex()]
         self.done(self.LOAD_INSTRUMENT)
 
     def act_setup_instrument(self):
-        self.selection_index = self.combo_box_instrument_to_setup.currentIndex()
+        self.selected_template = self.instruments_to_setup[self.combo_box_instrument_to_setup.currentIndex()]
         self.done(self.SETUP_INSTRUMENT)
 
     def act_delete_instrument(self):
         index = self.combo_box_instrument_to_delete.currentIndex()
+        uuid = self.instrument_uuids[index]
         instrument = self.combo_box_instrument_to_delete.currentText()
         msg = QtGui.QMessageBox(self)
         msg.setIcon(QtGui.QMessageBox.Warning)
@@ -626,85 +630,30 @@ class DialogStartUp(QtGui.QDialog):
         msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
         msg.setDefaultButton(QtGui.QMessageBox.No)
         if msg.exec_() == QtGui.QMessageBox.Yes:
-            del CFG.instruments[index]
+            CFG.read()
+            if uuid not in CFG.instruments.keys():
+                txt = f"Failed to delete instrument [{uuid}] {instrument}, " \
+                      f"configuration was updated by another instance of Inlinino."
+                logger.warning(txt)
+                QtGui.QMessageBox.warning(self, "Inlinino: Configuration Error", txt, QtGui.QMessageBox.Ok)
+                return
+            del CFG.instruments[uuid]
             CFG.write()
             self.combo_box_instrument_to_load.removeItem(index)
             self.combo_box_instrument_to_delete.removeItem(index)
-            logger.warning(f"Deleted instrument [{index}] {instrument}")
+            del self.instrument_uuids[index]
+            logger.warning(f"Deleted instrument [{uuid}] {instrument}")
 
 
 class DialogInstrumentSetup(QtGui.QDialog):
     ENCODING = 'ascii'
     OPTIONAL_FIELDS = ['Variable Precision', 'Prefix Custom']
 
-    def __init__(self, template, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        if isinstance(template, str):
-            # Load template from instrument type
-            self.create = True
-            self.cfg_index = -1
-            self.cfg = {'module': template}
-            uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + template + '.ui'), self)
-            # Add specific fields
-            if hasattr(self, 'scroll_area_layout_immersed'):
-                self.tdf_files = []
-        elif isinstance(template, int):
-            # Load from preconfigured instrument
-            self.create = False
-            self.cfg_index = template
-            self.cfg = CFG.instruments[template]
-            uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + self.cfg['module'] + '.ui'), self)
-            # Populate fields
-            for k, v in self.cfg.items():
-                if hasattr(self, 'le_' + k):
-                    if isinstance(v, bytes):
-                        getattr(self, 'le_' + k).setText(v.decode().encode('unicode_escape').decode())
-                    elif isinstance(v, list):
-                        getattr(self, 'le_' + k).setText(', '.join([str(vv) for vv in v]))
-                    else:
-                        getattr(self, 'le_' + k).setText(v)
-                elif hasattr(self, 'te_' + k):
-                    if isinstance(v, list):
-                        getattr(self, 'te_' + k).setPlainText(',\n'.join([str(vv) for vv in v]))
-                    else:
-                        getattr(self, 'te_' + k).setPlainText(v)
-                elif hasattr(self, 'combobox_' + k):
-                    if v:
-                        getattr(self, 'combobox_' + k).setCurrentIndex(0)
-                    else:
-                        getattr(self, 'combobox_' + k).setCurrentIndex(1)
-            # Populate special fields specific to each module
-            if self.cfg['module'] == 'dataq':
-                for c in self.cfg['channels_enabled']:
-                    getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
-            if self.cfg['module'] == 'ontrack':
-                self.checkbox_relay_enabled.setChecked(self.cfg['relay_enabled'])
-                for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
-                    getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
-                    getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)
-                for c, g in zip(self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains']):
-                    getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).setChecked(True)
-                    getattr(self, 'spinbox_analog_channel%d_gain' % (c)).setValue(g)
-            if hasattr(self, 'combobox_interface'):
-                if 'interface' in self.cfg.keys():
-                    if self.cfg['interface'] == 'serial':
-                        self.combobox_interface.setCurrentIndex(0)
-                    elif self.cfg['interface'] == 'socket':
-                        self.combobox_interface.setCurrentIndex(1)
-            if hasattr(self, 'scroll_area_layout_immersed'):
-                if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
-                    self.tdf_files = self.cfg['tdf_files']
-                    for f, i in zip(self.tdf_files, self.cfg['immersed']):
-                        widget = QtWidgets.QCheckBox(os.path.basename(f))
-                        if i:
-                            widget.setChecked(True)
-                        self.scroll_area_layout_immersed.addWidget(widget)
-                    self.scroll_area_layout_immersed.addItem(
-                        QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
-                else:
-                    self.tdf_files = []
-        else:
-            raise ValueError('Invalid instance type for template.')
+
+    def connect_backend(self):
+        # Connect buttons
         if 'button_browse_log_directory' in self.__dict__.keys():
             self.button_browse_log_directory.clicked.connect(self.act_browse_log_directory)
         if 'button_browse_device_file' in self.__dict__.keys():
@@ -943,11 +892,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 if type(item) == QtGui.QWidgetItem:
                     self.cfg['immersed'].append(bool(item.widget().checkState()))
         # Update global instrument cfg
-        if self.create:
-            CFG.instruments.append(self.cfg)
-            self.cfg_index = -1
-        else:
-            CFG.instruments[self.cfg_index] = self.cfg.copy()
+        CFG.read()  # Update local cfg if other instance updated cfg
+        CFG.instruments[self.cfg_uuid] = self.cfg.copy()
         CFG.write()
         self.accept()
 
@@ -989,6 +935,89 @@ class DialogInstrumentSetup(QtGui.QDialog):
         msg.setWindowTitle("Inlinino: Setup Instrument Warning")
         msg.setStandardButtons(QtGui.QMessageBox.Ok)
         msg.exec_()
+
+
+class DialogInstrumentCreate(DialogInstrumentSetup):
+    def __init__(self, template, parent=None):
+        # Init parent
+        super().__init__(parent)
+        # Load template from instrument type
+        self.cfg_uuid = str(uuid.uuid1())
+        self.cfg = {'module': template}
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + template + '.ui'), self)
+        # Add specific fields
+        if hasattr(self, 'scroll_area_layout_immersed'):
+            self.tdf_files = []
+        # Connect Buttons
+        self.connect_backend()
+
+
+class DialogInstrumentUpdate(DialogInstrumentSetup):
+    def __init__(self, uuid, parent=None):
+        # Init parent
+        super().__init__(parent)
+        # Check if instrument exists
+        if uuid not in CFG.instruments.keys():
+            logger.warning('Instrument was deleted.')
+            QtGui.QMessageBox.warning(self, "Inlinino: Configuration Error",
+                                      'ERROR: Instrument was deleted.',
+                                      QtGui.QMessageBox.Ok)
+            self.cancel()
+        # Load from preconfigured instrument
+        self.cfg_uuid = uuid
+        self.cfg = CFG.instruments[uuid]
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + self.cfg['module'] + '.ui'), self)
+        # Populate fields
+        for k, v in self.cfg.items():
+            if hasattr(self, 'le_' + k):
+                if isinstance(v, bytes):
+                    getattr(self, 'le_' + k).setText(v.decode().encode('unicode_escape').decode())
+                elif isinstance(v, list):
+                    getattr(self, 'le_' + k).setText(', '.join([str(vv) for vv in v]))
+                else:
+                    getattr(self, 'le_' + k).setText(v)
+            elif hasattr(self, 'te_' + k):
+                if isinstance(v, list):
+                    getattr(self, 'te_' + k).setPlainText(',\n'.join([str(vv) for vv in v]))
+                else:
+                    getattr(self, 'te_' + k).setPlainText(v)
+            elif hasattr(self, 'combobox_' + k):
+                if v:
+                    getattr(self, 'combobox_' + k).setCurrentIndex(0)
+                else:
+                    getattr(self, 'combobox_' + k).setCurrentIndex(1)
+        # Populate special fields specific to each module
+        if self.cfg['module'] == 'dataq':
+            for c in self.cfg['channels_enabled']:
+                getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
+        if self.cfg['module'] == 'ontrack':
+            self.checkbox_relay_enabled.setChecked(self.cfg['relay_enabled'])
+            for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
+                getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
+                getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)
+            for c, g in zip(self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains']):
+                getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).setChecked(True)
+                getattr(self, 'spinbox_analog_channel%d_gain' % (c)).setValue(g)
+        if hasattr(self, 'combobox_interface'):
+            if 'interface' in self.cfg.keys():
+                if self.cfg['interface'] == 'serial':
+                    self.combobox_interface.setCurrentIndex(0)
+                elif self.cfg['interface'] == 'socket':
+                    self.combobox_interface.setCurrentIndex(1)
+        if hasattr(self, 'scroll_area_layout_immersed'):
+            if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
+                self.tdf_files = self.cfg['tdf_files']
+                for f, i in zip(self.tdf_files, self.cfg['immersed']):
+                    widget = QtWidgets.QCheckBox(os.path.basename(f))
+                    if i:
+                        widget.setChecked(True)
+                    self.scroll_area_layout_immersed.addWidget(widget)
+                self.scroll_area_layout_immersed.addItem(
+                    QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
+            else:
+                self.tdf_files = []
+        # Connect Buttons
+        self.connect_backend()
 
 
 class DialogSerialConnection(QtGui.QDialog):
@@ -1158,18 +1187,22 @@ class App(QtGui.QApplication):
         self.splash_screen.close()
 
     def start(self, instrument_index=None):
-        if not isinstance(instrument_index, int) or instrument_index > len(CFG.instruments):
+        if isinstance(instrument_index, int) and instrument_index < len(CFG.instruments):
+            # Get instrument index
+            instrument_uuid = CFG.instruments.keys()[instrument_index]
+        elif isinstance(instrument_index, str) and instrument_index in CFG.instruments.keys():
+            instrument_uuid = instrument_index
+        else:
             logger.debug('Startup Dialog')
             self.startup_dialog.show()
             act = self.startup_dialog.exec_()
             if act == self.startup_dialog.LOAD_INSTRUMENT:
-                instrument_index = self.startup_dialog.selection_index
+                instrument_uuid = self.startup_dialog.selected_uuid
             elif act == self.startup_dialog.SETUP_INSTRUMENT:
-                setup_dialog = DialogInstrumentSetup(
-                    self.startup_dialog.instruments_to_setup[self.startup_dialog.selection_index])
+                setup_dialog = DialogInstrumentCreate(self.startup_dialog.selected_template)
                 setup_dialog.show()
                 if setup_dialog.exec_():
-                    instrument_index = setup_dialog.cfg_index
+                    instrument_uuid = setup_dialog.cfg_uuid
                 else:
                     logger.info('Setup closed')
                     self.start()  # Restart application to go back to startup screen
@@ -1178,35 +1211,35 @@ class App(QtGui.QApplication):
                 sys.exit()
 
         # Load instrument
-        instrument_name = CFG.instruments[instrument_index]['model'] + ' ' \
-                          + CFG.instruments[instrument_index]['serial_number']
-        instrument_module_name = CFG.instruments[instrument_index]['module']
-        logger.debug('Loading instrument [' + str(instrument_index) + '] ' + instrument_name)
+        instrument_name = CFG.instruments[instrument_uuid]['model'] + ' ' \
+                          + CFG.instruments[instrument_uuid]['serial_number']
+        instrument_module_name = CFG.instruments[instrument_uuid]['module']
+        logger.debug('Loading instrument [' + str(instrument_uuid) + '] ' + instrument_name)
         instrument_loaded = False
         while not instrument_loaded:
             try:
                 if instrument_module_name == 'generic':
-                    self.main_window.init_instrument(Instrument(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(Instrument(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'acs':
-                    self.main_window.init_instrument(ACS(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(ACS(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'dataq':
-                    self.main_window.init_instrument(DATAQ(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(DATAQ(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'hyperbb':
-                    self.main_window.init_instrument(HyperBB(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(HyperBB(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'lisst':
-                    self.main_window.init_instrument(LISST(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(LISST(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
-                    self.main_window.init_instrument(NMEA(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(NMEA(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'ontrack':
-                    self.main_window.init_instrument(Ontrack(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(Ontrack(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'satlantic':
-                    self.main_window.init_instrument(Satlantic(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(Satlantic(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'sunav1':
-                    self.main_window.init_instrument(SunaV1(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(SunaV1(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'sunav2':
-                    self.main_window.init_instrument(SunaV2(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(SunaV2(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'taratsg':
-                    self.main_window.init_instrument(TaraTSG(instrument_index, InstrumentSignals()))
+                    self.main_window.init_instrument(TaraTSG(instrument_uuid, InstrumentSignals()))
                 else:
                     logger.critical('Instrument module not supported')
                     sys.exit(-1)
@@ -1217,7 +1250,7 @@ class App(QtGui.QApplication):
                 logger.warning(e)
                 self.closeAllWindows()  # ACS, HyperBB, LISST, and Suna are opening pyqtgraph windows
                 # Dialog Box
-                setup_dialog = DialogInstrumentSetup(instrument_index)
+                setup_dialog = DialogInstrumentUpdate(instrument_uuid)
                 setup_dialog.show()
                 setup_dialog.notification('Unable to load instrument. Please check configuration.', e)
                 if setup_dialog.exec_():
