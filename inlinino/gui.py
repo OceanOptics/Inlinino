@@ -345,7 +345,11 @@ class MainWindow(QtGui.QMainWindow):
                 if dialog.exec_():
                     try:
                         self.instrument.open(port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
-                                                 parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
+                                             parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
+                        # Save COM port used for next time
+                        CFG.read()
+                        CFG.interfaces[self.instrument.uuid] = dialog.port
+                        CFG.write()
                     except InterfaceException as e:
                         error_dialog()
             elif issubclass(type(self.instrument._interface), SocketInterface):
@@ -1038,6 +1042,11 @@ class DialogSerialConnection(QtGui.QDialog):
                 p_name += ' - ' + str(p.description)
             self.cb_port.addItem(p_name)
         # Set default values based on instrument
+        if instrument.uuid in CFG.interfaces.keys():
+            port = CFG.interfaces[instrument.uuid]
+            if port in [p.device for p in self.ports]:
+                self.cb_port.setCurrentIndex([self.cb_port.itemText(i)
+                                              for i in range(self.cb_port.count())].index(port))
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if hasattr(instrument, 'default_serial_baudrate'):
             baudrate = str(instrument.default_serial_baudrate)

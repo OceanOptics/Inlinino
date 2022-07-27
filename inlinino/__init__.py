@@ -69,7 +69,7 @@ def as_bytes(dct):
 class Cfg:
     def __init__(self):
         self.__logger = logging.getLogger('CFG')
-        self.instruments = []
+        self.instruments, self.interfaces = dict(), dict()
         self.read()
 
     def read(self):
@@ -87,11 +87,12 @@ class Cfg:
             self.instruments = d
         else:
             self.instruments = cfg['instruments']
-
+        if 'interfaces' in cfg.keys():
+            self.interfaces = cfg['interfaces']
 
     def write(self):
         self.__logger.info('Writing configuration.')
-        cfg = {'instruments': self.instruments}
+        cfg = {'instruments': self.instruments, 'interfaces': self.interfaces}
         with open(PATH_TO_CFG_FILE, 'w') as file:
             json.dump(cfg, file, cls=BytesEncoder)
 
