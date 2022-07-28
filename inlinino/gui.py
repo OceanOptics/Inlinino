@@ -925,8 +925,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if 'variable_precision' in self.cfg:
                 if not (len(self.cfg['variable_precision']) == 1 and self.cfg['variable_precision'][0] == ''):
                     for v in self.cfg['variable_precision']:
-                        if v[0] != '%' and v[-1] not in ['d', 'f']:
-                            self.notification('Invalid variable precision. '
+                        try:
+                            ', '.join(p % d for p, d in zip(self.cfg['variable_precision'],
+                                                            range(len(self.cfg['variable_precision']))))
+                        except ValueError:
+                            self.notification('Invalid variable precision format. '
                                               'Expect type specific formatting (e.g. %d or %.3f) separated by commas.')
                             return False
         return True
