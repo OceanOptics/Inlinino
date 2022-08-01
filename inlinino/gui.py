@@ -346,9 +346,12 @@ class MainWindow(QtGui.QMainWindow):
                     try:
                         self.instrument.open(port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
                                              parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
-                        # Save COM port used for next time
+                        # Save connection parameters for next time
                         CFG.read()
-                        CFG.interfaces[self.instrument.uuid] = dialog.port
+                        CFG.interfaces[self.instrument.uuid] = dict(
+                            port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
+                            parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout
+                        )
                         CFG.write()
                     except InterfaceException as e:
                         error_dialog()
@@ -1054,15 +1057,33 @@ class DialogSerialConnection(QtGui.QDialog):
             self.cb_port.addItem(p_name)
             ports_device.append(p.device)
         # Set default values based on instrument
-        if instrument.uuid in CFG.interfaces.keys():
-            port = CFG.interfaces[instrument.uuid]
-            if port in ports_device:
-                self.cb_port.setCurrentIndex(ports_device.index(port))
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if hasattr(instrument, 'default_serial_baudrate'):
             baudrate = str(instrument.default_serial_baudrate)
         if hasattr(instrument, 'default_serial_timeout'):
             timeout = instrument.default_serial_timeout
+        if instrument.uuid in CFG.interfaces.keys():
+            if isinstance(CFG.interfaces[instrument.uuid], str):  # Support legacy format
+                CFG.interfaces[instrument.uuid]['port'] = CFG.interfaces[instrument.uuid]
+            if 'port' in CFG.interfaces[instrument.uuid].keys():
+                port = CFG.interfaces[instrument.uuid]['port']
+                if port in ports_device:
+                    self.cb_port.setCurrentIndex(ports_device.index(port))
+            if 'baudrate' in CFG.interfaces[instrument.uuid].keys():
+                baudrate = str(CFG.interfaces[instrument.uuid]['baudrate'])
+            if 'bytesize' in CFG.interfaces[instrument.uuid].keys():
+                bytesize = f"{CFG.interfaces[instrument.uuid]['bytesize']} bits"
+            if 'parity' in CFG.interfaces[instrument.uuid].keys():
+                try:
+                    parity = {serial.PARITY_EVEN: 'even', serial.PARITY_ODD: 'odd',
+                              serial.PARITY_MARK: 'mark', serial.PARITY_SPACE: 'space',
+                              serial.PARITY_NONE: 'none'}[CFG.interfaces[instrument.uuid]['parity']]
+                except KeyError:
+                    logger.warning('cfg parity invalid.')
+            if 'stopbits' in CFG.interfaces[instrument.uuid].keys():
+                stopbits = str(CFG.interfaces[instrument.uuid]['stopbits'])
+            if 'timeout' in CFG.interfaces[instrument.uuid].keys():
+                timeout = CFG.interfaces[instrument.uuid]['timeout']
         self.cb_baudrate.setCurrentIndex([self.cb_baudrate.itemText(i) for i in range(self.cb_baudrate.count())].index(baudrate))
         self.cb_bytesize.setCurrentIndex([self.cb_bytesize.itemText(i) for i in range(self.cb_bytesize.count())].index(bytesize))
         self.cb_parity.setCurrentIndex([self.cb_parity.itemText(i) for i in range(self.cb_parity.count())].index(parity))
@@ -1096,7 +1117,7 @@ class DialogSerialConnection(QtGui.QDialog):
         elif self.cb_parity.currentText() == 'even':
             return serial.PARITY_EVEN
         elif self.cb_parity.currentText() == 'odd':
-            return serial.PARITY_EVEN
+            return serial.PARITY_ODD
         elif self.cb_parity.currentText() == 'mark':
             return serial.PARITY_MARK
         elif self.cb_parity.currentText() == 'space':
@@ -1104,7 +1125,7 @@ class DialogSerialConnection(QtGui.QDialog):
         raise ValueError('serial parity not defined')
 
     @property
-    def stopbits(self) -> int:
+    def stopbits(self) -> (int, float):
         if self.cb_stopbits.currentText() == '1':
             return serial.STOPBITS_ONE
         elif self.cb_stopbits.currentText() == '1.5':
