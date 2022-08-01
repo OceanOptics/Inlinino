@@ -6,7 +6,7 @@ Quick Start
 
 .. |link-to-ftp| raw:: html
 
-    <a href="http://misclab.umeoce.maine.edu/software/Inlinino/Inlinino-v
+    <a href="https://misclab.umeoce.maine.edu/software/Inlinino/Inlinino-v
 
 .. |end-link-win| raw:: html
 
