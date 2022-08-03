@@ -312,7 +312,7 @@ class ProdLogger:
         data = []
         for k, c in zip(self._frame_keys[packet.frame_header], self._frame_core_var[packet.frame_header]):
             if c:
-                data.append(np.array2string(packet.frame[k], separator=', ', threshold=np.inf, max_line_width=np.inf)[1:-1])
+                data.append(np.array2string(packet.frame[k], separator=',', threshold=np.inf, max_line_width=np.inf)[1:-1])
             else:
                 data.append(packet.frame[k])
         # values = packet.frame.values()  # Assume dictionary keep order which isn't the case with older python version

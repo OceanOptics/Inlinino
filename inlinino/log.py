@@ -67,8 +67,8 @@ class Log:
 
     def write_header(self):
         if self.variable_names:
-            self._file.write('time, ' + ', '.join(x for x in self.variable_names) + '\n')
-            self._file.write('yyyy/mm/dd HH:MM:SS.fff, ' + ', '.join(x for x in self.variable_units) + '\n')
+            self._file.write('time,' + ','.join(x for x in self.variable_names) + '\n')
+            self._file.write('yyyy/mm/dd HH:MM:SS.fff,' + ','.join(x for x in self.variable_units) + '\n')
 
     def open(self, timestamp):
         self.set_filename(timestamp)
@@ -105,10 +105,10 @@ class Log:
         self._smart_open(timestamp)
         if self.variable_precision:
             self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-                             ', ' + ', '.join(p % d for p, d in zip(self.variable_precision, data)) + '\n')
+                             ',' + ','.join(p % d for p, d in zip(self.variable_precision, data)) + '\n')
         else:
             self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-                             ', ' + ', '.join(str(d) for d in data) + '\n')
+                             ',' + ','.join(str(d) for d in data) + '\n')
 
     def close(self):
         if not self._file.closed:
@@ -155,8 +155,8 @@ class LogText(Log):
         self.registration = ''
 
     def write_header(self):
-        self._file.write('time, packet' + '\n')
-        self._file.write('yyyy/mm/dd HH:MM:SS.fff, ' + self.ENCODING + '\n')
+        self._file.write('time,packet' + '\n')
+        self._file.write('yyyy/mm/dd HH:MM:SS.fff,' + self.ENCODING + '\n')
 
     def write(self, data, timestamp):
         """
@@ -167,4 +167,4 @@ class LogText(Log):
         """
         self._smart_open(timestamp)
         self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
-                         ', ' + self.registration + data.decode(self.ENCODING, self.UNICODE_HANDLING) + '\n')
+                         ',' + self.registration + data.decode(self.ENCODING, self.UNICODE_HANDLING) + '\n')
