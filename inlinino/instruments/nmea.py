@@ -37,18 +37,14 @@ class NMEA(Instrument):
     #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
-        msg = pynmea2.parse(packet.decode())
-        # except ValueError:
-        #     msg = packet.decode()
-        #     if msg[0] == '$':
-        #         header = msg.split(',', 1)[0]
-        #         if header not in self._unknown_nmea_sentence:
-        #             self._unknown_nmea_sentence.append(header)
-        #             self.signal.packet_corrupted.emit()
-        #             self.logger.warning(f'Unknown NMEA sentence: {header}')
+        data = [None] * len(self.variable_names)
+        try:  # Remove try statement to raise error
+            msg = pynmea2.parse(packet.decode())
+        except ValueError:  # Skip error for corrupted frames (probability to fill log is too high)
+            return data
+        # Commented line for dev purpose only
         # print(packet)
         # print(msg.fields)
-        data = [None] * len(self.variable_names)
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):
             try:
                 if t == 'int':
