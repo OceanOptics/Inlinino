@@ -348,10 +348,9 @@ class MainWindow(QtGui.QMainWindow):
                                              parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
                         # Save connection parameters for next time
                         CFG.read()
-                        CFG.interfaces[self.instrument.uuid] = dict(
-                            port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
-                            parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout
-                        )
+                        CFG.interfaces.setdefault(self.instrument.uuid, {})
+                        for k in ('port', 'baudrate', 'bytesize', 'parity', 'stopbits', 'timeout'):
+                            CFG.interfaces[self.instrument.uuid][k] = getattr(dialog, k)
                         CFG.write()
                     except InterfaceException as e:
                         error_dialog()
@@ -361,6 +360,12 @@ class MainWindow(QtGui.QMainWindow):
                 if dialog.exec_():
                     try:
                         self.instrument.open(ip=dialog.ip, port=dialog.port)
+                        # Save connection parameters for next time
+                        CFG.read()
+                        CFG.interfaces.setdefault(self.instrument.uuid, {})
+                        for k in ('ip', 'port'):
+                            CFG.interfaces[self.instrument.uuid]['socket_' + k] = getattr(dialog, k)
+                        CFG.write()
                     except InterfaceException as e:
                         error_dialog()
             elif issubclass(type(self.instrument._interface), USBInterface) or \
@@ -1142,7 +1147,18 @@ class DialogSerialConnection(QtGui.QDialog):
 class DialogSocketConnection(QtGui.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        instrument = parent.instrument
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'socket_connection.ui'), self)
+        # Set defaults
+        if instrument.uuid in CFG.interfaces.keys():
+            if isinstance(CFG.interfaces[instrument.uuid], str):  # Support legacy format
+                CFG.interfaces[instrument.uuid]['port'] = CFG.interfaces[instrument.uuid]
+            if 'socket_ip' in CFG.interfaces[instrument.uuid].keys():
+                ip = str(CFG.interfaces[instrument.uuid]['socket_ip'])
+                self.le_ip.setText(ip)
+            if 'socket_port' in CFG.interfaces[instrument.uuid].keys():
+                port = CFG.interfaces[instrument.uuid]['socket_port']
+                self.sb_port.setValue(port)
         # Connect buttons
         self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)

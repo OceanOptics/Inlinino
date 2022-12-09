@@ -167,7 +167,8 @@ class Instrument:
             self.signal.status_update.emit()
             self._interface.stop()
             if wait_thread_join:
-                self._thread.join(self._interface.timeout)
+                timeout = self._interface.timeout if self._interface.timeout is not None else 1
+                self._thread.join(timeout)
                 if self._thread.is_alive():
                     self.logger.warning('Thread did not join.')
             self.log_stop()
