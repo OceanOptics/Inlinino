@@ -55,7 +55,7 @@ class SunaV2(Instrument):
         self.default_serial_timeout = 5
         #   frame_format: FULL_ASCII (others mode: NONE, FULL_BINARY, REDUCED_BINARY, CONCENTRATION_ASCII)
         # Auxiliary Data Plugin
-        self.plugin_aux_data = True
+        self.plugin_aux_data_enabled = True
         self.plugin_aux_data_variable_names = self.get_aux_names()
         # Display only selected variables
         self.plugin_active_timeseries_variables_selected = self.get_ts_names()

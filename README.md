@@ -25,6 +25,15 @@ To install Inlinino (tested with python 3.8 only, should work with newer python 
 
     pip install -r requirements.txt
 
+To use Ontrak ADU on Windows additional dll and python modules are needed. Note that in ontrack
+    
+    wget https://www.ontrak.net/images/adu_python_dll.zip
+    unzip adu_python_dll.zip
+    cp adu_python_dll/ontrak inlinino/ressources
+    wget https://www.ontrak.net/images/adu_python_libusb.zip
+    unzip adu_python_libusb.zip
+    cp adu_python_libusb/libusb/* inlinino/ressources/libusb
+
 Inlinino can then be started from the folder containing inlinino's source code with.
 
     python -m inlinino

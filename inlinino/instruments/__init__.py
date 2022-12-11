@@ -1,3 +1,4 @@
+import os
 import platform
 import socket
 from threading import Thread
@@ -5,10 +6,11 @@ from time import time
 
 import serial
 import usb.core
+import usb.backend.libusb1
 import hid
 
 from inlinino.log import Log, LogText
-from inlinino import CFG
+from inlinino import CFG, PATH_TO_RESOURCES
 import logging
 
 
@@ -56,11 +58,12 @@ class Instrument:
         self.variable_units = None
         self.variable_displayed = None
         # Plugins
-        self.plugin_aux_data = False
+        self.plugin_aux_data_enabled = False
         self.plugin_active_timeseries_variables = False
         self.spectrum_plot_enabled = False
-        self.secondary_dock_widget_enabled = False
         self.plugin_metadata_enabled = False
+        self.plugin_instrument_control_enabled = False
+        self.plugin_pump_control_enabled = False
 
         # Load cfg
         self.uuid = uuid
@@ -86,6 +89,12 @@ class Instrument:
     @property
     def bare_log_prefix(self) -> str:
         return self.model + self.serial_number
+
+    @property
+    def secondary_dock_widget_enabled(self) -> bool:
+        return self.plugin_metadata_enabled or \
+            self.plugin_instrument_control_enabled or \
+            self.plugin_pump_control_enabled
 
     def setup(self, cfg, raw_logger=LogText):
         self.logger.debug('Setup')
@@ -316,7 +325,7 @@ class Instrument:
             return self.name + '[off]'
 
 
-class InterfaceException(Exception):
+class InterfaceException(IOError):
     pass
 
 
@@ -402,9 +411,9 @@ class SerialInterface(Interface):
     def close(self):
         self._serial.close()
 
-    def read(self):
+    def read(self, size=None):
         try:
-            return self._serial.read(self._serial.in_waiting or 1)
+            return self._serial.read(self._serial.in_waiting or 1 if size is None else size)
         except serial.SerialException as e:
             raise InterfaceException(e)
 
@@ -444,8 +453,8 @@ class SocketInterface(Interface):
         if self._socket is not None:
             self._socket.close()
 
-    def read(self):
-        return self._socket.recv(65536)
+    def read(self, size=65536):
+        return self._socket.recv(size)
         # return self._socket.recvfrom(socket.CMSG_SPACE(200))[0]  # socket.CMSG_SPACE is not supported by Windows
 
     def write(self, data):
@@ -453,17 +462,20 @@ class SocketInterface(Interface):
 
 
 class USBInterface(Interface):
+    """
+    Based on libusb interfaced through pyusb compatible with Linux, Darwin, and Windows
+    Requirements: pyusb=1.0.2
+    Warning: dll for windows might only be compatible with ontrak ADU devices
+    """
     def __init__(self):
         self._device: usb.core.Device = None
         self._timeout = 200  # ms
         self._linux_kernel_drive_was_active = False
-        self.read_endpoint, self.read_size, self.write_endpoint = None, 1, None
+        self.read_endpoint, self.write_endpoint = 0x81, 0x01
 
     @property
     def is_open(self) -> bool:
-        if self._device is None:
-            return False
-        return True
+        return self._device is not None
 
     @property
     def timeout(self) -> int:
@@ -477,20 +489,35 @@ class USBInterface(Interface):
             return f'usb'
 
     def open(self, vendor_id, product_id):
-        self._device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
-        if self.is_open:
+        try:
+            # Load backend (Windows dll)
+            backend = None
+            if platform.system() == 'Windows':
+                arch = platform.architecture()[0]
+                mapa = {'32bit': 'x86', '64bit': 'x64'}
+                if arch not in mapa.keys():
+                    raise ValueError(f'Architecture {arch} not supported.')
+                backend = usb.backend.libusb1.get_backend(
+                    find_library=lambda x: os.path.join(PATH_TO_RESOURCES, 'libusb', mapa[arch], 'crap.dll'))
+                print(backend)
+                print(os.path.join(PATH_TO_RESOURCES, 'libusb', mapa[arch], 'libusb-1.0.dll'))
+            # Find device
+            self._device = usb.core.find(backend=backend, idVendor=vendor_id, idProduct=product_id)
             # Special case for linux
-            if platform.system() == 'Linux':
+            if platform.system() in 'Linux':
                 if self._device.is_kernel_driver_active(0) is True:
                     # tell the kernel to detach
                     self._device.detach_kernel_driver(0)
                     self._linux_kernel_drive_was_active = True
-            self._device.reset()
-            # Set active configuration
-            self._device.set_configuration()
-            # Claim interface 0
-            usb.util.claim_interface(self._device, 0)
-        else:
+            if self.is_open:
+                self._device.reset()
+                # Set active configuration
+                self._device.set_configuration()
+                # Claim interface 0
+                usb.util.claim_interface(self._device, 0)
+        except (IOError, ValueError) as e:
+            raise InterfaceException(f'Try with another USB interface.\n{repr(e)}')
+        if not self.is_open:
             raise InterfaceException('USB device not found. Please ensure it is connected.')
 
     def close(self):
@@ -500,14 +527,20 @@ class USBInterface(Interface):
                 self._device.attach_kernel_driver(0)
             self._device = None
 
-    def read(self):
-        return self._device.read(self.read_endpoint, self.read_size, timeout=self._timeout)
+    def read(self, size=1):
+        # size is converted from bytes to bits
+        return self._device.read(self.read_endpoint, size*8, timeout=self._timeout)
 
     def write(self, data):
-        return self._device.write(self.write_endpoint, data, timeout=self._timeout)
+        return self._device.write(self.write_endpoint, data)
 
 
 class USBHIDInterface(Interface):
+    """
+    Based HID API compatible with Linux, Darwin, and Windows
+    Does not require additional dll for windows
+    Warning: bug have been encountered on windows
+    """
     def __init__(self):
         self._device = hid.device()
         self._is_open = False
@@ -544,8 +577,8 @@ class USBHIDInterface(Interface):
             finally:
                 self._is_open = False
 
-    def read(self):
-        return self._device.read(self.read_size)
+    def read(self, size=1):
+        return self._device.read(size, self._timeout)
 
     def write(self, data):
-        return self._device.write(data.encode(), timeout=self._timeout)
+        return self._device.write(data)

@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>588</width>
+    <width>742</width>
     <height>412</height>
    </rect>
   </property>
@@ -34,7 +34,7 @@
           <bool>false</bool>
          </property>
          <property name="text">
-          <string>Ontrack</string>
+          <string>ontrak</string>
          </property>
         </widget>
        </item>
@@ -42,19 +42,6 @@
         <widget class="QLabel" name="label_2">
          <property name="text">
           <string>Model</string>
-         </property>
-         <property name="buddy">
-          <cstring>le_model</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QLineEdit" name="le_model">
-         <property name="enabled">
-          <bool>true</bool>
-         </property>
-         <property name="text">
-          <string>ADU100</string>
          </property>
         </widget>
        </item>
@@ -73,6 +60,49 @@
          <property name="text">
           <string/>
          </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="combobox_model">
+         <item>
+          <property name="text">
+           <string>ADU100</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>ADU200</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_14">
+         <property name="text">
+          <string>Interface</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="combobox_interface">
+         <property name="currentIndex">
+          <number>1</number>
+         </property>
+         <item>
+          <property name="text">
+           <string>usb</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>usb-hid</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>usb-aduhid</string>
+          </property>
+         </item>
         </widget>
        </item>
       </layout>
@@ -110,8 +140,11 @@
             <height>30</height>
            </size>
           </property>
+          <property name="currentText">
+           <string>off</string>
+          </property>
           <property name="currentIndex">
-           <number>0</number>
+           <number>1</number>
           </property>
           <item>
            <property name="text">
@@ -215,20 +248,115 @@
           </sizepolicy>
          </property>
          <property name="title">
-          <string>Switch</string>
+          <string>Relay Output(s)</string>
          </property>
          <property name="checkable">
           <bool>false</bool>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout">
-          <item>
-           <widget class="QCheckBox" name="checkbox_relay_enabled">
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="0" column="1">
+           <widget class="QComboBox" name="combobox_relay0_mode">
+            <item>
+             <property name="text">
+              <string>Switch</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Pump</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="checkbox_relay0_enabled">
             <property name="text">
-             <string>Enable Switch</string>
+             <string>Relay 0</string>
             </property>
             <property name="checked">
              <bool>true</bool>
             </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="checkbox_relay1_enabled">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Relay 1</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QCheckBox" name="checkbox_relay3_enabled">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Relay3</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QCheckBox" name="checkbox_relay2_enabled">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Relay2</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="combobox_relay1_mode">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <item>
+             <property name="text">
+              <string>Switch</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Pump</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QComboBox" name="combobox_relay2_mode">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <item>
+             <property name="text">
+              <string>Switch</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Pump</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QComboBox" name="combobox_relay3_mode">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <item>
+             <property name="text">
+              <string>Switch</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Pump</string>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>
@@ -254,7 +382,7 @@
        <item>
         <widget class="QGroupBox" name="group_box_flowmeters">
          <property name="title">
-          <string>Flowmeter(s)</string>
+          <string>Digital Input(s)</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
           <item row="2" column="1">
@@ -405,6 +533,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QGroupBox" name="group_box_analog">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
          <property name="title">
           <string>Analog Channel(s)</string>
          </property>
@@ -459,6 +590,13 @@
             </property>
            </widget>
           </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="checkbox_analog_channel2_enabled">
+            <property name="text">
+             <string>Channel 2</string>
+            </property>
+           </widget>
+          </item>
           <item row="1" column="2">
            <widget class="QSpinBox" name="spinbox_analog_channel1_gain">
             <property name="minimum">
@@ -467,12 +605,8 @@
             <property name="maximum">
              <number>7</number>
             </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
-           <widget class="QCheckBox" name="checkbox_analog_channel2_enabled">
-            <property name="text">
-             <string>Channel 2</string>
+            <property name="value">
+             <number>7</number>
             </property>
            </widget>
           </item>
@@ -496,6 +630,30 @@
             </property>
             <property name="maximum">
              <number>2</number>
+            </property>
+            <property name="value">
+             <number>2</number>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QLabel" name="label_analog_channel0_input_range">
+            <property name="text">
+             <string>0 - 2.5V</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QLabel" name="label_analog_channel1_input_range">
+            <property name="text">
+             <string>0 - 19.53mV</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="3">
+           <widget class="QLabel" name="label_analog_channel2_input_range">
+            <property name="text">
+             <string>0 - 5V</string>
             </property>
            </widget>
           </item>
@@ -536,13 +694,12 @@
  </widget>
  <tabstops>
   <tabstop>le_manufacturer</tabstop>
-  <tabstop>le_model</tabstop>
   <tabstop>le_serial_number</tabstop>
   <tabstop>combobox_log_raw</tabstop>
   <tabstop>combobox_log_products</tabstop>
   <tabstop>le_log_path</tabstop>
   <tabstop>button_browse_log_directory</tabstop>
-  <tabstop>checkbox_relay_enabled</tabstop>
+  <tabstop>checkbox_relay0_enabled</tabstop>
   <tabstop>checkbox_event_counter_channel0_enabled</tabstop>
   <tabstop>spinbox_event_counter_channel0_k_factor</tabstop>
   <tabstop>checkbox_event_counter_channel1_enabled</tabstop>

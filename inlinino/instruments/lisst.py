@@ -21,7 +21,7 @@ class LISST(Instrument):
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 10
         # Init Auxiliary Data Plugin
-        self.plugin_aux_data = True
+        self.plugin_aux_data_enabled = True
         self.plugin_aux_data_variables_selected = []
         self.plugin_aux_data_variable_names = []
         # Init Channels to Plot Plugin

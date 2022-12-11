@@ -15,7 +15,7 @@ class TaraTSG(Instrument):
         self.default_serial_timeout = 3
 
         # Auxiliary Data Plugin
-        self.plugin_aux_data = True
+        self.plugin_aux_data_enabled = True
         self.plugin_aux_data_variable_names = ['Temp. 1 (ºC)', 'Temp. 2 (ºC)', 'Cond. 1 (S/m)', 'Salinity (psu)']
 
     def setup(self, cfg):

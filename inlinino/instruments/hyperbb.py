@@ -23,7 +23,7 @@ class HyperBB(Instrument):
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 1
         # Init Auxiliary Data Plugin
-        self.plugin_aux_data = True
+        self.plugin_aux_data_enabled = True
         self.plugin_aux_data_variable_names = ['Scan WL. (nm)', 'Gain', 'LED Temp. (ºC)', 'Water Temp. (ºC)',
                                                'Pressure (dBar)', 'Ref Zero Flag']
         # Select Channels to Plot Plugin

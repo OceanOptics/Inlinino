@@ -58,7 +58,7 @@ To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Wind
        hyperbb                               Sequoia HyperBB
        :ref:`lisst<qs-setup-lisst>`          Sequoia LISST
        nmea                                  Read & Parse NMEA over Serial or UDP
-       ontrack                               | Ontrack Control Systems ADU100
+       ontrak                               | Ontrak Control Systems ADU100
                                              | (supports Flow control, Flowmeter, & DAQ for Analog sensors)
        satlantic                             Satlantic Instruments (requires Instrument's Telemetry Definition or Calibration Files)
        suna                                  Satlantic Suna V1 and V2

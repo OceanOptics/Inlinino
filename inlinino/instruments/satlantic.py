@@ -46,7 +46,6 @@ class Satlantic(Instrument):
         self.spectrum_plot_trace_names = []
         self.spectrum_plot_x_values = []
         # Init Secondary Dock
-        self.secondary_dock_widget_enabled = True
         self.plugin_metadata_enabled = True
         # Init Metadata Data Plugin
         self.plugin_metadata_keys = []

@@ -25,7 +25,7 @@ class ACS(Instrument):
         self.default_serial_baudrate = 115200
         self.default_serial_timeout = 1
         # Init Auxiliary Data Plugin
-        self.plugin_aux_data = True
+        self.plugin_aux_data_enabled = True
         self.plugin_aux_data_variable_names = ['Internal Temp. (ºC)', 'External Temp. (ºC)', 'Outside Cal Range']
         # Init Channels to Plot Plugin
         self.plugin_active_timeseries_variables = True

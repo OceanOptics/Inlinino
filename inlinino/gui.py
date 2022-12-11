@@ -24,7 +24,8 @@ from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
-from inlinino.instruments.ontrack import Ontrack, SWITCH_FORCE_ON, SWITCH_FORCE_OFF, SWITCH_HOURLY, SWITCH_INTERVAL
+from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface,\
+    RELAY_ON, RELAY_OFF, RELAY_HOURLY, RELAY_INTERVAL
 from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
@@ -76,6 +77,7 @@ class MainWindow(QtGui.QMainWindow):
         # pg.setConfigOption('antialias', True)  # Lines are drawn with smooth edges at the cost of reduced performance
         self._buffer_timestamp = None
         self._buffer_data = []
+        self.reset_ts_trace = False
         self.last_timeseries_plot_refresh = time()
         self.timeseries_plot_widget = None
         self.last_spectrum_plot_refresh = time()
@@ -144,14 +146,9 @@ class MainWindow(QtGui.QMainWindow):
 
         # Set Plugins specific to instrument
         # Auxiliary Data Plugin
-        self.group_box_aux_data.setVisible(self.instrument.plugin_aux_data)
-        if self.instrument.plugin_aux_data:
-            # Set aux variable names
-            for v in self.instrument.plugin_aux_data_variable_names:
-                self.plugin_aux_data_variable_names.append(QtGui.QLabel(v))
-                self.plugin_aux_data_variable_values.append(QtGui.QLabel('?'))
-                self.group_box_aux_data_layout.addRow(self.plugin_aux_data_variable_names[-1],
-                                                      self.plugin_aux_data_variable_values[-1])
+        self.group_box_aux_data.setVisible(self.instrument.plugin_aux_data_enabled)
+        if self.instrument.plugin_aux_data_enabled:
+            self.set_aux_data_widget()
             # Connect signal
             self.instrument.signal.new_aux_data.connect(self.on_new_aux_data)
 
@@ -189,21 +186,22 @@ class MainWindow(QtGui.QMainWindow):
         self.centralwidget.layout().addWidget(self.timeseries_plot_widget)
 
         # Set Secondary Dock Widget
+        self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
+        self.set_instrument_control_widget()
+        self.set_pump_control_widget()
         if self.instrument.secondary_dock_widget_enabled:
             self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
-            self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
-            if hasattr(self.instrument, 'plugin_metadata_enabled') and self.instrument.plugin_metadata_enabled:
+            if self.instrument.plugin_metadata_enabled: # Must be initialized on setup
                 self.instrument.signal.new_meta_data.connect(self.on_new_meta_data)
                 self.set_metadata_widget()
             else:
-                self.group_box_metadata.setParent(None)
-            if hasattr(self.instrument, 'plugin_instrument_control_enabled') and \
-                    self.instrument.plugin_instrument_control_enabled:
-                self.set_instrument_control_widget()
-            else:
-                self.group_box_instrument_control.setParent(None)
+                self.group_box_metadata.hide()
+            if not self.instrument.plugin_instrument_control_enabled:
+                self.group_box_instrument_control.hide()
+            if not self.instrument.plugin_pump_control_enabled:
+                self.group_box_pump_control.hide()
         else:
-            self.dock_widget_secondary.setParent(None)
+            self.dock_widget_secondary.hide()
 
     @staticmethod
     def create_timeseries_plot_widget():
@@ -262,6 +260,19 @@ class MainWindow(QtGui.QMainWindow):
         self.spectrum_plot_widget.setXRange(min_x, max_x)
         self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
 
+    def set_aux_data_widget(self):
+        # Clear current fields if any
+        self.plugin_aux_data_variable_names = []
+        self.plugin_aux_data_variable_values = []
+        for i in reversed(range(self.group_box_aux_data_layout.count())):
+            self.group_box_aux_data_layout.itemAt(i).widget().setParent(None)
+        # Set aux variable names
+        for v in self.instrument.plugin_aux_data_variable_names:
+            self.plugin_aux_data_variable_names.append(QtGui.QLabel(v))
+            self.plugin_aux_data_variable_values.append(QtGui.QLabel('?'))
+            self.group_box_aux_data_layout.addRow(self.plugin_aux_data_variable_names[-1],
+                                                  self.plugin_aux_data_variable_values[-1])
+
     def set_metadata_widget(self):
         items = []
         for key, values in self.instrument.plugin_metadata_keys:
@@ -286,28 +297,46 @@ class MainWindow(QtGui.QMainWindow):
 
     def set_flow_control_switch_mode(self):
         if self.radio_instrument_control_filter.isChecked():
-            self.instrument.relay_mode = SWITCH_FORCE_ON
+            self.instrument.relay_status = RELAY_ON
             self.group_box_instrument_control_filter_schedule.setEnabled(False)
         elif self.radio_instrument_control_total.isChecked():
-            self.instrument.relay_mode = SWITCH_FORCE_OFF
+            self.instrument.relay_status = RELAY_OFF
             self.group_box_instrument_control_filter_schedule.setEnabled(False)
         elif self.radio_instrument_control_hourly.isChecked():
-            self.instrument.relay_mode = SWITCH_HOURLY
+            self.instrument.relay_status = RELAY_HOURLY
             self.group_box_instrument_control_filter_schedule.setEnabled(True)
             self.label_instrument_control_filter_start_every.setText('Start at minute')
             self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_hourly_start_at)
         elif self.radio_instrument_control_interval.isChecked():
-            self.instrument.relay_mode = SWITCH_INTERVAL
+            self.instrument.relay_status = RELAY_INTERVAL
             self.group_box_instrument_control_filter_schedule.setEnabled(True)
             self.label_instrument_control_filter_start_every.setText('Every (min)')
-            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_interval_every)
+            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_off_duration)
 
     def set_flow_control_switch_timing(self):
         if self.radio_instrument_control_hourly.isChecked():
             self.instrument.relay_hourly_start_at = self.spinbox_instrument_control_filter_start_every.value()
         elif self.radio_instrument_control_interval.isChecked():
-            self.instrument.relay_interval_every = self.spinbox_instrument_control_filter_start_every.value()
+            self.instrument.relay_off_duration = self.spinbox_instrument_control_filter_start_every.value()
         self.instrument.relay_on_duration = self.spinbox_instrument_control_filter_duration.value()
+
+    def set_pump_control_widget(self):
+        self.pb_toggle_pump.clicked.connect(self.set_pump_control_toggle_pump)
+        self.spinbox_pump_on.valueChanged.connect(self.set_pump_control_timing)
+        self.spinbox_pump_off.valueChanged.connect(self.set_pump_control_timing)
+
+    def set_pump_control_toggle_pump(self):
+        if self.pb_toggle_pump.isChecked():
+            self.pb_toggle_pump.setText('FORCE PUMP ON')
+            self.instrument.relay_status = RELAY_ON
+        else:
+            self.pb_toggle_pump.setText('Force Pump On')
+            self.instrument._relay_interval_start = time() - self.instrument.relay_on_duration * 60
+            self.instrument.relay_status = RELAY_INTERVAL
+
+    def set_pump_control_timing(self):
+        self.instrument.relay_on_duration = self.spinbox_pump_on.value()
+        self.instrument.relay_off_duration = self.spinbox_pump_off.value()
 
     def set_clock(self):
         zulu = gmtime(time())
@@ -321,12 +350,37 @@ class MainWindow(QtGui.QMainWindow):
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
             self.label_instrument_name.setText(self.instrument.short_name)
+            if self.instrument.interface_name.startswith('com'):
+                self.label_open_port.setText('Serial Port')
+            elif self.instrument.interface_name.startswith('socket'):
+                self.label_open_port.setText('Socket')
+            elif self.instrument.interface_name.startswith('usb'):
+                self.label_open_port.setText('USB Port')
+            self.reset_ts_trace = True  # Force update of variable names in timeseries
             if self.instrument.plugin_active_timeseries_variables:
                 self.set_active_timeseries_variables()
             if self.instrument.spectrum_plot_enabled:
                 self.set_spectrum_plot_widget()
+            if self.instrument.plugin_aux_data_enabled:
+                self.set_aux_data_widget()
             if self.instrument.plugin_metadata_enabled:
                 self.set_metadata_widget()
+            if self.instrument.plugin_instrument_control_enabled:
+                self.group_box_instrument_control.show()
+            else:
+                self.group_box_instrument_control.hide()
+            if self.instrument.plugin_pump_control_enabled:
+                self.group_box_pump_control.show()
+            else:
+                self.group_box_pump_control.hide()
+            if self.instrument.secondary_dock_widget_enabled:
+                if not self.dock_widget_secondary.isVisible():
+                    self.resize(self.frameGeometry().width() + 245, self.frameGeometry().height())
+                    self.dock_widget_secondary.show()
+            else:
+                if self.dock_widget_secondary.isVisible():
+                    self.resize(self.frameGeometry().width() - 245, self.frameGeometry().height())
+                    self.dock_widget_secondary.hide()
 
     def act_instrument_interface(self):
         def error_dialog():
@@ -369,7 +423,8 @@ class MainWindow(QtGui.QMainWindow):
                     except InterfaceException as e:
                         error_dialog()
             elif issubclass(type(self.instrument._interface), USBInterface) or \
-                    issubclass(type(self.instrument._interface), USBHIDInterface):
+                    issubclass(type(self.instrument._interface), USBHIDInterface) or \
+                    issubclass(type(self.instrument._interface), USBADUHIDInterface):
                 # No need for dialog as automatic
                 try:
                     self.instrument.open()
@@ -378,7 +433,6 @@ class MainWindow(QtGui.QMainWindow):
             else:
                 logger.error('Interface not supported by GUI.')
                 return
-
 
     def act_instrument_log(self):
         if self.instrument.log_active():
@@ -480,7 +534,8 @@ class MainWindow(QtGui.QMainWindow):
     @QtCore.pyqtSlot(list, float)
     @QtCore.pyqtSlot(np.ndarray, float)
     def on_new_ts_data(self, data, timestamp):
-        if len(self._buffer_data) != len(data):
+        if len(self._buffer_data) != len(data) or self.reset_ts_trace:
+            self.reset_ts_trace = False
             # Init buffers
             self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
             self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
@@ -540,7 +595,7 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot(list)
     def on_new_aux_data(self, data):
-        if self.instrument.plugin_aux_data:
+        if self.instrument.plugin_aux_data_enabled:
             for i, v in enumerate(data):
                 self.plugin_aux_data_variable_values[i].setText(str(v))
 
@@ -660,6 +715,9 @@ class DialogStartUp(QtGui.QDialog):
 class DialogInstrumentSetup(QtGui.QDialog):
     ENCODING = 'ascii'
     OPTIONAL_FIELDS = ['Variable Precision', 'Prefix Custom']
+    ADU100_AN01_GAIN2RANGE = {0: '2.5V', 1: '1.25V', 2: '0.625V', 3: '0.312V', 4: '0.156V', 5: '78.12mV', 6: '39.06mV',
+                              7: '19.53mV'}  # Values are truncated
+    ADU100_AN2_GAIN2RANGE = {1: '10V', 2: '5V'}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -684,6 +742,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_plaque_file.clicked.connect(self.act_browse_plaque_file)
         if 'button_browse_temperature_file' in self.__dict__.keys():
             self.button_browse_temperature_file.clicked.connect(self.act_browse_temperature_file)
+        if 'spinbox_analog_channel0_gain' in self.__dict__.keys():
+            self.spinbox_analog_channel0_gain.valueChanged.connect(self.act_update_analog_channel0_input_range)
+        if 'spinbox_analog_channel1_gain' in self.__dict__.keys():
+            self.spinbox_analog_channel1_gain.valueChanged.connect(self.act_update_analog_channel1_input_range)
+        if 'spinbox_analog_channel2_gain' in self.__dict__.keys():
+            self.spinbox_analog_channel2_gain.valueChanged.connect(self.act_update_analog_channel2_input_range)
+        if 'combobox_model' in self.__dict__.keys():
+            self.combobox_model.currentIndexChanged.connect(self.act_activate_fields_for_adu_model)
 
         # Cannot use default save button as does not provide mean to correctly validate user input
         self.button_save = QtGui.QPushButton('Save')
@@ -762,6 +828,27 @@ class DialogInstrumentSetup(QtGui.QDialog):
             caption='Choose temperature calibration file', filter='Temperature File (*.mat)')
         self.le_temperature_file.setText(file_name)
 
+    def act_update_analog_channel0_input_range(self):
+        self.label_analog_channel0_input_range.setText(
+            f'0 - {self.ADU100_AN01_GAIN2RANGE[self.spinbox_analog_channel0_gain.value()]}')
+
+    def act_update_analog_channel1_input_range(self):
+        self.label_analog_channel1_input_range.setText(
+            f'0 - {self.ADU100_AN01_GAIN2RANGE[self.spinbox_analog_channel1_gain.value()]}')
+
+    def act_update_analog_channel2_input_range(self):
+        self.label_analog_channel2_input_range.setText(
+            f'0 - {self.ADU100_AN2_GAIN2RANGE[self.spinbox_analog_channel2_gain.value()]}')
+
+    def act_activate_fields_for_adu_model(self):
+        model = self.combobox_model.currentText()
+        if model == 'ADU100':
+            self.group_box_analog.setEnabled(True)
+        elif model == 'ADU200':
+            self.group_box_analog.setEnabled(False)
+        else:
+            raise ValueError(f'Model {model} not supported.')
+
     def act_save(self):
         # Read form
         fields = [a for a in self.__dict__.keys() if 'combobox_' in a or 'le_' in a]
@@ -769,8 +856,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
         for f in fields:
             field_prefix, field_name = f.split('_', 1)
             field_pretty_name = field_name.replace('_', ' ').title()
-            if f == 'combobox_interface':
-                self.cfg[field_name] = self.combobox_interface.currentText()
+            if f in ['combobox_interface', 'combobox_model', *[f'combobox_relay{i}_mode' for i in range(4)]]:
+                self.cfg[field_name] = self.__dict__[f].currentText()
             elif field_prefix == 'le':
                 value = getattr(self, f).text().strip()
                 if not value:
@@ -865,8 +952,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = True
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
-        elif self.cfg['module'] == 'ontrack':
-            self.cfg['relay_enabled'] = self.checkbox_relay_enabled.isChecked()
+        elif self.cfg['module'] == 'ontrak':
+            self.cfg['model'] = self.combobox_model.currentText()
+            self.cfg['relay0_enabled'] = self.checkbox_relay0_enabled.isChecked()
             self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors'] = [], []
             for c in range(4):
                 if getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).isChecked():
@@ -879,8 +967,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg['analog_channels_enabled'].append(c)
                     g = getattr(self, 'spinbox_analog_channel%d_gain' % (c)).value()
                     self.cfg['analog_channels_gains'].append(g)
-            if not (self.cfg['relay_enabled'] or
-                    self.cfg['event_counter_channels_enabled'] or self.cfg['analog_channels_enabled']):
+            if not (self.cfg['relay0_enabled'] or self.cfg['event_counter_channels_enabled'] or
+                    (self.cfg['model'] == 'ADU100' and self.cfg['analog_channels_enabled'])):
                 self.notification('At least one switch, one flowmeter, or one analog channel must be selected.')
                 return
             if not (self.cfg['log_raw'] or self.cfg['log_products']):
@@ -1012,8 +1100,21 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
             for k in [k for k in self.cfg.keys() if k.startswith('variable_')]:
                 if len(self.cfg[k]) == 1 and self.cfg[k][0] == '':
                     del self.cfg[k]
-        if self.cfg['module'] == 'ontrack':
-            self.checkbox_relay_enabled.setChecked(self.cfg['relay_enabled'])
+        if self.cfg['module'] == 'ontrak':
+            try:
+                self.combobox_model.setCurrentIndex([self.combobox_model.itemText(i)
+                                                     for i in range(self.combobox_model.count())]
+                                                    .index(self.cfg['model']))
+            except ValueError:
+                logger.warning('Configured model not available in GUI. Interface set to GUI default.')
+            self.act_activate_fields_for_adu_model()
+            try:
+                self.combobox_relay0_mode.setCurrentIndex([self.combobox_relay0_mode.itemText(i)
+                                                           for i in range(self.combobox_relay0_mode.count())]
+                                                          .index(self.cfg['relay0_mode']))
+            except ValueError:
+                logger.warning('Configured relay0_mode not available in GUI. Interface set to GUI default.')
+            self.checkbox_relay0_enabled.setChecked(self.cfg['relay0_enabled'])
             for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
                 getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
                 getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)
@@ -1022,10 +1123,12 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                 getattr(self, 'spinbox_analog_channel%d_gain' % (c)).setValue(g)
         if hasattr(self, 'combobox_interface'):
             if 'interface' in self.cfg.keys():
-                if self.cfg['interface'] == 'serial':
-                    self.combobox_interface.setCurrentIndex(0)
-                elif self.cfg['interface'] == 'socket':
-                    self.combobox_interface.setCurrentIndex(1)
+                try:
+                    self.combobox_interface.setCurrentIndex([self.combobox_interface.itemText(i)
+                                                             for i in range(self.combobox_interface.count())]
+                                                            .index(self.cfg['interface']))
+                except ValueError:
+                    logger.warning('Configured interface not available in GUI. Interface set to GUI default.')
         if hasattr(self, 'scroll_area_layout_immersed'):
             if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
                 self.tdf_files = self.cfg['tdf_files']
@@ -1246,7 +1349,7 @@ class App(QtGui.QApplication):
     def start(self, instrument_index=None):
         if isinstance(instrument_index, int) and instrument_index < len(CFG.instruments):
             # Get instrument index
-            instrument_uuid = CFG.instruments.keys()[instrument_index]
+            instrument_uuid = list(CFG.instruments.keys())[instrument_index]
         elif isinstance(instrument_index, str) and instrument_index in CFG.instruments.keys():
             instrument_uuid = instrument_index
         else:
@@ -1287,8 +1390,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(LISST(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
                     self.main_window.init_instrument(NMEA(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'ontrack':
-                    self.main_window.init_instrument(Ontrack(instrument_uuid, InstrumentSignals()))
+                elif instrument_module_name == 'ontrak':
+                    self.main_window.init_instrument(Ontrak(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'satlantic':
                     self.main_window.init_instrument(Satlantic(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'sunav1':
