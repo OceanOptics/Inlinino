@@ -297,7 +297,6 @@ class Ontrak(Instrument):
             set_relay = True
         elif self.relay_status == RELAY_OFF:
             set_relay = False
-            self._relay_interval_start = None
         elif self.relay_status == RELAY_HOURLY:
             minute = int(strftime('%M'))
             stop_at = self.relay_hourly_start_at + self.relay_on_duration

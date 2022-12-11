@@ -308,6 +308,7 @@ class MainWindow(QtGui.QMainWindow):
             self.label_instrument_control_filter_start_every.setText('Start at minute')
             self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_hourly_start_at)
         elif self.radio_instrument_control_interval.isChecked():
+            self.instrument._relay_interval_start = time() - self.instrument.relay_on_duration * 60
             self.instrument.relay_status = RELAY_INTERVAL
             self.group_box_instrument_control_filter_schedule.setEnabled(True)
             self.label_instrument_control_filter_start_every.setText('Every (min)')
