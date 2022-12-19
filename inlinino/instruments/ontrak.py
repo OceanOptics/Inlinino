@@ -252,6 +252,7 @@ class Ontrak(Instrument):
         self._interface.write('RPK0')
         value = self._interface.read()
         self._relay_cached_position = None if value is None else bool(value)
+        self._relay_interval_start = time()
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
@@ -306,8 +307,6 @@ class Ontrak(Instrument):
             else:
                 set_relay = False
         elif self.relay_status == RELAY_INTERVAL:
-            if self._relay_interval_start is None:
-                self._relay_interval_start = time()
             delta = ((time() - self._relay_interval_start) / 60) % (self.relay_on_duration + self.relay_off_duration)
             set_relay = (delta < self.relay_on_duration)
         else:

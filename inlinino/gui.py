@@ -187,8 +187,8 @@ class MainWindow(QtGui.QMainWindow):
 
         # Set Secondary Dock Widget
         self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
-        self.set_instrument_control_widget()
-        self.set_pump_control_widget()
+        self.init_flow_control_control_widget()
+        self.init_pump_control_widget()
         if self.instrument.secondary_dock_widget_enabled:
             self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
             if self.instrument.plugin_metadata_enabled: # Must be initialized on setup
@@ -196,9 +196,13 @@ class MainWindow(QtGui.QMainWindow):
                 self.set_metadata_widget()
             else:
                 self.group_box_metadata.hide()
-            if not self.instrument.plugin_instrument_control_enabled:
+            if self.instrument.plugin_instrument_control_enabled:
+                self.set_flow_control_control_widget()
+            else:
                 self.group_box_instrument_control.hide()
-            if not self.instrument.plugin_pump_control_enabled:
+            if self.instrument.plugin_pump_control_enabled:
+                self.set_pump_control_widget()
+            else:
                 self.group_box_pump_control.hide()
         else:
             self.dock_widget_secondary.hide()
@@ -287,13 +291,17 @@ class MainWindow(QtGui.QMainWindow):
         self.tree_widget_metadata.expandAll()
         self.tree_widget_metadata.show()
 
-    def set_instrument_control_widget(self):
+    def init_flow_control_control_widget(self):
         self.radio_instrument_control_filter.clicked.connect(self.set_flow_control_switch_mode)
         self.radio_instrument_control_total.clicked.connect(self.set_flow_control_switch_mode)
         self.radio_instrument_control_hourly.clicked.connect(self.set_flow_control_switch_mode)
         self.radio_instrument_control_interval.clicked.connect(self.set_flow_control_switch_mode)
         self.spinbox_instrument_control_filter_start_every.valueChanged.connect(self.set_flow_control_switch_timing)
         self.spinbox_instrument_control_filter_duration.valueChanged.connect(self.set_flow_control_switch_timing)
+
+    def set_flow_control_control_widget(self):
+        self.set_flow_control_switch_mode()
+        self.set_flow_control_switch_timing()
 
     def set_flow_control_switch_mode(self):
         if self.radio_instrument_control_filter.isChecked():
@@ -321,10 +329,14 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.relay_off_duration = self.spinbox_instrument_control_filter_start_every.value()
         self.instrument.relay_on_duration = self.spinbox_instrument_control_filter_duration.value()
 
-    def set_pump_control_widget(self):
+    def init_pump_control_widget(self):
         self.pb_toggle_pump.clicked.connect(self.set_pump_control_toggle_pump)
         self.spinbox_pump_on.valueChanged.connect(self.set_pump_control_timing)
         self.spinbox_pump_off.valueChanged.connect(self.set_pump_control_timing)
+
+    def set_pump_control_widget(self):
+        self.instrument.relay_status = RELAY_INTERVAL
+        self.set_pump_control_timing()
 
     def set_pump_control_toggle_pump(self):
         if self.pb_toggle_pump.isChecked():
@@ -367,10 +379,12 @@ class MainWindow(QtGui.QMainWindow):
             if self.instrument.plugin_metadata_enabled:
                 self.set_metadata_widget()
             if self.instrument.plugin_instrument_control_enabled:
+                self.set_flow_control_control_widget()
                 self.group_box_instrument_control.show()
             else:
                 self.group_box_instrument_control.hide()
             if self.instrument.plugin_pump_control_enabled:
+                self.set_pump_control_widget()
                 self.group_box_pump_control.show()
             else:
                 self.group_box_pump_control.hide()
