@@ -252,7 +252,10 @@ class Ontrak(Instrument):
         self._interface.write('RPK0')
         value = self._interface.read()
         self._relay_cached_position = None if value is None else bool(value)
-        self._relay_interval_start = time()
+        if self.relay_mode == 'Pump':
+            self._relay_interval_start = time() - self.relay_on_duration * 60  # Default to off on start
+        else:
+            self._relay_interval_start = time()
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
