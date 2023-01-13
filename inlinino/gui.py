@@ -332,10 +332,9 @@ class MainWindow(QtGui.QMainWindow):
     def init_pump_control_widget(self):
         self.pb_toggle_pump.clicked.connect(self.set_pump_control_toggle_pump)
         self.spinbox_pump_on.valueChanged.connect(self.set_pump_control_timing)
-        self.spinbox_pump_off.valueChanged.connect(self.set_pump_control_timing)
 
     def set_pump_control_widget(self):
-        self.instrument.relay_status = RELAY_INTERVAL
+        self.instrument.relay_status = RELAY_HOURLY
         self.set_pump_control_timing()
 
     def set_pump_control_toggle_pump(self):
@@ -344,12 +343,11 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.relay_status = RELAY_ON
         else:
             self.pb_toggle_pump.setText('Force Pump On')
-            self.instrument._relay_interval_start = time() - self.instrument.relay_on_duration * 60
-            self.instrument.relay_status = RELAY_INTERVAL
+            self.instrument.relay_status = RELAY_HOURLY
 
     def set_pump_control_timing(self):
+        self.instrument.relay_hourly_start_at = 0
         self.instrument.relay_on_duration = self.spinbox_pump_on.value()
-        self.instrument.relay_off_duration = self.spinbox_pump_off.value()
 
     def set_clock(self):
         zulu = gmtime(time())

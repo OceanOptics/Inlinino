@@ -605,7 +605,7 @@
         <item>
          <widget class="QLabel" name="label_pump_schedule">
           <property name="text">
-           <string>Pump Schedule (minutes)</string>
+           <string>Pump Schedule</string>
           </property>
          </widget>
         </item>
@@ -614,7 +614,7 @@
           <item>
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>ON</string>
+             <string>Duration on (min)</string>
             </property>
            </widget>
           </item>
@@ -632,24 +632,17 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_10">
-            <property name="text">
-             <string>OFF</string>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
             </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QSpinBox" name="spinbox_pump_off">
-            <property name="minimum">
-             <number>0</number>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>0</width>
+              <height>20</height>
+             </size>
             </property>
-            <property name="maximum">
-             <number>9999</number>
-            </property>
-            <property name="value">
-             <number>55</number>
-            </property>
-           </widget>
+           </spacer>
           </item>
          </layout>
         </item>

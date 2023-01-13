@@ -10,7 +10,7 @@ import traceback
 import numpy as np
 
 
-__version__ = '2.8.5'
+__version__ = '2.8.6'
 
 # Setup Logger
 logging.basicConfig(level=logging.DEBUG)

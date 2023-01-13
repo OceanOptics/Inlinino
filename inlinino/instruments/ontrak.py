@@ -88,6 +88,7 @@ class Ontrak(Instrument):
         self.relay_on_duration = 10      # minutes
         self.relay_off_duration = 30     # minutes
         self._relay_interval_start = None
+        self._relay_hourly_skip_before = 0
         self._relay_cached_position = None
         # Event Counter(s) / Flowmeter(s)
         self.event_counter_channels = [0]
@@ -133,7 +134,7 @@ class Ontrak(Instrument):
         elif self.relay_mode == 'Pump':
             self.plugin_instrument_control_enabled = False
             self.plugin_pump_control_enabled = True
-            self.relay_status = RELAY_INTERVAL
+            self.relay_status = RELAY_HOURLY
         self._relay_interval_start = None
         self._relay_cached_position = None
         if 'event_counter_channels_enabled' not in cfg.keys():
@@ -253,9 +254,12 @@ class Ontrak(Instrument):
         value = self._interface.read()
         self._relay_cached_position = None if value is None else bool(value)
         if self.relay_mode == 'Pump':
-            self._relay_interval_start = time() - self.relay_on_duration * 60  # Default to off on start
+            # Skip first hour
+            self._relay_hourly_skip_before = time() + 3600
+            # self._relay_interval_start = time() - self.relay_on_duration * 60  # Default to off on start
         else:
-            self._relay_interval_start = time()
+            self._relay_hourly_skip_before = 0
+        self._relay_interval_start = time()
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
@@ -304,8 +308,9 @@ class Ontrak(Instrument):
         elif self.relay_status == RELAY_HOURLY:
             minute = int(strftime('%M'))
             stop_at = self.relay_hourly_start_at + self.relay_on_duration
-            if (self.relay_hourly_start_at <= minute < stop_at < 60) or \
-                    (60 <= stop_at and (self.relay_hourly_start_at <= minute or minute < stop_at % 60)):
+            if ((self.relay_hourly_start_at <= minute < stop_at < 60) or \
+                    (60 <= stop_at and (self.relay_hourly_start_at <= minute or minute < stop_at % 60))) and \
+                    self._relay_hourly_skip_before < time():
                 set_relay = True
             else:
                 set_relay = False
