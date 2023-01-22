@@ -22,6 +22,7 @@ from inlinino.instruments import Instrument, SerialInterface, SocketInterface, U
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
+from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
 from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface,\
@@ -30,6 +31,10 @@ from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
 from inlinino.instruments.lisst import LISSTParser
+from inlinino.plugins.flow_control import FlowControlPlugin
+from inlinino.plugins.hypernav_cal import HyperNavCalPlugin
+from inlinino.plugins.metadata import MetadataPlugin
+from inlinino.plugins.pump_control import PumpControlPlugin
 
 logger = logging.getLogger('GUI')
 
@@ -124,10 +129,41 @@ class MainWindow(QtGui.QMainWindow):
         self.alarm_message_box.setStandardButtons(QtWidgets.QMessageBox.Ignore)
         self.alarm_message_box.buttonClicked.connect(self.alarm_message_box_button_clicked)
         # Plugins variables
+        self.widget_metadata = None
+        self.plugins = {}
         self.plugin_aux_data_variable_names = []
         self.plugin_aux_data_variable_values = []
         self.plugin_active_timeseries_variables_model = None
         self.plugin_active_timeseries_variables_filter_proxy_model = None
+
+    def add_plugin(self, plugin_name: str):
+        """
+        Add and show plugin to Secondary Docked Widget from main GUI
+        :param plugin_name:
+        :return:
+        """
+        if plugin_name == 'FlowControlPlugin':
+            plugin = FlowControlPlugin(self.instrument)
+        elif plugin_name == 'HyperNavCalPlugin':
+            plugin = HyperNavCalPlugin(self.instrument)
+        elif plugin_name == 'MetadataPlugin':
+            plugin = MetadataPlugin(self.instrument)
+        elif plugin_name == 'PumpControlPlugin':
+            plugin = PumpControlPlugin(self.instrument)
+        else:
+            raise ValueError(f'Plugin "{plugin_name}" not supported.')
+        self.plugins[plugin_name] = plugin
+        self.docked_widget_secondary_layout.addWidget(plugin)
+
+    def show_plugin(self, key: str):
+        if key in self.plugins.keys():
+            self.plugins[key].show()
+        else:
+            self.add_plugin(key)
+
+    def hide_plugin(self, key: str):
+        if key in self.plugins.keys():
+            self.plugins[key].hide()
 
     def init_instrument(self, instrument):
         self.instrument = instrument
@@ -142,7 +178,6 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.packet_logged.connect(self.on_packet_logged)
         self.instrument.signal.new_ts_data.connect(self.on_new_ts_data)
         self.instrument.signal.alarm.connect(self.on_data_timeout)
-        self.on_status_update()  # Run now as didn't run with instrument.setup because signal was not connected
 
         # Set Plugins specific to instrument
         # Auxiliary Data Plugin
@@ -187,25 +222,27 @@ class MainWindow(QtGui.QMainWindow):
 
         # Set Secondary Dock Widget
         self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
-        self.init_flow_control_control_widget()
-        self.init_pump_control_widget()
         if self.instrument.secondary_dock_widget_enabled:
             self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
             if self.instrument.plugin_metadata_enabled: # Must be initialized on setup
-                self.instrument.signal.new_meta_data.connect(self.on_new_meta_data)
-                self.set_metadata_widget()
-            else:
-                self.group_box_metadata.hide()
+                self.add_plugin('MetadataPlugin')
             if self.instrument.plugin_instrument_control_enabled:
-                self.set_flow_control_control_widget()
-            else:
-                self.group_box_instrument_control.hide()
+                self.add_plugin('FlowControlPlugin')
             if self.instrument.plugin_pump_control_enabled:
-                self.set_pump_control_widget()
+                self.add_plugin('PumpControlPlugin')
+            if self.instrument.plugin_hypernav_cal_enabled:
+                self.resize(self.frameGeometry().width() + 408 - 245, self.frameGeometry().height())
+                self.add_plugin('HyperNacCalPlugin')
             else:
-                self.group_box_pump_control.hide()
+                # Only add vertical spacer if not hypernav cal plugin
+                self.docked_widget_secondary_layout.addItem(
+                    QtGui.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding))
         else:
             self.dock_widget_secondary.hide()
+        # Run status update
+        #   didn't run with instrument.setup because signal was not connected
+        #   need to be after plugin(s) initialization
+        self.on_status_update()
 
     @staticmethod
     def create_timeseries_plot_widget():
@@ -277,78 +314,6 @@ class MainWindow(QtGui.QMainWindow):
             self.group_box_aux_data_layout.addRow(self.plugin_aux_data_variable_names[-1],
                                                   self.plugin_aux_data_variable_values[-1])
 
-    def set_metadata_widget(self):
-        items = []
-        for key, values in self.instrument.plugin_metadata_keys:
-            item = QtWidgets.QTreeWidgetItem([key, '0'])
-            for value in values:
-                item.addChild(QtWidgets.QTreeWidgetItem([value, ' ']))
-            items.append(item)
-        self.tree_widget_metadata.clear()
-        self.tree_widget_metadata.addTopLevelItems(items)
-        self.tree_widget_metadata.resizeColumnToContents(0)
-        self.tree_widget_metadata.setColumnWidth(1,20)  # Needed to prevent expanding too much on first show
-        self.tree_widget_metadata.expandAll()
-        self.tree_widget_metadata.show()
-
-    def init_flow_control_control_widget(self):
-        self.radio_instrument_control_filter.clicked.connect(self.set_flow_control_switch_mode)
-        self.radio_instrument_control_total.clicked.connect(self.set_flow_control_switch_mode)
-        self.radio_instrument_control_hourly.clicked.connect(self.set_flow_control_switch_mode)
-        self.radio_instrument_control_interval.clicked.connect(self.set_flow_control_switch_mode)
-        self.spinbox_instrument_control_filter_start_every.valueChanged.connect(self.set_flow_control_switch_timing)
-        self.spinbox_instrument_control_filter_duration.valueChanged.connect(self.set_flow_control_switch_timing)
-
-    def set_flow_control_control_widget(self):
-        self.set_flow_control_switch_mode()
-        self.set_flow_control_switch_timing()
-
-    def set_flow_control_switch_mode(self):
-        if self.radio_instrument_control_filter.isChecked():
-            self.instrument.relay_status = RELAY_ON
-            self.group_box_instrument_control_filter_schedule.setEnabled(False)
-        elif self.radio_instrument_control_total.isChecked():
-            self.instrument.relay_status = RELAY_OFF
-            self.group_box_instrument_control_filter_schedule.setEnabled(False)
-        elif self.radio_instrument_control_hourly.isChecked():
-            self.instrument.relay_status = RELAY_HOURLY
-            self.group_box_instrument_control_filter_schedule.setEnabled(True)
-            self.label_instrument_control_filter_start_every.setText('Start at minute')
-            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_hourly_start_at)
-        elif self.radio_instrument_control_interval.isChecked():
-            self.instrument._relay_interval_start = time() - self.instrument.relay_on_duration * 60
-            self.instrument.relay_status = RELAY_INTERVAL
-            self.group_box_instrument_control_filter_schedule.setEnabled(True)
-            self.label_instrument_control_filter_start_every.setText('Every (min)')
-            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_off_duration)
-
-    def set_flow_control_switch_timing(self):
-        if self.radio_instrument_control_hourly.isChecked():
-            self.instrument.relay_hourly_start_at = self.spinbox_instrument_control_filter_start_every.value()
-        elif self.radio_instrument_control_interval.isChecked():
-            self.instrument.relay_off_duration = self.spinbox_instrument_control_filter_start_every.value()
-        self.instrument.relay_on_duration = self.spinbox_instrument_control_filter_duration.value()
-
-    def init_pump_control_widget(self):
-        self.pb_toggle_pump.clicked.connect(self.set_pump_control_toggle_pump)
-        self.spinbox_pump_on.valueChanged.connect(self.set_pump_control_timing)
-
-    def set_pump_control_widget(self):
-        self.instrument.relay_status = RELAY_HOURLY
-        self.set_pump_control_timing()
-
-    def set_pump_control_toggle_pump(self):
-        if self.pb_toggle_pump.isChecked():
-            self.pb_toggle_pump.setText('FORCE PUMP ON')
-            self.instrument.relay_status = RELAY_ON
-        else:
-            self.pb_toggle_pump.setText('Force Pump On')
-            self.instrument.relay_status = RELAY_HOURLY
-
-    def set_pump_control_timing(self):
-        self.instrument.relay_hourly_start_at = 0
-        self.instrument.relay_on_duration = self.spinbox_pump_on.value()
-
     def set_clock(self):
         zulu = gmtime(time())
         self.label_clock.setText(strftime('%H:%M:%S', zulu) + ' UTC')
@@ -375,17 +340,17 @@ class MainWindow(QtGui.QMainWindow):
             if self.instrument.plugin_aux_data_enabled:
                 self.set_aux_data_widget()
             if self.instrument.plugin_metadata_enabled:
-                self.set_metadata_widget()
+                self.show_plugin('MetadataPlugin')
+            else:
+                self.hide_plugin('MetadataPlugin')
             if self.instrument.plugin_instrument_control_enabled:
-                self.set_flow_control_control_widget()
-                self.group_box_instrument_control.show()
+                self.show_plugin('FlowControlPlugin')
             else:
-                self.group_box_instrument_control.hide()
+                self.hide_plugin('FlowControlPlugin')
             if self.instrument.plugin_pump_control_enabled:
-                self.set_pump_control_widget()
-                self.group_box_pump_control.show()
+                self.show_plugin('PumpControlPlugin')
             else:
-                self.group_box_pump_control.hide()
+                self.hide_plugin('PumpControlPlugin')
             if self.instrument.secondary_dock_widget_enabled:
                 if not self.dock_widget_secondary.isVisible():
                     self.resize(self.frameGeometry().width() + 245, self.frameGeometry().height())
@@ -513,10 +478,7 @@ class MainWindow(QtGui.QMainWindow):
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
         if self.instrument.plugin_metadata_enabled:
             self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
-            root = self.tree_widget_metadata.invisibleRootItem()
-            for parent_idx, counter in enumerate(self.instrument.plugin_metadata_frame_counters):
-                if root.child(parent_idx) is not None:
-                    root.child(parent_idx).setText(1, str(counter))
+            self.plugins['MetadataPlugin'].reset()
 
     @QtCore.pyqtSlot()
     def on_packet_received(self):
@@ -611,20 +573,6 @@ class MainWindow(QtGui.QMainWindow):
         if self.instrument.plugin_aux_data_enabled:
             for i, v in enumerate(data):
                 self.plugin_aux_data_variable_values[i].setText(str(v))
-
-    @QtCore.pyqtSlot(list)
-    def on_new_meta_data(self, data):
-        if not self.instrument.plugin_metadata_enabled:
-            return
-        root = self.tree_widget_metadata.invisibleRootItem()
-        for parent_idx, (parent_value, child_values) in enumerate(data):
-            if root.child(parent_idx) is None:
-                continue
-            if parent_value is not None:
-                root.child(parent_idx).setText(1, str(parent_value))
-            if child_values is not None:
-                for child_idx, child_value in enumerate(child_values):
-                    root.child(parent_idx).child(child_idx).setText(1, str(child_value))
 
     @QtCore.pyqtSlot(QtCore.QModelIndex)
     def on_active_timeseries_variables_update(self, proxy_index):
@@ -1000,7 +948,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = False
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
-        elif self.cfg['module'] == 'satlantic':
+        elif self.cfg['module'] in ['satlantic', 'hypernav']:
             self.cfg['tdf_files'] = self.tdf_files
             self.cfg['immersed'] = []
             for i in range(self.scroll_area_layout_immersed.count()):
