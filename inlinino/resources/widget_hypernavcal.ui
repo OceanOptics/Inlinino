@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>408</width>
-    <height>641</height>
+    <width>386</width>
+    <height>763</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,7 +27,10 @@
     <number>0</number>
    </property>
    <item>
-    <widget class="QTabWidget" name="tabWidget">
+    <widget class="QTabWidget" name="tw_top">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
        <horstretch>0</horstretch>
@@ -35,15 +38,15 @@
       </sizepolicy>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
-     <widget class="QWidget" name="hn_control_tab">
+     <widget class="QWidget" name="control_tab">
       <attribute name="title">
        <string>Control</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
-        <widget class="QGroupBox" name="groupBox">
+        <widget class="QGroupBox" name="configuration">
          <property name="title">
           <string>Configuration</string>
          </property>
@@ -54,16 +57,19 @@
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_2">
             <item>
-             <widget class="QLabel" name="label_16">
+             <widget class="QPushButton" name="ctrl_get_cfg">
+              <property name="enabled">
+               <bool>true</bool>
+              </property>
               <property name="text">
-               <string>Get Configuration</string>
+               <string>Get</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_4">
+             <widget class="QLabel" name="label_16">
               <property name="text">
-               <string>Get</string>
+               <string>Configuration</string>
               </property>
              </widget>
             </item>
@@ -72,9 +78,12 @@
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::MinimumExpanding</enum>
+              </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>40</width>
+                <width>0</width>
                 <height>20</height>
                </size>
               </property>
@@ -85,26 +94,29 @@
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_3">
             <item>
-             <widget class="QComboBox" name="comboBox_2"/>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="lineEdit"/>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButton_5">
+             <widget class="QPushButton" name="ctrl_set_cfg">
               <property name="text">
                <string>Set</string>
               </property>
              </widget>
             </item>
             <item>
+             <widget class="QComboBox" name="ctrl_set_parameter"/>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="ctrl_set_value"/>
+            </item>
+            <item>
              <spacer name="horizontalSpacer_3">
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::MinimumExpanding</enum>
+              </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>40</width>
+                <width>0</width>
                 <height>20</height>
                </size>
               </property>
@@ -122,7 +134,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QComboBox" name="comboBox_3">
+             <widget class="QComboBox" name="ctrl_set_head">
               <item>
                <property name="text">
                 <string>BOTH</string>
@@ -145,9 +157,12 @@
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::MinimumExpanding</enum>
+              </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>40</width>
+                <width>0</width>
                 <height>20</height>
                </size>
               </property>
@@ -159,7 +174,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox_2">
+        <widget class="QGroupBox" name="sampling">
          <property name="title">
           <string>Sampling</string>
          </property>
@@ -167,14 +182,14 @@
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout">
             <item>
-             <widget class="QPushButton" name="pushButton">
+             <widget class="QPushButton" name="ctrl_start">
               <property name="text">
                <string>Start</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_2">
+             <widget class="QPushButton" name="ctrl_stop">
               <property name="text">
                <string>Stop</string>
               </property>
@@ -185,9 +200,12 @@
               <property name="orientation">
                <enum>Qt::Horizontal</enum>
               </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::MinimumExpanding</enum>
+              </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>40</width>
+                <width>0</width>
                 <height>20</height>
                </size>
               </property>
@@ -209,7 +227,7 @@
               </widget>
              </item>
              <item row="0" column="1">
-              <widget class="QComboBox" name="comboBox">
+              <widget class="QComboBox" name="ctrl_int_time">
                <item>
                 <property name="text">
                  <string>20</string>
@@ -260,14 +278,17 @@
               </widget>
              </item>
              <item row="1" column="1">
-              <widget class="QSpinBox" name="spinBox">
+              <widget class="QSpinBox" name="ctrl_light_dark_ratio">
                <property name="minimum">
                 <number>1</number>
+               </property>
+               <property name="value">
+                <number>5</number>
                </property>
               </widget>
              </item>
              <item row="2" column="0">
-              <widget class="QPushButton" name="pushButton_3">
+              <widget class="QPushButton" name="ctrl_cal">
                <property name="text">
                 <string>Start Cal</string>
                </property>
@@ -279,42 +300,83 @@
          </layout>
         </widget>
        </item>
+       <item>
+        <spacer name="verticalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::MinimumExpanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="hn_caracterize_tab">
+     <widget class="QWidget" name="hn_characterize_tab">
       <attribute name="title">
-       <string>Caracterize</string>
+       <string>Characterize</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_7">
+      <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
-        <widget class="QGroupBox" name="groupBox_4">
+        <layout class="QFormLayout" name="formLayout">
+         <item row="0" column="1">
+          <widget class="QComboBox" name="crt_characterized_head">
+           <item>
+            <property name="text">
+             <string>PRT</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>SBD</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_9">
+           <property name="text">
+            <string>Select Radiometer</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="status">
          <property name="title">
           <string>Status</string>
          </property>
          <layout class="QFormLayout" name="formLayout_3">
-          <item row="0" column="0">
+          <item row="1" column="0">
            <widget class="QLabel" name="label_4">
             <property name="text">
              <string>Integration Time (ms)</string>
             </property>
            </widget>
           </item>
-          <item row="0" column="1">
-           <widget class="QLineEdit" name="lineEdit_3">
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="crt_int_time">
             <property name="readOnly">
              <bool>true</bool>
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
+          <item row="2" column="0">
            <widget class="QLabel" name="label_5">
             <property name="text">
              <string>Pixel Registration</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
-           <widget class="QLineEdit" name="lineEdit_4">
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="crt_pix_reg">
             <property name="readOnly">
              <bool>true</bool>
             </property>
@@ -324,10 +386,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox_5">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Dark Test Tooltip&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
+        <widget class="QGroupBox" name="dark_tests">
          <property name="title">
           <string>Dark Tests</string>
          </property>
@@ -347,7 +406,7 @@
            </widget>
           </item>
           <item row="3" column="1">
-           <widget class="QLineEdit" name="lineEdit_6">
+           <widget class="QLineEdit" name="dt_mean_value">
             <property name="readOnly">
              <bool>true</bool>
             </property>
@@ -361,37 +420,46 @@
            </widget>
           </item>
           <item row="4" column="1">
-           <widget class="QLineEdit" name="lineEdit_7">
+           <widget class="QLineEdit" name="dt_noise_level_value">
             <property name="readOnly">
              <bool>true</bool>
             </property>
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QLineEdit" name="lineEdit_5">
+           <widget class="QLineEdit" name="dt_spec_shape_value">
             <property name="readOnly">
              <bool>true</bool>
             </property>
            </widget>
           </item>
           <item row="4" column="2">
-           <widget class="QLabel" name="label_11">
+           <widget class="QLabel" name="dt_noise_level_test">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Noise Level Test&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The standard deviation for each pixel must be lower than 200 counts.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>FAIL</string>
+             <string/>
             </property>
            </widget>
           </item>
           <item row="3" column="2">
-           <widget class="QLabel" name="label_10">
+           <widget class="QLabel" name="dt_mean_test">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Mean Value Test&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The mean of all spectrum must be lower than 6000 counts.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>PASS</string>
+             <string/>
             </property>
            </widget>
           </item>
           <item row="0" column="2">
-           <widget class="QLabel" name="label_9">
+           <widget class="QLabel" name="dt_spec_shape_test">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Spectral Shape Test&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The mean standard deviation of the spectrum must be lower than 100 counts.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>PASS</string>
+             <string/>
             </property>
            </widget>
           </item>
@@ -400,9 +468,12 @@
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::MinimumExpanding</enum>
+            </property>
             <property name="sizeHint" stdset="0">
              <size>
-              <width>40</width>
+              <width>0</width>
               <height>20</height>
              </size>
             </property>
@@ -412,10 +483,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox_6">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Light Tests tooltips&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
+        <widget class="QGroupBox" name="light_tests">
          <property name="title">
           <string>Light Tests</string>
          </property>
@@ -427,17 +495,36 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
-           <widget class="QLineEdit" name="lineEdit_9">
+          <item row="0" column="3">
+           <spacer name="horizontalSpacer_6">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::MinimumExpanding</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>0</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="lt_px_reg_offset">
             <property name="readOnly">
              <bool>true</bool>
             </property>
            </widget>
           </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="label_15">
+          <item row="0" column="2">
+           <widget class="QLabel" name="lt_px_reg_test">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Pixel Registration Test&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Not Yet Implemented. Will test the position of HgAr peaks with respect to wavelength registration from spectrophotometer manufacturer.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>FAIL</string>
+             <string/>
             </property>
            </widget>
           </item>
@@ -448,32 +535,22 @@
             </property>
            </widget>
           </item>
-          <item row="0" column="2">
-           <widget class="QLabel" name="label_14">
+          <item row="1" column="2">
+           <widget class="QLabel" name="lt_peak_test">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Peak Value Test&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The 98th percentile value must be greater than 30,000 counts.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>PASS</string>
+             <string/>
             </property>
            </widget>
           </item>
-          <item row="0" column="1">
-           <widget class="QLineEdit" name="lineEdit_8">
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="lt_peak_value">
             <property name="readOnly">
              <bool>true</bool>
             </property>
            </widget>
-          </item>
-          <item row="0" column="3">
-           <spacer name="horizontalSpacer_6">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
           </item>
          </layout>
         </widget>
@@ -499,11 +576,11 @@
     </widget>
    </item>
    <item>
-    <widget class="QTabWidget" name="tabWidget_2">
+    <widget class="QTabWidget" name="tw_bottom">
      <property name="currentIndex">
       <number>0</number>
      </property>
-     <widget class="QWidget" name="hn_serial_monitor_tab">
+     <widget class="QWidget" name="serial_monitor_tab">
       <attribute name="title">
        <string>Serial Monitor</string>
       </attribute>
@@ -511,7 +588,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
-          <widget class="QLineEdit" name="lineEdit_2">
+          <widget class="QLineEdit" name="serial_monitor_command">
            <property name="inputMask">
             <string/>
            </property>
@@ -519,12 +596,12 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>Command to send to HyperNAV</string>
+            <string>Command (Enter to send to HyperNAV)</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_6">
+          <widget class="QPushButton" name="serial_monitor_send">
            <property name="text">
             <string>Send</string>
            </property>
@@ -533,7 +610,10 @@
         </layout>
        </item>
        <item>
-        <widget class="QPlainTextEdit" name="plainTextEdit">
+        <widget class="QPlainTextEdit" name="serial_monitor_console">
+         <property name="lineWrapMode">
+          <enum>QPlainTextEdit::NoWrap</enum>
+         </property>
          <property name="readOnly">
           <bool>true</bool>
          </property>
@@ -545,33 +625,35 @@
       <attribute name="title">
        <string>Frame View</string>
       </attribute>
+      <layout class="QVBoxLayout" name="tab_frame_view_layout"/>
      </widget>
     </widget>
    </item>
   </layout>
  </widget>
  <tabstops>
-  <tabstop>pushButton_4</tabstop>
-  <tabstop>comboBox_2</tabstop>
-  <tabstop>lineEdit</tabstop>
-  <tabstop>pushButton_5</tabstop>
-  <tabstop>comboBox_3</tabstop>
-  <tabstop>pushButton_2</tabstop>
-  <tabstop>comboBox</tabstop>
-  <tabstop>spinBox</tabstop>
-  <tabstop>pushButton_3</tabstop>
-  <tabstop>lineEdit_2</tabstop>
-  <tabstop>pushButton_6</tabstop>
-  <tabstop>plainTextEdit</tabstop>
-  <tabstop>tabWidget</tabstop>
-  <tabstop>tabWidget_2</tabstop>
-  <tabstop>lineEdit_3</tabstop>
-  <tabstop>lineEdit_4</tabstop>
-  <tabstop>lineEdit_5</tabstop>
-  <tabstop>lineEdit_6</tabstop>
-  <tabstop>lineEdit_7</tabstop>
-  <tabstop>lineEdit_8</tabstop>
-  <tabstop>lineEdit_9</tabstop>
+  <tabstop>ctrl_get_cfg</tabstop>
+  <tabstop>ctrl_set_cfg</tabstop>
+  <tabstop>ctrl_set_parameter</tabstop>
+  <tabstop>ctrl_set_value</tabstop>
+  <tabstop>ctrl_set_head</tabstop>
+  <tabstop>ctrl_start</tabstop>
+  <tabstop>ctrl_stop</tabstop>
+  <tabstop>ctrl_int_time</tabstop>
+  <tabstop>ctrl_light_dark_ratio</tabstop>
+  <tabstop>ctrl_cal</tabstop>
+  <tabstop>serial_monitor_command</tabstop>
+  <tabstop>serial_monitor_send</tabstop>
+  <tabstop>serial_monitor_console</tabstop>
+  <tabstop>crt_int_time</tabstop>
+  <tabstop>crt_pix_reg</tabstop>
+  <tabstop>dt_spec_shape_value</tabstop>
+  <tabstop>dt_mean_value</tabstop>
+  <tabstop>dt_noise_level_value</tabstop>
+  <tabstop>lt_px_reg_offset</tabstop>
+  <tabstop>lt_peak_value</tabstop>
+  <tabstop>tw_bottom</tabstop>
+  <tabstop>tw_top</tabstop>
  </tabstops>
  <resources/>
  <connections/>

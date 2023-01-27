@@ -64,6 +64,7 @@ class Instrument:
         self.plugin_metadata_enabled = False
         self.plugin_instrument_control_enabled = False
         self.plugin_pump_control_enabled = False
+        self.plugin_hypernav_cal_enabled = False
 
         # Load cfg
         self.uuid = uuid
@@ -87,6 +88,10 @@ class Instrument:
         return self._interface.name
 
     @property
+    def interface_signal(self):
+        return self._interface.signal
+
+    @property
     def bare_log_prefix(self) -> str:
         return self.model + self.serial_number
 
@@ -94,7 +99,8 @@ class Instrument:
     def secondary_dock_widget_enabled(self) -> bool:
         return self.plugin_metadata_enabled or \
             self.plugin_instrument_control_enabled or \
-            self.plugin_pump_control_enabled
+            self.plugin_pump_control_enabled or \
+            self.plugin_hypernav_cal_enabled
 
     def setup(self, cfg, raw_logger=LogText):
         self.logger.debug('Setup')
@@ -356,7 +362,7 @@ class Interface:
     def close(self):
         pass
 
-    def read(self):
+    def read(self, size=None):
         pass
 
     def write(self, data):
@@ -467,6 +473,7 @@ class USBInterface(Interface):
     Requirements: pyusb=1.0.2
     Warning: dll for windows might only be compatible with ontrak ADU devices
     """
+
     def __init__(self):
         self._device: usb.core.Device = None
         self._timeout = 200  # ms
@@ -529,7 +536,7 @@ class USBInterface(Interface):
 
     def read(self, size=1):
         # size is converted from bytes to bits
-        return self._device.read(self.read_endpoint, size*8, timeout=self._timeout)
+        return self._device.read(self.read_endpoint, size * 8, timeout=self._timeout)
 
     def write(self, data):
         return self._device.write(self.write_endpoint, data)
@@ -541,6 +548,7 @@ class USBHIDInterface(Interface):
     Does not require additional dll for windows
     Warning: bug have been encountered on windows
     """
+
     def __init__(self):
         self._device = hid.device()
         self._is_open = False
@@ -582,3 +590,42 @@ class USBHIDInterface(Interface):
 
     def write(self, data):
         return self._device.write(data)
+
+
+def get_spy_interface(interface: Interface):
+    class Spy(interface):
+        def __init__(self, signal, max_buffer=2 ** 20):
+            super().__init__()
+            self.signal = signal
+            # self.read_queue = b''
+            # self.write_queue = b''
+            # self.max_buffer = max_buffer
+
+        def read(self, *args, **kwargs):
+            buffer = super().read(*args, **kwargs)
+            # self.read_queue += buffer
+            # if len(self.read_queue) > self.max_buffer:
+            #     self.read_queue = self.read_queue[-self.max_buffer:]
+            if len(buffer) > 0:
+                self.signal.read.emit(buffer)
+            return buffer
+
+        def write(self, data: bytes):
+            # self.write_queue += data
+            # if len(self.write_queue) > self.max_buffer:
+            #     self.write_queue = self.write_queue[-self.max_buffer:]
+            self.signal.write.emit(data)
+            return super().write(data)
+
+        # def spy_read_read(self):
+        #     # TODO Add thread lock
+        #     buffer = self.read_queue
+        #     self.read_queue = b''
+        #     return buffer
+        #
+        # def spy_read_write(self):
+        #     buffer = self.write_queue
+        #     self.write_queue = b''
+        #     return buffer
+
+    return Spy

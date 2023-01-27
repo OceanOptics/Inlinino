@@ -14,7 +14,7 @@ from inlinino.log import Log, LogBinary
 from inlinino.instruments import Instrument
 
 
-PacketMaker = namedtuple('SatlanticPacket', ['frame', 'frame_header'])
+SatPacket = namedtuple('SatlanticPacket', ['frame', 'frame_header'])
 
 
 class Satlantic(Instrument):
@@ -26,7 +26,12 @@ class Satlantic(Instrument):
     KEYS_TO_NOT_DISPLAY = KEYS_TO_IGNORE + ['DATEFIELD', 'TIMEFIELD', 'CHECK_SUM']
 
     def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, setup=False, *args, **kwargs)
+        if 'setup' in kwargs.keys():
+            setup=kwargs['setup']
+            super().__init__(uuid, signal, *args, **kwargs)
+        else:
+            setup=True
+            super().__init__(uuid, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
         self.frame_headers_idx = []
@@ -51,7 +56,8 @@ class Satlantic(Instrument):
         self.plugin_metadata_keys = []
         self.plugin_metadata_frame_counters = []
         # Setup
-        self.init_setup()
+        if setup:
+            self.init_setup()
 
     def setup(self, cfg):
         self.logger.debug('Setup')
@@ -62,38 +68,39 @@ class Satlantic(Instrument):
         for f in self.REQUIRED_CFG_FIELDS:
             if f not in cfg.keys():
                 raise ValueError(f'Missing field %s' % f)
-        # Parse Calibration Files
-        self._parser = pySat.Instrument()
-        if isinstance(cfg['tdf_files'], list):
-            for f, i in zip(cfg['tdf_files'], cfg['immersed']):
-                if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS:
-                    raise pySat.CalibrationFileExtensionError(f'File extension incorrect: {f}')
-                self.logger.debug(f'Reading [immersed={i}] {f}')
-                foo = pySat.Parser(f, i)
-                self._parser.cal[foo.frame_header] = foo
-                self._parser.max_frame_header_length = max(self._parser.max_frame_header_length, len(foo.frame_header))
-        elif isinstance(cfg['tdf_files'], str):
-            empty_sip, i = True, 0
-            archive = zipfile.ZipFile(cfg['tdf_files'], 'r')
-            dirsip = os.path.join(os.path.dirname(cfg['tdf_files']),
-                                  os.path.splitext(os.path.basename(cfg['tdf_files']))[0])
-            if not os.path.exists(dirsip):
-                os.mkdir(dirsip)
-            archive.extractall(path=dirsip)
-            for f in zip(archive.namelist()):
-                if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS \
-                        or os.path.basename(f)[0] == '.':
-                    continue
-                empty_sip, i = False, i + 1
-                self.logger.debug(f"Reading [immersed={cfg['immersed'][i]}] {f}")
-                foo = pySat.Parser(os.path.join(dirsip, f), cfg['immersed'][i])
-                self._parser.cal[foo.frame_header] = foo
-                self._parser.max_frame_header_length = max(self._parser.max_frame_header_length,
-                                                           len(foo.frame_header))
-            if empty_sip:
-                raise pySat.CalibrationFileEmptyError('No calibration file found in sip')
-        else:
-            raise ValueError('Expect list or str for tdf_files')
+        if 'tdf_files' in cfg.keys() and 'immersed' in cfg.keys():  # Needed for child HyperNav which has custom parser
+            # Parse Calibration Files
+            self._parser = pySat.Instrument()
+            if isinstance(cfg['tdf_files'], list):
+                for f, i in zip(cfg['tdf_files'], cfg['immersed']):
+                    if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS:
+                        raise pySat.CalibrationFileExtensionError(f'File extension incorrect: {f}')
+                    self.logger.debug(f'Reading [immersed={i}] {f}')
+                    foo = pySat.Parser(f, i)
+                    self._parser.cal[foo.frame_header] = foo
+                    self._parser.max_frame_header_length = max(self._parser.max_frame_header_length, len(foo.frame_header))
+            elif isinstance(cfg['tdf_files'], str):
+                empty_sip, i = True, 0
+                archive = zipfile.ZipFile(cfg['tdf_files'], 'r')
+                dirsip = os.path.join(os.path.dirname(cfg['tdf_files']),
+                                      os.path.splitext(os.path.basename(cfg['tdf_files']))[0])
+                if not os.path.exists(dirsip):
+                    os.mkdir(dirsip)
+                archive.extractall(path=dirsip)
+                for f in zip(archive.namelist()):
+                    if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS \
+                            or os.path.basename(f)[0] == '.':
+                        continue
+                    empty_sip, i = False, i + 1
+                    self.logger.debug(f"Reading [immersed={cfg['immersed'][i]}] {f}")
+                    foo = pySat.Parser(os.path.join(dirsip, f), cfg['immersed'][i])
+                    self._parser.cal[foo.frame_header] = foo
+                    self._parser.max_frame_header_length = max(self._parser.max_frame_header_length,
+                                                               len(foo.frame_header))
+                if empty_sip:
+                    raise pySat.CalibrationFileEmptyError('No calibration file found in sip')
+            else:
+                raise ValueError('Expect list or str for tdf_files')
         for v in self._parser.cal.values():
             if v.baudrate is not None:
                 self.default_serial_baudrate = v.baudrate
@@ -164,22 +171,22 @@ class Satlantic(Instrument):
             if unknown_bytes:
                 # Log bytes in raw files
                 if self.log_raw_enabled and self._log_active:
-                    self._log_raw.write(PacketMaker(unknown_bytes, None), timestamp)
+                    self._log_raw.write(SatPacket(unknown_bytes, None), timestamp)
             if packet:
-                self.handle_packet(PacketMaker(packet, frame_header), timestamp)
+                self.handle_packet(SatPacket(packet, frame_header), timestamp)
 
-    def parse(self, packet: PacketMaker):
+    def parse(self, packet: SatPacket):
         try:
             data, valid_frame = self._parser.parse_frame(packet.frame, packet.frame_header, flag_get_auxiliary_variables=True)
+            if not valid_frame:
+                self.signal.packet_corrupted.emit()
+            return SatPacket(data, packet.frame_header)
         except pySat.ParserError as e:
             self.signal.packet_corrupted.emit()
             self.logger.warning(e)
             self.logger.debug(packet)
-        if not valid_frame:
-            self.signal.packet_corrupted.emit()
-        return PacketMaker(data, packet.frame_header)
 
-    def handle_data(self, data: PacketMaker, timestamp: float):
+    def handle_data(self, data: SatPacket, timestamp: float):
         cal = self._parser.cal[data.frame_header]
         # Update Metadata Plugin
         metadata = [(None, None)] * len(self.frame_headers_idx)
@@ -215,7 +222,7 @@ class Satlantic(Instrument):
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def udpate_active_timeseries_variables(self, name:str, state: bool):
+    def udpate_active_timeseries_variables(self, name: str, state: bool):
         if not ((state and name not in self.plugin_active_timeseries_variables_selected) or
                 (not state and name in self.plugin_active_timeseries_variables_selected)):
             return
@@ -307,7 +314,7 @@ class ProdLogger:
         for l in self._log.values():
             l.update_cfg(cfg)
 
-    def write(self, packet: PacketMaker, timestamp: float):
+    def write(self, packet: SatPacket, timestamp: float):
         data = []
         for k, c in zip(self._frame_keys[packet.frame_header], self._frame_core_var[packet.frame_header]):
             if c:
@@ -361,5 +368,5 @@ class RawLogger(LogBinary):
         return pack('!ii', int(strftime('%Y%j', gmtime(s))),
                     int('{}{:03d}'.format(strftime('%H%M%S', gmtime(s)), int(ms * 1000))))[1:]
 
-    def write(self, packet: PacketMaker, timestamp: float):
+    def write(self, packet: SatPacket, timestamp: float):
         super().write(packet.frame, timestamp)

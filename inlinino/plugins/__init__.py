@@ -13,8 +13,8 @@ class GenericPlugin(QtWidgets.QWidget):
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, f'widget_{self.__class__.__name__.lower()[:-6]}.ui'), self)
         # App variables
         self.instrument = instrument
-        self.setup()
         self.active = True
+        self.setup()
 
     @property
     def name(self) -> str:

@@ -25,8 +25,7 @@ from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
-from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface,\
-    RELAY_ON, RELAY_OFF, RELAY_HOURLY, RELAY_INTERVAL
+from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface
 from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
@@ -35,20 +34,9 @@ from inlinino.plugins.flow_control import FlowControlPlugin
 from inlinino.plugins.hypernav_cal import HyperNavCalPlugin
 from inlinino.plugins.metadata import MetadataPlugin
 from inlinino.plugins.pump_control import PumpControlPlugin
+from inlinino.signal import InstrumentSignals, HyperNavSignals
 
 logger = logging.getLogger('GUI')
-
-
-class InstrumentSignals(QtCore.QObject):
-    status_update = QtCore.pyqtSignal()
-    packet_received = QtCore.pyqtSignal()
-    packet_corrupted = QtCore.pyqtSignal()
-    packet_logged = QtCore.pyqtSignal()
-    new_ts_data = QtCore.pyqtSignal(object, float)
-    new_spectrum_data = QtCore.pyqtSignal(list)
-    new_aux_data = QtCore.pyqtSignal(list)
-    new_meta_data = QtCore.pyqtSignal(list)
-    alarm = QtCore.pyqtSignal(bool)
 
 
 def seconds_to_strmmss(seconds):
@@ -153,7 +141,10 @@ class MainWindow(QtGui.QMainWindow):
         else:
             raise ValueError(f'Plugin "{plugin_name}" not supported.')
         self.plugins[plugin_name] = plugin
-        self.docked_widget_secondary_layout.addWidget(plugin)
+        if plugin_name == 'MetadataPlugin' and 'HyperNavCalPlugin' in self.plugins.keys():
+            self.plugins['HyperNavCalPlugin'].tab_frame_view_layout.addWidget(plugin)
+        else:
+            self.docked_widget_secondary_layout.addWidget(plugin)
 
     def show_plugin(self, key: str):
         if key in self.plugins.keys():
@@ -224,15 +215,16 @@ class MainWindow(QtGui.QMainWindow):
         self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
         if self.instrument.secondary_dock_widget_enabled:
             self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
-            if self.instrument.plugin_metadata_enabled: # Must be initialized on setup
-                self.add_plugin('MetadataPlugin')
             if self.instrument.plugin_instrument_control_enabled:
                 self.add_plugin('FlowControlPlugin')
-            if self.instrument.plugin_pump_control_enabled:
-                self.add_plugin('PumpControlPlugin')
             if self.instrument.plugin_hypernav_cal_enabled:
                 self.resize(self.frameGeometry().width() + 408 - 245, self.frameGeometry().height())
-                self.add_plugin('HyperNacCalPlugin')
+                self.add_plugin('HyperNavCalPlugin')
+            if self.instrument.plugin_metadata_enabled:  # Should be after HyperNavCalPlugin
+                self.add_plugin('MetadataPlugin')
+            if self.instrument.plugin_pump_control_enabled:
+                self.add_plugin('PumpControlPlugin')
+
             else:
                 # Only add vertical spacer if not hypernav cal plugin
                 self.docked_widget_secondary_layout.addItem(
@@ -432,6 +424,8 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.signal.new_ts_data.emit([], time())
         if self.instrument.spectrum_plot_enabled:
             self.set_spectrum_plot_widget()
+        if self.instrument.plugin_hypernav_cal_enabled:
+            self.plugins['HyperNavCalPlugin'].clear()
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
@@ -703,6 +697,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_plaque_file.clicked.connect(self.act_browse_plaque_file)
         if 'button_browse_temperature_file' in self.__dict__.keys():
             self.button_browse_temperature_file.clicked.connect(self.act_browse_temperature_file)
+        if 'button_browse_px_reg_prt' in self.__dict__.keys():
+            self.button_browse_px_reg_prt.clicked.connect(self.act_browse_px_reg_prt)
+        if 'button_browse_px_reg_sbd' in self.__dict__.keys():
+            self.button_browse_px_reg_sbd.clicked.connect(self.act_browse_px_reg_sbd)
         if 'spinbox_analog_channel0_gain' in self.__dict__.keys():
             self.spinbox_analog_channel0_gain.valueChanged.connect(self.act_update_analog_channel0_input_range)
         if 'spinbox_analog_channel1_gain' in self.__dict__.keys():
@@ -789,6 +787,18 @@ class DialogInstrumentSetup(QtGui.QDialog):
             caption='Choose temperature calibration file', filter='Temperature File (*.mat)')
         self.le_temperature_file.setText(file_name)
 
+    def act_browse_px_reg_prt(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose port side pixel registration file',
+            filter='Registration File (*.cgs *.cal *.tdf *.CGS *.CAL *.TDF)')
+        self.le_optional_px_reg_path_prt.setText(file_name)
+
+    def act_browse_px_reg_sbd(self):
+        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+            caption='Choose starboard pixel registration file',
+            filter='Registration File (*.cgs *.cal *.tdf *.CGS *.CAL *.TDF)')
+        self.le_optional_px_reg_path_sbd.setText(file_name)
+
     def act_update_analog_channel0_input_range(self):
         self.label_analog_channel0_input_range.setText(
             f'0 - {self.ADU100_AN01_GAIN2RANGE[self.spinbox_analog_channel0_gain.value()]}')
@@ -816,12 +826,15 @@ class DialogInstrumentSetup(QtGui.QDialog):
         empty_fields = list()
         for f in fields:
             field_prefix, field_name = f.split('_', 1)
+            field_optional = 'optional' in f
+            if field_optional:
+                field_name = field_name[9:]
             field_pretty_name = field_name.replace('_', ' ').title()
             if f in ['combobox_interface', 'combobox_model', *[f'combobox_relay{i}_mode' for i in range(4)]]:
                 self.cfg[field_name] = self.__dict__[f].currentText()
             elif field_prefix == 'le':
                 value = getattr(self, f).text().strip()
-                if not value:
+                if not field_optional and not value:
                     empty_fields.append(field_pretty_name)
                     continue
                 # Apply special formatting to specific variables
@@ -948,13 +961,25 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = False
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
-        elif self.cfg['module'] in ['satlantic', 'hypernav']:
+        elif self.cfg['module'] in 'satlantic':
             self.cfg['tdf_files'] = self.tdf_files
             self.cfg['immersed'] = []
             for i in range(self.scroll_area_layout_immersed.count()):
                 item = self.scroll_area_layout_immersed.itemAt(i)
                 if type(item) == QtGui.QWidgetItem:
                     self.cfg['immersed'].append(bool(item.widget().checkState()))
+        elif self.cfg['module'] == 'hypernav':
+            try:
+                self.cfg['prt_sbs_sn'] = int(self.cfg['prt_sbs_sn'])
+            except ValueError:
+                self.notification('Port side serial number must be an integer.')
+                return
+            try:
+                self.cfg['sbd_sbs_sn'] = int(self.cfg['sbd_sbs_sn'])
+            except ValueError:
+                self.notification('Starboard serial number must be an integer.')
+                return
+            # TODO Validate files received for pixel registration
         # Update global instrument cfg
         CFG.read()  # Update local cfg if other instance updated cfg
         CFG.instruments[self.cfg_uuid] = self.cfg.copy()
@@ -1041,6 +1066,8 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                     getattr(self, 'le_' + k).setText(v.decode().encode('unicode_escape').decode())
                 elif isinstance(v, list):
                     getattr(self, 'le_' + k).setText(', '.join([str(vv) for vv in v]))
+                elif isinstance(v, int):
+                    getattr(self, 'le_' + k).setText(f'{v:d}')
                 else:
                     getattr(self, 'le_' + k).setText(v)
             elif hasattr(self, 'te_' + k):
@@ -1347,6 +1374,8 @@ class App(QtGui.QApplication):
                     self.main_window.init_instrument(DATAQ(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'hyperbb':
                     self.main_window.init_instrument(HyperBB(instrument_uuid, InstrumentSignals()))
+                elif instrument_module_name == 'hypernav':
+                    self.main_window.init_instrument(HyperNav(instrument_uuid, HyperNavSignals()))
                 elif instrument_module_name == 'lisst':
                     self.main_window.init_instrument(LISST(instrument_uuid, InstrumentSignals()))
                 elif instrument_module_name == 'nmea':
