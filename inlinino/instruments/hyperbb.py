@@ -1,8 +1,5 @@
 from inlinino.instruments import Instrument
-import pyqtgraph as pg
-import configparser
 import numpy as np
-from time import sleep
 from threading import Lock
 from scipy.io import loadmat
 from scipy.interpolate import interp2d, splrep, splev  # , pchip_interpolate
