@@ -415,10 +415,10 @@
   </widget>
  </widget>
  <tabstops>
-  <tabstop>button_setup</tabstop>
   <tabstop>button_serial</tabstop>
   <tabstop>button_log</tabstop>
   <tabstop>button_figure_clear</tabstop>
+  <tabstop>button_setup</tabstop>
   <tabstop>le_filename</tabstop>
   <tabstop>le_directory</tabstop>
   <tabstop>le_active_timeseries_variables_search</tabstop>

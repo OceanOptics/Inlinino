@@ -31,10 +31,10 @@ from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
 from inlinino.instruments.lisst import LISSTParser
 from inlinino.plugins.flow_control import FlowControlPlugin
-from inlinino.plugins.hypernav_cal import HyperNavCalPlugin
+from inlinino.plugins.hypernav_widget import HyperNavCalPlugin
 from inlinino.plugins.metadata import MetadataPlugin
 from inlinino.plugins.pump_control import PumpControlPlugin
-from inlinino.signal import InstrumentSignals, HyperNavSignals
+from inlinino.app_signal import InstrumentSignals, HyperNavSignals
 
 logger = logging.getLogger('GUI')
 
@@ -168,7 +168,8 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
         self.instrument.signal.packet_logged.connect(self.on_packet_logged)
         self.instrument.signal.new_ts_data.connect(self.on_new_ts_data)
-        self.instrument.signal.alarm.connect(self.on_data_timeout)
+        if self.instrument.signal.alarm is not None:
+            self.instrument.signal.alarm.connect(self.on_data_timeout)
 
         # Set Plugins specific to instrument
         # Auxiliary Data Plugin
@@ -224,7 +225,6 @@ class MainWindow(QtGui.QMainWindow):
                 self.add_plugin('MetadataPlugin')
             if self.instrument.plugin_pump_control_enabled:
                 self.add_plugin('PumpControlPlugin')
-
             else:
                 # Only add vertical spacer if not hypernav cal plugin
                 self.docked_widget_secondary_layout.addItem(
@@ -291,6 +291,9 @@ class MainWindow(QtGui.QMainWindow):
         min_x = 0 if min_x is None else min_x
         max_x = 1 if max_x is None else max_x
         self.spectrum_plot_widget.setXRange(min_x, max_x)
+        if hasattr(self.instrument, 'spectrum_plot_x_label'):
+            x_label_name, x_label_units = self.instrument.spectrum_plot_x_label
+            self.spectrum_plot_widget.plotItem.setLabel('bottom', x_label_name, units=x_label_units)
         self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
 
     def set_aux_data_widget(self):
@@ -426,6 +429,9 @@ class MainWindow(QtGui.QMainWindow):
             self.set_spectrum_plot_widget()
         if self.instrument.plugin_hypernav_cal_enabled:
             self.plugins['HyperNavCalPlugin'].clear()
+        if self.instrument.plugin_metadata_enabled:
+            self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
+            self.plugins['MetadataPlugin'].reset()
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
@@ -602,8 +608,13 @@ class MainWindow(QtGui.QMainWindow):
     def closeEvent(self, event):
         msg = QtGui.QMessageBox(self)
         msg.setIcon(QtGui.QMessageBox.Question)
+        msg.setText("Are you sure you want to exit?")
+        if self.instrument.plugin_hypernav_cal_enabled:
+            txt = self.instrument.check_sbs_sn()
+            if txt:
+                msg.setIcon(QtGui.QMessageBox.Warning)
+                msg.setText(txt + "\nDo you want to exit anyway?")
         msg.setWindowTitle("Inlinino: Closing Application")
-        msg.setText("Are you sure to quit ?")
         msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
         msg.setDefaultButton(QtGui.QMessageBox.No)
         if msg.exec_() == QtGui.QMessageBox.Yes:
@@ -1059,8 +1070,12 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
         self.cfg_uuid = uuid
         self.cfg = CFG.instruments[uuid]
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'setup_' + self.cfg['module'] + '.ui'), self)
+        # Get optional fields
+        optional_fields = [k[12:] for k in self.__dict__.keys() if 'optional' in k]
         # Populate fields
         for k, v in self.cfg.items():
+            if k in optional_fields:
+                k = 'optional_' + k
             if hasattr(self, 'le_' + k):
                 if isinstance(v, bytes):
                     getattr(self, 'le_' + k).setText(v.decode().encode('unicode_escape').decode())

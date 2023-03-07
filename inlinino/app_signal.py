@@ -1,4 +1,4 @@
-from pyqtgraph import QtCore
+from pyqtgraph.Qt import QtCore
 
 
 class InstrumentSignals(QtCore.QObject):
@@ -16,6 +16,9 @@ class InstrumentSignals(QtCore.QObject):
 class HyperNavSignals(InstrumentSignals):
     toggle_command_mode = QtCore.pyqtSignal(bool)
     new_frame = QtCore.pyqtSignal(object)
+    cfg_update = QtCore.pyqtSignal(str)
+    warning = QtCore.pyqtSignal(str)
+    alarm = None  # Disable data timeout
 
 
 class InterfaceSignals(QtCore.QObject):

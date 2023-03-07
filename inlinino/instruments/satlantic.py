@@ -173,18 +173,18 @@ class Satlantic(Instrument):
                 if self.log_raw_enabled and self._log_active:
                     self._log_raw.write(SatPacket(unknown_bytes, None), timestamp)
             if packet:
-                self.handle_packet(SatPacket(packet, frame_header), timestamp)
+                try:
+                    self.handle_packet(SatPacket(packet, frame_header), timestamp)
+                except pySat.ParserError as e:
+                    self.signal.packet_corrupted.emit()
+                    self.logger.warning(e)
+                    self.logger.debug(packet)
 
     def parse(self, packet: SatPacket):
-        try:
-            data, valid_frame = self._parser.parse_frame(packet.frame, packet.frame_header, flag_get_auxiliary_variables=True)
-            if not valid_frame:
-                self.signal.packet_corrupted.emit()
-            return SatPacket(data, packet.frame_header)
-        except pySat.ParserError as e:
+        data, valid_frame = self._parser.parse_frame(packet.frame, packet.frame_header, flag_get_auxiliary_variables=True)
+        if not valid_frame:
             self.signal.packet_corrupted.emit()
-            self.logger.warning(e)
-            self.logger.debug(packet)
+        return SatPacket(data, packet.frame_header)
 
     def handle_data(self, data: SatPacket, timestamp: float):
         cal = self._parser.cal[data.frame_header]

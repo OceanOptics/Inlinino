@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>386</width>
-    <height>763</height>
+    <width>307</width>
+    <height>632</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -38,7 +38,7 @@
       </sizepolicy>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="control_tab">
       <attribute name="title">
@@ -56,6 +56,16 @@
           </property>
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <property name="spacing">
+             <number>5</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="label_16">
+              <property name="text">
+               <string>Configuration </string>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QPushButton" name="ctrl_get_cfg">
               <property name="enabled">
@@ -63,13 +73,6 @@
               </property>
               <property name="text">
                <string>Get</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="label_16">
-              <property name="text">
-               <string>Configuration</string>
               </property>
              </widget>
             </item>
@@ -93,18 +96,21 @@
           </item>
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <property name="spacing">
+             <number>5</number>
+            </property>
+            <item>
+             <widget class="QComboBox" name="ctrl_set_parameter"/>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="ctrl_set_value"/>
+            </item>
             <item>
              <widget class="QPushButton" name="ctrl_set_cfg">
               <property name="text">
                <string>Set</string>
               </property>
              </widget>
-            </item>
-            <item>
-             <widget class="QComboBox" name="ctrl_set_parameter"/>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="ctrl_set_value"/>
             </item>
             <item>
              <spacer name="horizontalSpacer_3">
@@ -126,10 +132,13 @@
           </item>
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <property name="spacing">
+             <number>5</number>
+            </property>
             <item>
              <widget class="QLabel" name="label_3">
               <property name="text">
-               <string>Sampled Spectrometer</string>
+               <string>Sampled Spectrometer </string>
               </property>
              </widget>
             </item>
@@ -222,12 +231,15 @@
              <item row="0" column="0">
               <widget class="QLabel" name="label">
                <property name="text">
-                <string>Integration Time</string>
+                <string>Integration Time (ms)</string>
                </property>
               </widget>
              </item>
              <item row="0" column="1">
               <widget class="QComboBox" name="ctrl_int_time">
+               <property name="currentText">
+                <string>40</string>
+               </property>
                <item>
                 <property name="text">
                  <string>20</string>
@@ -283,7 +295,7 @@
                 <number>1</number>
                </property>
                <property name="value">
-                <number>5</number>
+                <number>1</number>
                </property>
               </widget>
              </item>
@@ -617,6 +629,9 @@
          <property name="readOnly">
           <bool>true</bool>
          </property>
+         <property name="plainText">
+          <string notr="true"/>
+         </property>
         </widget>
        </item>
       </layout>
@@ -632,8 +647,6 @@
   </layout>
  </widget>
  <tabstops>
-  <tabstop>ctrl_get_cfg</tabstop>
-  <tabstop>ctrl_set_cfg</tabstop>
   <tabstop>ctrl_set_parameter</tabstop>
   <tabstop>ctrl_set_value</tabstop>
   <tabstop>ctrl_set_head</tabstop>

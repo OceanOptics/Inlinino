@@ -49,11 +49,17 @@
         <property name="selectionMode">
          <enum>QAbstractItemView::NoSelection</enum>
         </property>
-        <property name="indentation">
-         <number>8</number>
+        <property name="animated">
+         <bool>true</bool>
+        </property>
+        <property name="headerHidden">
+         <bool>false</bool>
         </property>
         <attribute name="headerVisible">
-         <bool>false</bool>
+         <bool>true</bool>
+        </attribute>
+        <attribute name="headerMinimumSectionSize">
+         <number>120</number>
         </attribute>
         <column>
          <property name="text">
@@ -62,7 +68,7 @@
         </column>
         <column>
          <property name="text">
-          <string>Values</string>
+          <string>Value</string>
          </property>
         </column>
        </widget>

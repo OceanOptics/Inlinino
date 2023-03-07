@@ -78,6 +78,12 @@
       </property>
       <item row="0" column="0">
        <widget class="QLabel" name="label_10">
+        <property name="statusTip">
+         <string>Log data as received by the instrument and timestamp it. Output data file follow Satlantic conventions and is similar to SatView output.</string>
+        </property>
+        <property name="whatsThis">
+         <string>Log data as received by the instrument and timestamp it. Output data file follow Satlantic conventions and is similar to SatView output.</string>
+        </property>
         <property name="text">
          <string>Log Raw</string>
         </property>
@@ -114,6 +120,12 @@
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_11">
+        <property name="statusTip">
+         <string>Apply calibration or telemetry definition to incoming raw data to output human-readable data in csv files. Equivalent of SatCon output.</string>
+        </property>
+        <property name="whatsThis">
+         <string>Apply calibration or telemetry definition to incoming raw data to output human-readable data in csv files. Equivalent of SatCon output.</string>
+        </property>
         <property name="text">
          <string>Log Products</string>
         </property>
@@ -130,8 +142,11 @@
           <height>30</height>
          </size>
         </property>
+        <property name="currentText">
+         <string>off</string>
+        </property>
         <property name="currentIndex">
-         <number>0</number>
+         <number>1</number>
         </property>
         <item>
          <property name="text">

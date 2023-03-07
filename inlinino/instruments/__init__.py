@@ -213,21 +213,24 @@ class Instrument:
                         data_received = timestamp
                         if data_timeout_flag:
                             data_timeout_flag = False
-                            self.signal.alarm.emit(False)
+                            if self.signal.alarm is not None:
+                                self.signal.alarm.emit(False)
                     except Exception as e:
                         self.logger.warning(e)
-                        # raise e
+                        raise e
                 else:
                     if data_received is not None and \
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
                         self.logger.error(f'No data received during the past {timestamp - data_received:.2f} seconds')
                         data_timeout_flag = True
-                        self.signal.alarm.emit(True)
+                        if self.signal.alarm is not None:
+                            self.signal.alarm.emit(True)
             except InterfaceException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
                 self.logger.error(e)
-                self.signal.alarm.emit(True)
+                if self.signal.alarm is not None:
+                    self.signal.alarm.emit(True)
                 break
         self.close(wait_thread_join=False)
 
@@ -592,7 +595,7 @@ class USBHIDInterface(Interface):
         return self._device.write(data)
 
 
-def get_spy_interface(interface: Interface):
+def get_spy_interface(interface: Interface, echo=True):
     class Spy(interface):
         def __init__(self, signal, max_buffer=2 ** 20):
             super().__init__()
@@ -614,7 +617,8 @@ def get_spy_interface(interface: Interface):
             # self.write_queue += data
             # if len(self.write_queue) > self.max_buffer:
             #     self.write_queue = self.write_queue[-self.max_buffer:]
-            self.signal.write.emit(data)
+            if echo:
+                self.signal.write.emit(data)
             return super().write(data)
 
         # def spy_read_read(self):

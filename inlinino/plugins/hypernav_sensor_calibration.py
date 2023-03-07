@@ -28,7 +28,7 @@ def compute_dark_stats(data: np.ndarray) -> HyperNavDarkSpecStats:
     )
 
 
-def test_dark(stats: HyperNavDarkSpecStats) -> HyperNavDarkSpecStats:
+def grade_dark_frames(stats: HyperNavDarkSpecStats) -> HyperNavDarkSpecStats:
     """
     Pass/Fail test for characterization of dark from HyperNav spectrometer + board assembly
 
@@ -38,7 +38,7 @@ def test_dark(stats: HyperNavDarkSpecStats) -> HyperNavDarkSpecStats:
     return HyperNavDarkSpecStats(
         spectral_shape=stats.spectral_shape < 100,
         mean_value=stats.mean_value < 6000,
-        noise_level=stats.noise_level < 200,
+        noise_level=stats.noise_level < 80,
     )
 
 
@@ -57,11 +57,11 @@ def compute_light_stats(data: np.ndarray) -> HyperNavLightSpecStats:
     """
     return HyperNavLightSpecStats(
         pixel_registration=np.nan,  # TODO Implement test
-        peak_value=np.nanpercentile(data, 98),
+        peak_value=np.nanpercentile(data, 99.5),
     )
 
 
-def test_light(stats: HyperNavLightSpecStats) -> HyperNavLightSpecStats:
+def grade_light_frames(stats: HyperNavLightSpecStats) -> HyperNavLightSpecStats:
     """
     Pass/Fail test for characterization of light from HyperNav spectrometer + board assembly
 
