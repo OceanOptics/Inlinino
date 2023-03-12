@@ -1,20 +1,29 @@
 import os.path
+from threading import Thread
+
+from glob import glob
 from time import time, sleep
+from multiprocessing import Process
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
 
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
-from inlinino.plugins import GenericPlugin
-from inlinino.plugins.hypernav_sensor_calibration import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames
+from inlinino.widgets import GenericWidget, classproperty
+from inlinino.widgets.monitor import MonitorWidget
+from inlinino.widgets.metadata import MetadataWidget
+
+from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
+    spec_board_report
+from hypernav.io import HyperNAV as HyperNavIO
 
 UPASS = u'\u2705'
 UFAIL = u'\u274C'
 
 
-class HyperNavCalPlugin(GenericPlugin):
-    BUFFER_LENGTH = 120
+class HyperNavCalWidget(GenericWidget):
+    expanding = True
     HN_PARAMETERS = [
         'SENSTYPE','SENSVERS','SERIALNO','PWRSVISR','USBSWTCH','SPCSBDSN','SPCPRTSN','FRMSBDSN','FRMPRTSN',
         'ACCMNTNG','ACCVERTX','ACCVERTY','ACCVERTZ','MAG_MINX','MAG_MAXX','MAG_MINY','MAG_MAXY','MAG_MINZ','MAG_MAXZ',
@@ -24,12 +33,22 @@ class HyperNavCalPlugin(GenericPlugin):
         'STUPSTUS','MSGLEVEL','MSGFSIZE','DATFSIZE','OUTFRSUB','LOGFRAMS','ACQCOUNT','CNTCOUNT','DATAMODE'
     ]
 
+    @classproperty
+    def __snake_name__(cls) -> str:
+        return 'hypernav_cal_widget'
+
     def __init__(self, instrument: HyperNav):
-        # Plugin variables (init before super() due to setup)
-        self.lu = {}
-        self.characterized_head_sn = None
+        # widget variables (init before super() due to setup)
         self.time_last_tx = 0
+        self.widgets = {'serial_monitor': MonitorWidget(instrument),
+                        'frame_view': MetadataWidget(instrument),
+                        'characterize': HyperNavCharacterizeDMWidget(instrument)}
+                        # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
         super().__init__(instrument)
+        # Add widgets
+        self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
+        self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
+        self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
         # Connect signals (must be after super() as required ui to be loaded)
         self.instrument.signal.warning.connect(self.warning_message_box)
         self.instrument.signal.cfg_update.connect(self.update_set_cfg_value)
@@ -43,23 +62,6 @@ class HyperNavCalPlugin(GenericPlugin):
         self.ctrl_start.clicked.connect(self.start)
         self.ctrl_stop.clicked.connect(self.stop)
         self.ctrl_cal.clicked.connect(self.cal)
-        # Characterize
-        self.crt_characterized_head.currentTextChanged.connect(self.set_head_to_characterize)
-        self.instrument.signal.new_frame.connect(self.characterize)
-        # Serial Monitor
-        self.instrument.interface_signal.read.connect(self.update_serial_console)
-        self.instrument.interface_signal.write.connect(self.update_serial_console)
-        self.serial_monitor_command.returnPressed.connect(self.send_command)
-        self.serial_monitor_send.clicked.connect(self.send_command)
-        self.serial_monitor_console.setMaximumBlockCount(80)  # Maximum number of lines in console
-
-    def show(self):
-        self.group_box_instrument_control.show()
-        super().show()
-
-    def hide(self):
-        self.group_box_instrument_control.hide()
-        super().hide()
 
     def setup(self):
         self.clear()
@@ -67,15 +69,13 @@ class HyperNavCalPlugin(GenericPlugin):
         for param in self.HN_PARAMETERS:
             self.ctrl_set_parameter.addItem(param)
         self.toggle_control(False)  # TODO Should be toggled when instrument is open or closed
-        # Characterize
-        self.set_head_to_characterize(self.crt_characterized_head.currentText())
 
     def clear(self):
-        # Characterize
-        self.lu = {}
-        self.clear_characterize()
-        # Serial Monitor
-        self.serial_monitor_console.clear()
+        for widget in self.widgets.values():
+            widget.clear()
+
+    def counter_reset(self):
+        self.widgets['frame_view'].clear()
 
     @QtCore.pyqtSlot(str)
     def warning_message_box(self, message):
@@ -183,70 +183,6 @@ class HyperNavCalPlugin(GenericPlugin):
     def cal(self):
         self.tx(f'cal {self.ctrl_int_time.currentText()},{self.ctrl_light_dark_ratio.value()}')
 
-    """
-    Characterize
-    """
-    def set_head_to_characterize(self, head):
-        self.characterized_head_sn = self.instrument.get_head_sbs_sn(head)
-        if self.instrument.px_reg_path[head]:
-            self.crt_pix_reg.setText(os.path.basename(self.instrument.px_reg_path[head]))
-        else:
-            self.crt_pix_reg.setText('pixel number')
-        self.clear_characterize()  # Empty UI
-
-    @QtCore.pyqtSlot(object)
-    def characterize(self, data: SatPacket):
-        # Update buffer
-        if data.frame_header not in self.lu.keys():
-            self.lu[data.frame_header] = np.empty((self.BUFFER_LENGTH, 2048), dtype=np.float32)
-            self.lu[data.frame_header][:] = np.NaN
-        self.lu[data.frame_header] = np.roll(self.lu[data.frame_header], -1, axis=0)
-        idx_start, idx_end = self.instrument._parser_core_idx_limits[data.frame_header]
-        self.lu[data.frame_header][-1, :] = data.frame[idx_start:idx_end]
-        # Get side to analyze
-        if int(data.frame_header[-4:]) != self.characterized_head_sn:
-            # Only analyze relevant side
-            return
-        # Update integration time
-        idx_inttime = 4
-        self.crt_int_time.setText(f'{data.frame[idx_inttime]}')
-        # Get number of observations
-        n_obs = np.sum(np.any(~np.isnan(self.lu[data.frame_header]), axis=1))
-        # Update Dark
-        if data.frame_header[4] == 'D':
-            stats = compute_dark_stats(self.lu[data.frame_header])
-            test = grade_dark_frames(stats)
-            self.dark_tests.setTitle(f'Dark Tests (n={n_obs})')
-            self.dt_spec_shape_value.setText(f'{stats.spectral_shape:.1f}')
-            self.dt_spec_shape_test.setText(UPASS if test.spectral_shape else UFAIL)
-            self.dt_mean_value.setText(f'{stats.mean_value:.1f}')
-            self.dt_mean_test.setText(UPASS if test.mean_value else UFAIL)
-            self.dt_noise_level_value.setText(f'{stats.noise_level:.1f}')
-            self.dt_noise_level_test.setText(UPASS if test.noise_level else UFAIL)
-        # Update Light
-        if data.frame_header[4] == 'L':
-            stats = compute_light_stats(self.lu[data.frame_header])
-            test = grade_light_frames(stats)
-            self.light_tests.setTitle(f'Light Tests (n={n_obs})')
-            self.lt_px_reg_offset.setText(f'{stats.pixel_registration:.2f}')
-            self.lt_px_reg_test.setText(UPASS if test.pixel_registration else UFAIL)
-            self.lt_peak_value.setText(f'{stats.peak_value:.0f}')
-            self.lt_peak_test.setText(UPASS if test.peak_value else UFAIL)
-
-    def clear_characterize(self):
-        self.dt_spec_shape_value.setText('')
-        self.dt_spec_shape_test.setText('')
-        self.dt_mean_value.setText('')
-        self.dt_mean_test.setText('')
-        self.dt_noise_level_value.setText('')
-        self.dt_noise_level_test.setText('')
-        self.lt_px_reg_offset.setText('')
-        self.lt_px_reg_test.setText('')
-        self.lt_peak_value.setText('')
-        self.lt_peak_test.setText('')
-        self.dark_tests.setTitle(f'Dark Tests')
-        self.light_tests.setTitle(f'Light Tests')
-
 
     """
     Serial Monitor
@@ -265,3 +201,149 @@ class HyperNavCalPlugin(GenericPlugin):
         else:
             self.tx(cmd)
             self.serial_monitor_command.setText('')
+
+
+class HyperNavCharacterizeRTWidget(GenericWidget):
+    BUFFER_LENGTH = 120
+
+    @classproperty
+    def __snake_name__(cls) -> str:
+        return 'hypernav_characterize_rt_widget'
+
+    def __init__(self, instrument: HyperNav):
+        # Custom variables
+        self.lu = {}
+        self.head_sn = None
+        super().__init__(instrument)
+        # Connect signals and triggers
+        self.crt_characterized_head.currentTextChanged.connect(self.set_head)
+        self.instrument.signal.new_frame.connect(self.characterize)
+
+    def setup(self):
+        self.set_head(self.crt_characterized_head.currentText())
+
+    def clear(self):
+        self.lu = {}
+        self.dt_spec_shape_value.setText('')
+        self.dt_spec_shape_test.setText('')
+        self.dt_mean_value.setText('')
+        self.dt_mean_test.setText('')
+        self.dt_noise_level_value.setText('')
+        self.dt_noise_level_test.setText('')
+        self.lt_px_reg_offset.setText('')
+        self.lt_px_reg_test.setText('')
+        self.lt_peak_value.setText('')
+        self.lt_peak_test.setText('')
+        self.dark_tests.setTitle(f'Dark Tests')
+        self.light_tests.setTitle(f'Light Tests')
+
+    def set_head(self, head):
+        self.head_sn = self.instrument.get_head_sbs_sn(head)
+        if self.instrument.px_reg_path[head]:
+            self.crt_pix_reg.setText(os.path.basename(self.instrument.px_reg_path[head]))
+        else:
+            self.crt_pix_reg.setText('pixel number')
+        self.clear()
+
+    @QtCore.pyqtSlot(object)
+    def characterize(self, data: SatPacket):
+        # Update buffer
+        if data.frame_header not in self.lu.keys():
+            self.lu[data.frame_header] = np.empty((self.BUFFER_LENGTH, 2048), dtype=np.float32)
+            self.lu[data.frame_header][:] = np.NaN
+        self.lu[data.frame_header] = np.roll(self.lu[data.frame_header], -1, axis=0)
+        idx_start, idx_end = self.instrument._parser_core_idx_limits[data.frame_header]
+        self.lu[data.frame_header][-1, :] = data.frame[idx_start:idx_end]
+        # Get side to analyze
+        if int(data.frame_header[-4:]) != self.head_sn:
+            # Only analyze relevant side
+            return
+        # Update integration time
+        idx_inttime = 4
+        self.crt_int_time.setText(f'{data.frame[idx_inttime]}')
+        # Get number of observations
+        n_obs = np.sum(np.any(~np.isnan(self.lu[data.frame_header]), axis=1))
+        # Update Dark
+        if data.frame_header[4] == 'D':
+            stats = compute_dark_stats(self.lu[data.frame_header])
+            test = grade_dark_frames(stats)
+            self.dark_tests.setTitle(f'Dark Tests (n={n_obs})')
+            self.dt_spec_shape_value.setText(f'{stats.range:.1f}')
+            self.dt_spec_shape_test.setText(UPASS if test.range else UFAIL)
+            self.dt_mean_value.setText(f'{stats.mean:.1f}')
+            self.dt_mean_test.setText(UPASS if test.mean else UFAIL)
+            self.dt_noise_level_value.setText(f'{stats.noise:.1f}')
+            self.dt_noise_level_test.setText(UPASS if test.noise else UFAIL)
+        # Update Light
+        if data.frame_header[4] == 'L':
+            stats = compute_light_stats(self.lu[data.frame_header])
+            test = grade_light_frames(stats)
+            self.light_tests.setTitle(f'Light Tests (n={n_obs})')
+            # self.lt_px_reg_offset.setText(f'{stats.pixel_registration:.2f}')
+            # self.lt_px_reg_test.setText(UPASS if test.pixel_registration else UFAIL)
+            self.lt_peak_value.setText(f'{stats.range:.0f}')
+            self.lt_peak_test.setText(UPASS if test.range else UFAIL)
+
+
+class HyperNavCharacterizeDMWidget(GenericWidget):
+
+    @classproperty
+    def __snake_name__(cls) -> str:
+        return 'hypernav_characterize_dm_widget'
+
+    def __init__(self, instrument: HyperNav):
+        self.worker = None
+        super().__init__(instrument)
+        self.generate_report_button.clicked.connect(self.start)
+        self.instrument.signal.status_update.connect(self.update_filename_combobox)
+
+    def setup(self):
+        self.update_filename_combobox()
+
+    @QtCore.pyqtSlot()
+    def update_filename_combobox(self):
+        self.filename_combobox.clear()
+        file_list = [os.path.basename(f) for f in sorted(glob(os.path.join(
+            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))]
+        self.filename_combobox.addItems(file_list)
+        self.filename_combobox.setCurrentIndex(len(file_list)-1)
+
+    @QtCore.pyqtSlot()
+    def start(self):
+        if not self.generate_report_button.isEnabled():
+            return
+        # Disable button
+        self.generate_report_button.setText('Processing ...')
+        self.generate_report_button.setEnabled(False)
+        # Check file to analyze is closed
+        filename = self.filename_combobox.currentText()
+        if self.instrument.log_active and filename == self.instrument.log_filename:
+            self.instrument.signal.warning.emit('Stop logging to analyze data.')
+            return
+        # Start worker
+        self.worker = Process(name='HyperNavWorker', target=HyperNavCharacterizeDMWidget.run, args=(
+            self.instrument.serial_number, self.instrument.prt_sbs_sn, self.instrument.sbd_sbs_sn,
+            self.instrument.log_path, filename
+        ))
+        self.worker.start()
+        # Start join thread
+        Thread(target=self._join, daemon=True).start()
+
+    @staticmethod
+    def run(hn_sn, prt_sn, sbd_sn, path, filename):
+        hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
+        data, meta = hn.read_inlinino(os.path.join(path, filename))
+        for sn in (prt_sn, sbd_sn):
+            if f'SATYLZ{sn:04d}' in meta['valid_frames'].keys() or f'SATYDZ{sn:04d}' in meta['valid_frames'].keys():
+                ref = os.path.splitext(filename)[0]
+                report = spec_board_report(data, ref, sn)
+                dpi = 96
+                report.write_image(os.path.join(path, f"{ref}_SBSSN{sn:04}.pdf"), width=dpi * 11, height=dpi * 8.5)
+                report.show()
+
+    def _join(self):
+        if self.worker is None:
+            return
+        self.worker.join()
+        self.generate_report_button.setText('Generate Report')
+        self.generate_report_button.setEnabled(True)

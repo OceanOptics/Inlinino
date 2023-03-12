@@ -10,3 +10,5 @@ pynmea2>=1.18.0
 pyusb>=1.2
 hidapi>=0.11
 setuptools
+plotly
+kaleido

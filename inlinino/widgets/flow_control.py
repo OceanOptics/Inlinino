@@ -1,10 +1,10 @@
 from time import time
 
 from inlinino.instruments.ontrak import RELAY_ON, RELAY_OFF, RELAY_HOURLY, RELAY_INTERVAL
-from inlinino.plugins import GenericPlugin
+from inlinino.widgets import GenericWidget
 
 
-class FlowControlPlugin(GenericPlugin):
+class FlowControlWidget(GenericWidget):
 
     def __init__(self, instrument):
         super().__init__(instrument)
@@ -15,17 +15,16 @@ class FlowControlPlugin(GenericPlugin):
         self.spinbox_instrument_control_filter_start_every.valueChanged.connect(self.set_switch_timing)
         self.spinbox_instrument_control_filter_duration.valueChanged.connect(self.set_switch_timing)
 
-    def show(self):
-        self.group_box_instrument_control.show()
-        super().show()
-
-    def hide(self):
-        self.group_box_instrument_control.hide()
-        super().hide()
-
     def setup(self):
         self.set_switch_mode()
         self.set_switch_timing()
+
+    def reset(self):
+        if self.instrument.widget_flow_control_enabled:
+            self.setup()
+            self.group_box_instrument_control.show()
+        else:
+            self.group_box_instrument_control.hide()
 
     def set_switch_mode(self):
         if self.radio_instrument_control_filter.isChecked():

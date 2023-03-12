@@ -6,7 +6,6 @@ import uuid
 import zipfile
 from math import floor
 from time import time, gmtime, strftime
-
 import serial
 from serial.tools.list_ports import comports as list_serial_comports
 import numpy as np
@@ -16,7 +15,9 @@ from PyQt5 import QtMultimedia
 from pyACS.acs import ACS as ACSParser
 import pySatlantic.instrument as pySat
 
-from inlinino import RingBuffer, CFG, __version__, PATH_TO_RESOURCES, COLOR_SET
+from inlinino import RingBuffer, __version__, PATH_TO_RESOURCES, COLOR_SET
+from inlinino.app_signal import InstrumentSignals, HyperNavSignals
+from inlinino.cfg import CFG
 from inlinino.instruments import Instrument, SerialInterface, SocketInterface, USBInterface, USBHIDInterface, \
     InterfaceException
 from inlinino.instruments.acs import ACS
@@ -30,11 +31,13 @@ from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
 from inlinino.instruments.lisst import LISSTParser
-from inlinino.plugins.flow_control import FlowControlPlugin
-from inlinino.plugins.hypernav_widget import HyperNavCalPlugin
-from inlinino.plugins.metadata import MetadataPlugin
-from inlinino.plugins.pump_control import PumpControlPlugin
-from inlinino.app_signal import InstrumentSignals, HyperNavSignals
+from inlinino.widgets.aux_data import AuxDataWidget
+from inlinino.widgets.flow_control import FlowControlWidget
+from inlinino.widgets.hypernav import HyperNavCalWidget
+from inlinino.widgets.metadata import MetadataWidget
+from inlinino.widgets.pump_control import PumpControlWidget
+from inlinino.widgets.select_channel import SelectChannelWidget
+
 
 logger = logging.getLogger('GUI')
 
@@ -89,7 +92,7 @@ class MainWindow(QtGui.QMainWindow):
         self.button_setup.clicked.connect(self.act_instrument_setup)
         self.button_serial.clicked.connect(self.act_instrument_interface)
         self.button_log.clicked.connect(self.act_instrument_log)
-        self.button_figure_clear.clicked.connect(self.act_clear_plots)
+        self.button_figure_clear.clicked.connect(self.act_clear)
         # Set clock
         self.signal_clock = QtCore.QTimer()
         self.signal_clock.timeout.connect(self.set_clock)
@@ -116,53 +119,38 @@ class MainWindow(QtGui.QMainWindow):
                                        "Is the instruments set to continuously send data?\n")
         self.alarm_message_box.setStandardButtons(QtWidgets.QMessageBox.Ignore)
         self.alarm_message_box.buttonClicked.connect(self.alarm_message_box_button_clicked)
-        # Plugins variables
+        # Widgets variables
         self.widget_metadata = None
-        self.plugins = {}
-        self.plugin_aux_data_variable_names = []
-        self.plugin_aux_data_variable_values = []
-        self.plugin_active_timeseries_variables_model = None
-        self.plugin_active_timeseries_variables_filter_proxy_model = None
+        self.widgets = []
 
-    def add_plugin(self, plugin_name: str):
-        """
-        Add and show plugin to Secondary Docked Widget from main GUI
-        :param plugin_name:
-        :return:
-        """
-        if plugin_name == 'FlowControlPlugin':
-            plugin = FlowControlPlugin(self.instrument)
-        elif plugin_name == 'HyperNavCalPlugin':
-            plugin = HyperNavCalPlugin(self.instrument)
-        elif plugin_name == 'MetadataPlugin':
-            plugin = MetadataPlugin(self.instrument)
-        elif plugin_name == 'PumpControlPlugin':
-            plugin = PumpControlPlugin(self.instrument)
+    def add_widget(self, widget, secondary_dock=True):
+        self.widgets.append(widget(self.instrument))
+        self.widgets[-1].layout.setContentsMargins(QtCore.QMargins(0, 0, 0, 0))
+        if secondary_dock:
+            self.docked_widget_secondary_layout.addWidget(self.widgets[-1])
         else:
-            raise ValueError(f'Plugin "{plugin_name}" not supported.')
-        self.plugins[plugin_name] = plugin
-        if plugin_name == 'MetadataPlugin' and 'HyperNavCalPlugin' in self.plugins.keys():
-            self.plugins['HyperNavCalPlugin'].tab_frame_view_layout.addWidget(plugin)
-        else:
-            self.docked_widget_secondary_layout.addWidget(plugin)
+            self.docked_widget_primary_layout.addWidget(self.widgets[-1])
 
-    def show_plugin(self, key: str):
-        if key in self.plugins.keys():
-            self.plugins[key].show()
+    def toggle_secondary_dock(self, init=False):
+        if self.instrument.secondary_dock_widget_enabled:
+            if not self.dock_widget_secondary.isVisible() or init:
+                self.resize(self.width() + 207, self.height())  # Bug expands vertically
+                self.dock_widget_secondary.show()
         else:
-            self.add_plugin(key)
-
-    def hide_plugin(self, key: str):
-        if key in self.plugins.keys():
-            self.plugins[key].hide()
+            if self.dock_widget_secondary.isVisible() or init:
+                if not init:
+                    self.resize(self.width() - 207, self.height())
+                self.dock_widget_secondary.hide()
 
     def init_instrument(self, instrument):
         self.instrument = instrument
         self.label_instrument_name.setText(self.instrument.short_name)
+        # Set interface
         if self.instrument.interface_name.startswith('socket'):
             self.label_open_port.setText('Socket')
         elif self.instrument.interface_name.startswith('usb'):
             self.label_open_port.setText('USB Port')
+        # Connect Signals
         self.instrument.signal.status_update.connect(self.on_status_update)
         self.instrument.signal.packet_received.connect(self.on_packet_received)
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
@@ -170,38 +158,34 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.new_ts_data.connect(self.on_new_ts_data)
         if self.instrument.signal.alarm is not None:
             self.instrument.signal.alarm.connect(self.on_data_timeout)
-
-        # Set Plugins specific to instrument
-        # Auxiliary Data Plugin
-        self.group_box_aux_data.setVisible(self.instrument.plugin_aux_data_enabled)
-        if self.instrument.plugin_aux_data_enabled:
-            self.set_aux_data_widget()
-            # Connect signal
-            self.instrument.signal.new_aux_data.connect(self.on_new_aux_data)
-
-        # Select Channels To Plot Plugin
-        self.group_box_active_timeseries_variables.setVisible(self.instrument.plugin_active_timeseries_variables)
-        if self.instrument.plugin_active_timeseries_variables:
-            # Set Data Model & Filter Proxy Model
-            self.plugin_active_timeseries_variables_model = QtGui.QStandardItemModel()
-            self.plugin_active_timeseries_variables_filter_proxy_model = QtCore.QSortFilterProxyModel()
-            self.plugin_active_timeseries_variables_filter_proxy_model.setSourceModel(self.plugin_active_timeseries_variables_model)
-            self.plugin_active_timeseries_variables_filter_proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
-            # Connect Search Field to Filter Proxy Model
-            self.le_active_timeseries_variables_search.textChanged.connect(
-                self.plugin_active_timeseries_variables_filter_proxy_model.setFilterRegExp)
-            # Add Data Filter Proxy Model to List View
-            self.list_view_active_timeseries_variables.setModel(
-                self.plugin_active_timeseries_variables_filter_proxy_model)
-            self.list_view_active_timeseries_variables.clicked.connect(self.on_active_timeseries_variables_update)
-            # Add variables to data model
-            self.set_active_timeseries_variables()
-            # Delete extra spacer to allow channels plugin to expand
-            for i in reversed(range(self.dw_primary_layout.count())):
-                if isinstance(self.dw_primary_layout.itemAt(i).spacerItem(), QtWidgets.QSpacerItem):
-                    self.dw_primary_layout.removeItem(self.dw_primary_layout.itemAt(i))
-                    break
-
+        # Set Widgets
+        available_widgets = ((AuxDataWidget, False),
+                             (FlowControlWidget, True),
+                             (HyperNavCalWidget, True),
+                             (MetadataWidget, True),
+                             (PumpControlWidget, True),
+                             (SelectChannelWidget, False))
+        primary_vertical_spacer, secondary_vertical_spacer = True, True
+        for widget, secondary_dock in available_widgets:
+            if getattr(self.instrument, f'widget_{widget.__snake_name__[:-7]}_enabled') or\
+                    widget.__name__ in self.instrument.widgets_to_load:
+                self.add_widget(widget, secondary_dock)
+                if widget.expanding:
+                    if secondary_dock:
+                        secondary_vertical_spacer = False
+                    else:
+                        primary_vertical_spacer = False
+        # Add vertical spacer to docks
+        if primary_vertical_spacer:
+            self.docked_widget_primary_layout.addItem(
+                QtGui.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+            )
+        if secondary_vertical_spacer:
+            self.docked_widget_secondary_layout.addItem(
+                QtGui.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+            )
+        # Set secondary dock
+        self.toggle_secondary_dock(init=True)
         # Set Central Widget with Plot(s)
         if self.instrument.spectrum_plot_enabled:
             if self.spectrum_plot_widget is None:
@@ -211,29 +195,9 @@ class MainWindow(QtGui.QMainWindow):
             self.instrument.signal.new_spectrum_data.connect(self.on_new_spectrum_data)
         self.timeseries_plot_widget = self.create_timeseries_plot_widget()
         self.centralwidget.layout().addWidget(self.timeseries_plot_widget)
-
-        # Set Secondary Dock Widget
-        self.dock_widget_secondary.widget().setMinimumSize(QtCore.QSize(200, self.frameGeometry().height()))
-        if self.instrument.secondary_dock_widget_enabled:
-            self.resize(self.frameGeometry().width()+245, self.frameGeometry().height())
-            if self.instrument.plugin_instrument_control_enabled:
-                self.add_plugin('FlowControlPlugin')
-            if self.instrument.plugin_hypernav_cal_enabled:
-                self.resize(self.frameGeometry().width() + 408 - 245, self.frameGeometry().height())
-                self.add_plugin('HyperNavCalPlugin')
-            if self.instrument.plugin_metadata_enabled:  # Should be after HyperNavCalPlugin
-                self.add_plugin('MetadataPlugin')
-            if self.instrument.plugin_pump_control_enabled:
-                self.add_plugin('PumpControlPlugin')
-            else:
-                # Only add vertical spacer if not hypernav cal plugin
-                self.docked_widget_secondary_layout.addItem(
-                    QtGui.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding))
-        else:
-            self.dock_widget_secondary.hide()
         # Run status update
         #   didn't run with instrument.setup because signal was not connected
-        #   need to be after plugin(s) initialization
+        #   need to be after widget(s) initialization
         self.on_status_update()
 
     @staticmethod
@@ -264,21 +228,6 @@ class MainWindow(QtGui.QMainWindow):
         widget.plotItem.addLegend()
         return widget
 
-    def set_active_timeseries_variables(self):
-        # Clear Past Variables
-        self.plugin_active_timeseries_variables_model.clear()
-        # Set Current Variables
-        for v in self.instrument.plugin_active_timeseries_variables_names:
-            item = QtGui.QStandardItem(v)
-            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-            if v in self.instrument.plugin_active_timeseries_variables_selected:
-                item.setData(QtCore.QVariant(QtCore.Qt.Checked), QtCore.Qt.CheckStateRole)
-            else:
-                item.setData(QtCore.QVariant(QtCore.Qt.Unchecked), QtCore.Qt.CheckStateRole)
-            self.plugin_active_timeseries_variables_model.appendRow(item)
-        # Clear Search field
-        self.le_active_timeseries_variables_search.setText('')
-
     def set_spectrum_plot_widget(self):
         self.spectrum_plot_widget.clear()  # Remove all items (past frame headers)
         min_x, max_x = None, None
@@ -296,19 +245,6 @@ class MainWindow(QtGui.QMainWindow):
             self.spectrum_plot_widget.plotItem.setLabel('bottom', x_label_name, units=x_label_units)
         self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
 
-    def set_aux_data_widget(self):
-        # Clear current fields if any
-        self.plugin_aux_data_variable_names = []
-        self.plugin_aux_data_variable_values = []
-        for i in reversed(range(self.group_box_aux_data_layout.count())):
-            self.group_box_aux_data_layout.itemAt(i).widget().setParent(None)
-        # Set aux variable names
-        for v in self.instrument.plugin_aux_data_variable_names:
-            self.plugin_aux_data_variable_names.append(QtGui.QLabel(v))
-            self.plugin_aux_data_variable_values.append(QtGui.QLabel('?'))
-            self.group_box_aux_data_layout.addRow(self.plugin_aux_data_variable_names[-1],
-                                                  self.plugin_aux_data_variable_values[-1])
-
     def set_clock(self):
         zulu = gmtime(time())
         self.label_clock.setText(strftime('%H:%M:%S', zulu) + ' UTC')
@@ -321,39 +257,21 @@ class MainWindow(QtGui.QMainWindow):
         if setup_dialog.exec_():
             self.instrument.setup(setup_dialog.cfg)
             self.label_instrument_name.setText(self.instrument.short_name)
+            # Set Interface Name
             if self.instrument.interface_name.startswith('com'):
                 self.label_open_port.setText('Serial Port')
             elif self.instrument.interface_name.startswith('socket'):
                 self.label_open_port.setText('Socket')
             elif self.instrument.interface_name.startswith('usb'):
                 self.label_open_port.setText('USB Port')
+            # Reset Plots
             self.reset_ts_trace = True  # Force update of variable names in timeseries
-            if self.instrument.plugin_active_timeseries_variables:
-                self.set_active_timeseries_variables()
             if self.instrument.spectrum_plot_enabled:
                 self.set_spectrum_plot_widget()
-            if self.instrument.plugin_aux_data_enabled:
-                self.set_aux_data_widget()
-            if self.instrument.plugin_metadata_enabled:
-                self.show_plugin('MetadataPlugin')
-            else:
-                self.hide_plugin('MetadataPlugin')
-            if self.instrument.plugin_instrument_control_enabled:
-                self.show_plugin('FlowControlPlugin')
-            else:
-                self.hide_plugin('FlowControlPlugin')
-            if self.instrument.plugin_pump_control_enabled:
-                self.show_plugin('PumpControlPlugin')
-            else:
-                self.hide_plugin('PumpControlPlugin')
-            if self.instrument.secondary_dock_widget_enabled:
-                if not self.dock_widget_secondary.isVisible():
-                    self.resize(self.frameGeometry().width() + 245, self.frameGeometry().height())
-                    self.dock_widget_secondary.show()
-            else:
-                if self.dock_widget_secondary.isVisible():
-                    self.resize(self.frameGeometry().width() - 245, self.frameGeometry().height())
-                    self.dock_widget_secondary.hide()
+            # Reset Widgets
+            for widget in self.widgets:
+                widget.reset()
+            self.toggle_secondary_dock()
 
     def act_instrument_interface(self):
         def error_dialog():
@@ -408,7 +326,7 @@ class MainWindow(QtGui.QMainWindow):
                 return
 
     def act_instrument_log(self):
-        if self.instrument.log_active():
+        if self.instrument.log_active:
             logger.debug('Stop logging')
             self.instrument.log_stop()
         else:
@@ -421,17 +339,14 @@ class MainWindow(QtGui.QMainWindow):
                 logger.debug('Start logging')
                 self.instrument.log_start()
 
-    def act_clear_plots(self):
+    def act_clear(self):
         if len(self._buffer_data) > 0:
             # Send no data which reset buffers
             self.instrument.signal.new_ts_data.emit([], time())
         if self.instrument.spectrum_plot_enabled:
             self.set_spectrum_plot_widget()
-        if self.instrument.plugin_hypernav_cal_enabled:
-            self.plugins['HyperNavCalPlugin'].clear()
-        if self.instrument.plugin_metadata_enabled:
-            self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
-            self.plugins['MetadataPlugin'].reset()
+        for widget in self.widgets:
+            widget.clear()
 
     @QtCore.pyqtSlot()
     def on_status_update(self):
@@ -439,7 +354,7 @@ class MainWindow(QtGui.QMainWindow):
             self.button_serial.setText('Close')
             self.button_serial.setToolTip('Disconnect instrument.')
             self.button_log.setEnabled(True)
-            if self.instrument.log_active():
+            if self.instrument.log_active:
                 status = 'Logging'
                 if self.instrument.log_raw_enabled:
                     if self.instrument.log_prod_enabled:
@@ -468,17 +383,16 @@ class MainWindow(QtGui.QMainWindow):
             self.button_serial.setText('Open')
             self.button_serial.setToolTip('Connect instrument.')
             self.button_log.setEnabled(False)
-        self.le_filename.setText(self.instrument.log_get_filename())
-        self.le_directory.setText(self.instrument.log_get_path())
+        self.le_filename.setText(self.instrument.log_filename)
+        self.le_directory.setText(self.instrument.log_path)
         self.packets_received = 0
         self.label_packets_received.setText(str(self.packets_received))
         self.packets_logged = 0
         self.label_packets_logged.setText(str(self.packets_logged))
         self.packets_corrupted = 0
         self.label_packets_corrupted.setText(str(self.packets_corrupted))
-        if self.instrument.plugin_metadata_enabled:
-            self.instrument.plugin_metadata_frame_counters = [0] * len(self.instrument.plugin_metadata_frame_counters)
-            self.plugins['MetadataPlugin'].reset()
+        for widget in self.widgets:
+            widget.counter_reset()
 
     @QtCore.pyqtSlot()
     def on_packet_received(self):
@@ -521,8 +435,8 @@ class MainWindow(QtGui.QMainWindow):
             # self.centralwidget.layout().replaceWidget(self.timeseries_plot_widget, new_plot_widget)
             # self.timeseries_plot_widget = new_plot_widget
             # Init curves
-            if hasattr(self.instrument, 'plugin_active_timeseries_variables_selected'):
-                legend = self.instrument.plugin_active_timeseries_variables_selected
+            if hasattr(self.instrument, 'widget_active_timeseries_variables_selected'):
+                legend = self.instrument.widget_active_timeseries_variables_selected
             else:
                 legend = [f"{name} ({units})" for name, units in
                           zip(self.instrument.variable_names, self.instrument.variable_units)]
@@ -568,21 +482,6 @@ class MainWindow(QtGui.QMainWindow):
             self.spectrum_plot_widget.plotItem.items[i].setData(x, y, connect="finite")
         self.last_spectrum_plot_refresh = time()
 
-    @QtCore.pyqtSlot(list)
-    def on_new_aux_data(self, data):
-        if self.instrument.plugin_aux_data_enabled:
-            for i, v in enumerate(data):
-                self.plugin_aux_data_variable_values[i].setText(str(v))
-
-    @QtCore.pyqtSlot(QtCore.QModelIndex)
-    def on_active_timeseries_variables_update(self, proxy_index):
-        source_index = self.plugin_active_timeseries_variables_filter_proxy_model.mapToSource(proxy_index).row()
-        if self.instrument.plugin_active_timeseries_variables:
-            self.instrument.udpate_active_timeseries_variables(
-                self.plugin_active_timeseries_variables_model.item(source_index).text(),
-                bool(self.plugin_active_timeseries_variables_model.item(source_index).checkState())
-            )
-
     @QtCore.pyqtSlot(bool)
     def on_data_timeout(self, active):
         if active and not self.alarm_message_box_active:
@@ -609,7 +508,7 @@ class MainWindow(QtGui.QMainWindow):
         msg = QtGui.QMessageBox(self)
         msg.setIcon(QtGui.QMessageBox.Question)
         msg.setText("Are you sure you want to exit?")
-        if self.instrument.plugin_hypernav_cal_enabled:
+        if self.instrument.widget_hypernav_cal_enabled:
             txt = self.instrument.check_sbs_sn()
             if txt:
                 msg.setIcon(QtGui.QMessageBox.Warning)
@@ -1289,7 +1188,7 @@ class DialogLoggerOptions(QtGui.QDialog):
         self.le_prefix_custom_connected = False
         self.instrument = parent.instrument
         # Logger Options
-        self.le_log_path.setText(self.instrument.log_get_path())
+        self.le_log_path.setText(self.instrument.log_path)
         self.button_browse_log_directory.clicked.connect(self.act_browse_log_directory)
         self.update_filename_template()
         # Connect Prefix Checkbox to update Filename Template
@@ -1334,7 +1233,7 @@ class DialogLoggerOptions(QtGui.QDialog):
         self.show()
 
     def update_filename_template(self):
-        # self.le_filename_template.setText(instrument.log_get_filename())  # Not up to date
+        # self.le_filename_template.setText(instrument.log_filename)  # Not up to date
         self.le_filename_template.setText(self.cover_log_prefix + self.instrument.bare_log_prefix +
                                           '_YYYYMMDD_hhmmss.' + self.instrument.log_get_file_ext())
 
@@ -1381,33 +1280,17 @@ class App(QtGui.QApplication):
         instrument_loaded = False
         while not instrument_loaded:
             try:
-                if instrument_module_name == 'generic':
-                    self.main_window.init_instrument(Instrument(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'acs':
-                    self.main_window.init_instrument(ACS(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'dataq':
-                    self.main_window.init_instrument(DATAQ(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'hyperbb':
-                    self.main_window.init_instrument(HyperBB(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'hypernav':
-                    self.main_window.init_instrument(HyperNav(instrument_uuid, HyperNavSignals()))
-                elif instrument_module_name == 'lisst':
-                    self.main_window.init_instrument(LISST(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'nmea':
-                    self.main_window.init_instrument(NMEA(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'ontrak':
-                    self.main_window.init_instrument(Ontrak(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'satlantic':
-                    self.main_window.init_instrument(Satlantic(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'sunav1':
-                    self.main_window.init_instrument(SunaV1(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'sunav2':
-                    self.main_window.init_instrument(SunaV2(instrument_uuid, InstrumentSignals()))
-                elif instrument_module_name == 'taratsg':
-                    self.main_window.init_instrument(TaraTSG(instrument_uuid, InstrumentSignals()))
-                else:
+                instrument_class = {'generic': Instrument, 'acs': ACS, 'dataq': DATAQ, 'hyperbb': HyperBB,
+                                    'hypernav': HyperNav,
+                                    'lisst': LISST, 'nmea': NMEA, 'ontrak': Ontrak, 'satlantic': Satlantic,
+                                    'sunav1': SunaV1, 'sunav2': SunaV2, 'taratsg': TaraTSG}
+                instrument_signal = HyperNavSignals if instrument_module_name == 'hypernav' else InstrumentSignals
+                if instrument_module_name not in instrument_class.keys():
                     logger.critical('Instrument module not supported')
                     sys.exit(-1)
+                self.main_window.init_instrument(instrument_class[instrument_module_name](
+                    instrument_uuid, CFG.instruments[instrument_uuid].copy(), instrument_signal()
+                ))
                 instrument_loaded = True
             except Exception as e:
                 raise e

@@ -9,7 +9,7 @@ import numpy as np
 import pySatlantic.instrument as pySat
 
 from inlinino.instruments import get_spy_interface, SerialInterface
-from inlinino.instruments.satlantic import Satlantic, SatPacket
+from inlinino.instruments.satlantic import Satlantic, SatPacket, ProdLogger
 from inlinino.app_signal import HyperNavSignals, InterfaceSignals
 
 
@@ -36,12 +36,13 @@ class HyperNav(Satlantic):
     RE_CMD_GET = re.compile(b'(get)', re.IGNORECASE)
     RE_CMD_SET = re.compile(b'(set)', re.IGNORECASE)
 
-    def __init__(self, uuid, signal: HyperNavSignals, *args, **kwargs):
-        super().__init__(uuid, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, cfg, signal: HyperNavSignals, *args, **kwargs):
+        super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Custom serial interface
         self._interface = get_spy_interface(SerialInterface, echo=False)(InterfaceSignals())
-        # Plugin variables
-        self.plugin_hypernav_cal_enabled = True
+        # Widget variables
+        self.widget_hypernav_cal_enabled = True
+        self.widget_metadata_enabled = False  # Already included in hypernav_cal widget
         self.spectrum_plot_x_label = ('', '')  # Name, Units
         # Special variables
         self._frame_finder = None
@@ -60,7 +61,7 @@ class HyperNav(Satlantic):
         self._parser_key_map = {}
         self._parser_core_idx_limits = {}
         # Setup
-        self.init_setup()
+        self.setup(cfg)
 
     def get_head_sbs_sn(self, side: str):
         return self.prt_sbs_sn if side == 'PRT' else self.sbd_sbs_sn
@@ -179,6 +180,9 @@ class HyperNav(Satlantic):
             self._parser_core_idx_limits[k] = (min(p.core_variables), max(p.core_variables)+1)
         # Setup as regular Satlantic instrument
         super().setup(cfg)
+        # Change default file length to one day
+        self._log_raw.file_length = 24 * 60 * 60  # seconds
+        self._log_prod.file_length = self._log_raw.file_length
 
     def data_received(self, data: bytearray, timestamp: float):
         self._buffer.extend(data)
@@ -341,12 +345,12 @@ class HyperNav(Satlantic):
     def handle_data(self, data: SatPacket, timestamp: float):
         # Needed to overwrite handle_data has data format changed from calibrated dict to raw list.
         cal = self._parser.cal[data.frame_header]
-        # Update Metadata Plugin
+        # Update Metadata Widget
         metadata = [(None, None)] * len(self.frame_headers_idx)
         idx = self.frame_headers_idx[data.frame_header]
-        self.plugin_metadata_frame_counters[idx] += 1
+        self.widget_metadata_frame_counters[idx] += 1
         values = [data.frame[i] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
-        metadata[idx] = (self.plugin_metadata_frame_counters[idx], values)
+        metadata[idx] = (self.widget_metadata_frame_counters[idx], values)
         self.signal.new_meta_data.emit(metadata)
         # Update Timeseries
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
@@ -363,13 +367,17 @@ class HyperNav(Satlantic):
         # Update Spectrum Plot
         spectrum_data = [None] * len(self.frame_headers_idx)
         idx_start, idx_end = self._parser_core_idx_limits[data.frame_header]
-        spectrum_data[self.frame_headers_idx[data.frame_header]] = np.array(data.frame[idx_start:idx_end])
+        spectra = np.array(data.frame[idx_start:idx_end])
+        spectrum_data[self.frame_headers_idx[data.frame_header]] = spectra
         self.signal.new_spectrum_data.emit(spectrum_data)
-        # Update Calibration Plugin
+        # Update Calibration Widget
         self.signal.new_frame.emit(data)
         # Log Parsed Data
         if self.log_prod_enabled and self._log_active:
-            self._log_prod.write(data, timestamp)
+            self._log_prod.write(SatPacket(
+                [*data.frame[:idx_start], ProdLogger.format_core_variable(spectra), *data.frame[idx_end:]],
+                data.frame_header
+            ), timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
@@ -409,6 +417,9 @@ def hypernav_telemetry_definition(pixel_registration=None):
     satx_z.data_type = ['BS', 'BD', 'BU', 'BU', 'BU', 'BU', 'BU', 'BU',
                         'BS', 'BS', 'BS', 'BU', 'BS', 'BU', 'BS', 'BS',
                         'BS', 'BS', 'BS', 'BS', 'BU'] + ['BU'] * n_pixel + ['BU']
+    satx_z.fit_type = ['COUNT', 'COUNT', 'COUNT', 'COUNT', 'COUNT', 'COUNT', 'COUNT', 'COUNT',
+                       'POLYU', 'POLYU', 'COUNT', 'COUNT', 'COUNT', 'COUNT', 'POLYU', 'POLYU',
+                       'POLYU', 'POLYU', 'POLYU', 'POLYU', 'COUNT'] + ['OPTIC3'] * n_pixel + ['COUNT']
     satx_z.core_variables = [i for i, t in enumerate(satx_z.type) if t == 'LU']
     satx_z.core_groupname = 'LU'
     satx_z.auxiliary_variables = [i for i, x in enumerate(satx_z.type) if x.upper() != satx_z.core_groupname]
@@ -427,8 +438,9 @@ def hypernav_telemetry_definition(pixel_registration=None):
     # TERMINATOR is NOT added to auxiliary_variables
     saty_z.variable_frame_length = True
     saty_z.field_separator = [','] * 2070 + ['\r\n']
-    saty_z.data_type = ['AI', 'AF', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI',
-                        'AI', 'AI', 'AI', 'AI', 'AI', 'AS'] + ['AI'] * n_pixel + ['AI', 'AS']
+    saty_z.data_type = ['AI', 'AF', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI',
+                        'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI',
+                        'AI', 'AI', 'AI', 'AI', 'AS'] + ['AI'] * n_pixel + ['AI', 'AS']
     saty_z.check_cum_index = None
     saty_z.frame_terminator = '\r\n'
     saty_z.frame_terminator_bytes = b'\x0D\x0A'
@@ -450,6 +462,7 @@ def ocr504_telemetry_definition():
                 ['NONE', 'PCB', 'COUNTER', 'SUM', 'TERMINATOR']
     satdi4.key = [t if i == 'NONE' else f'{t}_{i}' for t, i in zip(satdi4.type, satdi4.id)]
     satdi4.data_type = ['AF', 'BS'] + ['BU'] * n_pixel + ['BU', 'BU', 'BU', 'BU', 'BU']
+    satdi4.fit_type = ['COUNT', 'COUNT'] + ['OPTIC2'] * n_pixel + ['POLYU', 'POLYU', 'COUNT', 'COUNT', 'NONE']
     satdi4.core_variables = [i for i, t in enumerate(satdi4.type) if t == satdi4.core_groupname]
     satdi4.auxiliary_variables = [i for i, x in enumerate(satdi4.type) if x.upper() != satdi4.core_groupname]
     satdi4.variable_frame_length = False

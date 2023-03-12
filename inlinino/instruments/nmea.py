@@ -9,11 +9,11 @@ class NMEA(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_types', 'variable_precision']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
         self.active_timeseries_variables = []
-        self.plugin_active_timeseries_variables_selected = list()
+        self.widget_active_timeseries_variables_selected = list()
         self._unknown_nmea_sentence = []
-        super().__init__(uuid, signal, *args, **kwargs)
+        super().__init__(uuid, cfg, signal, *args, **kwargs)
 
         # Default serial communication parameters
         self.default_serial_baudrate = 4800
@@ -26,11 +26,11 @@ class NMEA(Instrument):
         super().setup(cfg)
         # Set active timeseries variables
         self.active_timeseries_variables = np.zeros(len(self.variable_types), dtype=bool)
-        self.plugin_active_timeseries_variables_selected = list()
+        self.widget_active_timeseries_variables_selected = list()
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):
             if t in ['int', 'float']:
                 self.active_timeseries_variables[i] = True
-                self.plugin_active_timeseries_variables_selected.append(k)
+                self.widget_active_timeseries_variables_selected.append(k)
         # self._log_prod.variable_precision = []  # Disable precision when writing with log
 
     # def open(self, port=None, baudrate=4800, bytesize=8, parity='N', stopbits=1, timeout=10):

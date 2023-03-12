@@ -142,9 +142,6 @@
           <height>30</height>
          </size>
         </property>
-        <property name="currentText">
-         <string>off</string>
-        </property>
         <property name="currentIndex">
          <number>1</number>
         </property>

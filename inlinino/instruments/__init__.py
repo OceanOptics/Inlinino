@@ -10,7 +10,7 @@ import usb.backend.libusb1
 import hid
 
 from inlinino.log import Log, LogText
-from inlinino import CFG, PATH_TO_RESOURCES
+from inlinino import PATH_TO_RESOURCES
 import logging
 
 
@@ -25,7 +25,7 @@ class Instrument:
                            'variable_names', 'variable_units', 'variable_precision']
     DATA_TIMEOUT = 60  # seconds
 
-    def __init__(self, uuid, signal=None, setup=True):
+    def __init__(self, uuid, cfg, signal=None, setup=True):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Communication Interface
@@ -57,22 +57,20 @@ class Instrument:
         self.variable_names = None
         self.variable_units = None
         self.variable_displayed = None
-        # Plugins
-        self.plugin_aux_data_enabled = False
-        self.plugin_active_timeseries_variables = False
+        # widgets
         self.spectrum_plot_enabled = False
-        self.plugin_metadata_enabled = False
-        self.plugin_instrument_control_enabled = False
-        self.plugin_pump_control_enabled = False
-        self.plugin_hypernav_cal_enabled = False
+        self.widget_aux_data_enabled = False
+        self.widget_flow_control_enabled = False
+        self.widget_hypernav_cal_enabled = False
+        self.widget_metadata_enabled = False
+        self.widget_pump_control_enabled = False
+        self.widget_select_channel_enabled = False
+        self.widgets_to_load = []  # To load widgets disabled on setup
 
         # Load cfg
         self.uuid = uuid
         if setup:
-            self.init_setup()
-
-    def init_setup(self):
-        self.setup(CFG.instruments[self.uuid].copy())
+            self.setup(cfg)
 
     @property
     def name(self) -> str:
@@ -97,10 +95,10 @@ class Instrument:
 
     @property
     def secondary_dock_widget_enabled(self) -> bool:
-        return self.plugin_metadata_enabled or \
-            self.plugin_instrument_control_enabled or \
-            self.plugin_pump_control_enabled or \
-            self.plugin_hypernav_cal_enabled
+        return self.widget_metadata_enabled or \
+            self.widget_flow_control_enabled or \
+            self.widget_pump_control_enabled or \
+            self.widget_hypernav_cal_enabled
 
     def setup(self, cfg, raw_logger=LogText):
         self.logger.debug('Setup')
@@ -283,13 +281,16 @@ class Instrument:
         self._log_raw.close()
         self._log_prod.close()
 
+    @property
     def log_active(self):
         return self._log_active
 
-    def log_get_path(self):
+    @property
+    def log_path(self):
         return self._log_raw.path
 
-    def log_get_filename(self):
+    @property
+    def log_filename(self):
         if self.log_raw_enabled or not self.log_prod_enabled:
             return self._log_raw.filename
         else:
