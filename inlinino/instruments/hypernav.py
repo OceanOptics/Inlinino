@@ -332,13 +332,16 @@ class HyperNav(Satlantic):
                 # Invalid frame (in SatView format), likely truncated by another frame
                 raise pySat.ParserError(f"Failed to decode frame {packet.frame_header}.")
             if len(data) != parser.frame_nfields:
-                raise pySat.ParserError(f"Invalid number of fields {packet.frame_header}.")
+                raise pySat.ParserError(f"Invalid number of fields in {packet.frame_header}.")
         else:
             data = unpack(parser.frame_fmt, packet.frame[10:])
-        if 'AI' in parser.data_type or 'AF' in parser.data_type:
-            data = [int(v) if t == 'AI' else
-                    float(v) if t == 'AF' else v
-                    for v, t in zip(data, parser.data_type)]
+        try:
+            if 'AI' in parser.data_type or 'AF' in parser.data_type:
+                data = [int(v) if t == 'AI' else
+                        float(v) if t == 'AF' else v
+                        for v, t in zip(data, parser.data_type)]
+        except ValueError:
+            raise pySat.ParserError(f"Unexpected data type in {packet.frame_header}.")
         frame_header = packet.frame[:10].decode(self._parser.ENCODING)
         return SatPacket(data, frame_header)
 
@@ -437,7 +440,7 @@ def hypernav_telemetry_definition(pixel_registration=None):
     saty_z.units.append('')
     # TERMINATOR is NOT added to auxiliary_variables
     saty_z.variable_frame_length = True
-    saty_z.field_separator = [','] * 2070 + ['\r\n']
+    saty_z.field_separator = [','] * satx_z.frame_nfields + ['\r\n']
     saty_z.data_type = ['AI', 'AF', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI',
                         'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI', 'AI',
                         'AI', 'AI', 'AI', 'AI', 'AS'] + ['AI'] * n_pixel + ['AI', 'AS']

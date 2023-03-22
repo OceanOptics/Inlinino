@@ -1,9 +1,11 @@
 import os.path
+import queue
+
 from threading import Thread
 
 from glob import glob
 from time import time, sleep
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
@@ -14,9 +16,12 @@ from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
 
-from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-    spec_board_report
-from hypernav.io import HyperNAV as HyperNavIO
+try:
+    from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
+        spec_board_report, GRAPH_CFG
+    from hypernav.io import HyperNAV as HyperNavIO
+except IndexError:
+    HyperNavIO = None
 
 UPASS = u'\u2705'
 UFAIL = u'\u274C'
@@ -42,7 +47,7 @@ class HyperNavCalWidget(GenericWidget):
         self.time_last_tx = 0
         self.widgets = {'serial_monitor': MonitorWidget(instrument),
                         'frame_view': MetadataWidget(instrument),
-                        'characterize': HyperNavCharacterizeDMWidget(instrument)}
+                        'characterize': HyperNavCharacterizeDMWidget(instrument)}  # TODO if HyperNAVIO is not None, load this widget
                         # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
         super().__init__(instrument)
         # Add widgets
@@ -293,6 +298,7 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
 
     def __init__(self, instrument: HyperNav):
         self.worker = None
+        self.queue = Queue()
         super().__init__(instrument)
         self.generate_report_button.clicked.connect(self.start)
         self.instrument.signal.status_update.connect(self.update_filename_combobox)
@@ -312,38 +318,61 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
     def start(self):
         if not self.generate_report_button.isEnabled():
             return
-        # Disable button
-        self.generate_report_button.setText('Processing ...')
-        self.generate_report_button.setEnabled(False)
         # Check file to analyze is closed
         filename = self.filename_combobox.currentText()
         if self.instrument.log_active and filename == self.instrument.log_filename:
             self.instrument.signal.warning.emit('Stop logging to analyze data.')
             return
+        # Disable button
+        self.generate_report_button.setText('Processing ...')
+        self.generate_report_button.setEnabled(False)
         # Start worker
         self.worker = Process(name='HyperNavWorker', target=HyperNavCharacterizeDMWidget.run, args=(
             self.instrument.serial_number, self.instrument.prt_sbs_sn, self.instrument.sbd_sbs_sn,
-            self.instrument.log_path, filename
+            self.instrument.log_path, filename, self.queue
         ))
         self.worker.start()
         # Start join thread
         Thread(target=self._join, daemon=True).start()
 
     @staticmethod
-    def run(hn_sn, prt_sn, sbd_sn, path, filename):
-        hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
-        data, meta = hn.read_inlinino(os.path.join(path, filename))
-        for sn in (prt_sn, sbd_sn):
-            if f'SATYLZ{sn:04d}' in meta['valid_frames'].keys() or f'SATYDZ{sn:04d}' in meta['valid_frames'].keys():
+    def run(hn_sn, prt_sn, sbd_sn, path, filename, queue):
+        try:
+            hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
+            data, meta = hn.read_inlinino(os.path.join(path, filename))
+            # Find HyperNav frame serial numbers
+            analyzed_sn = set([int(k[6:]) for k in meta['valid_frames'].keys() if
+                               True in [k.startswith(hdr) for hdr in ('SATYLZ', 'SATYDZ', 'SATXLZ', 'SATXDZ')]])
+            warning_sn = []
+            for sn in analyzed_sn:
+                if sn not in (prt_sn, sbd_sn):
+                    warning_sn.append(sn)
                 ref = os.path.splitext(filename)[0]
                 report = spec_board_report(data, ref, sn)
                 dpi = 96
                 report.write_image(os.path.join(path, f"{ref}_SBSSN{sn:04}.pdf"), width=dpi * 11, height=dpi * 8.5)
-                report.show()
+                report.show(config=GRAPH_CFG)
+            if warning_sn:
+                queue.put((filename, 'warning', ', '.join([f'{sn:04d}' for sn in warning_sn])))
+            else:
+                queue.put((filename, 'ok'))
+        except Exception as e:
+            queue.put((filename, 'error', e))
 
     def _join(self):
         if self.worker is None:
             return
         self.worker.join()
+        # Check if job finished properly
+        try:
+            result = self.queue.get_nowait()
+        except queue.Empty:
+            result = ('error', 'No results from worker.')
+        if result[1] == 'warning':
+            self.instrument.signal.warning.emit(f'Unexpected head serial number(s) {result[2]} in "{result[0]}".')
+        elif result[1] == 'error':
+            self.instrument.signal.warning.emit(f'The error "{result[2]}" occurred while analyzing "{result[0]}".\n'
+                                                f'Unable to generate report.')
+        # Reset buttons
         self.generate_report_button.setText('Generate Report')
         self.generate_report_button.setEnabled(True)
