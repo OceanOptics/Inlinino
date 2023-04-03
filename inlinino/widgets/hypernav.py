@@ -19,7 +19,7 @@ from inlinino.widgets.metadata import MetadataWidget
 try:
     from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
         spec_board_report, GRAPH_CFG
-    from hypernav.io import HyperNAV as HyperNavIO
+    from hypernav.io import HyperNav as HyperNavIO
 except IndexError:
     HyperNavIO = None
 
