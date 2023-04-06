@@ -9,16 +9,18 @@ from multiprocessing import Process, Queue
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
+from functools import reduce, partial
 
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
+from inlinino.widgets.shared.file_label import FileLabel
 
 try:
     from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-        spec_board_report, GRAPH_CFG
+        spec_board_report, GRAPH_CFG, calibration_report
     from hypernav.io import HyperNav as HyperNavIO
 except IndexError:
     HyperNavIO = None
@@ -45,13 +47,18 @@ class HyperNavCalWidget(GenericWidget):
     def __init__(self, instrument: HyperNav):
         # widget variables (init before super() due to setup)
         self.time_last_tx = 0
-        self.widgets = {'serial_monitor': MonitorWidget(instrument),
-                        'frame_view': MetadataWidget(instrument),
-                        'characterize': HyperNavCharacterizeDMWidget(instrument)}  # TODO if HyperNAVIO is not None, load this widget
-                        # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
+        self.widgets = {
+            'serial_monitor': MonitorWidget(instrument),
+            'frame_view': MetadataWidget(instrument),
+            # TODO if HyperNAVIO is not None, load this widget
+            'characterize': HyperNavCharacterizeDMWidget(instrument),
+            'calibrate': HyperNavCalibrateWidget(instrument),
+            # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
+        }
         super().__init__(instrument)
         # Add widgets
         self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
+        self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
         self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
         self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
         # Connect signals (must be after super() as required ui to be loaded)
@@ -358,6 +365,132 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
                 queue.put((filename, 'ok'))
         except Exception as e:
             queue.put((filename, 'error', e))
+
+    def _join(self):
+        if self.worker is None:
+            return
+        self.worker.join()
+        # Check if job finished properly
+        try:
+            result = self.queue.get_nowait()
+        except queue.Empty:
+            result = ('error', 'No results from worker.')
+        if result[1] == 'warning':
+            self.instrument.signal.warning.emit(f'Unexpected head serial number(s) {result[2]} in "{result[0]}".')
+        elif result[1] == 'error':
+            self.instrument.signal.warning.emit(f'The error "{result[2]}" occurred while analyzing "{result[0]}".\n'
+                                                f'Unable to generate report.')
+        # Reset buttons
+        self.generate_report_button.setText('Generate Report')
+        self.generate_report_button.setEnabled(True)
+
+class HyperNavCalibrateWidget(GenericWidget):
+    @classproperty
+    def __snake_name__(cls) -> str:
+        return 'hypernav_calibrate_widget'
+
+    def __init__(self, instrument: HyperNav):
+        self.worker = None
+        self.queue = Queue()
+        super().__init__(instrument)
+        self.generate_report_button.clicked.connect(self.start)
+        self.instrument.signal.status_update.connect(self.update_filename_combobox)
+        self.generate_report_button.setEnabled(False)
+
+        self.lamp_file_label = FileLabel(self.filename_lamp_label)
+        self.plaque_file_label = FileLabel(self.filename_plaque_label)
+        self.wavelength_file_label = FileLabel(self.filename_wavelength_label)
+
+        self.setup_browse_files([
+            (self.browse_lamp_button, self.lamp_file_label),
+            (self.browse_plaque_button, self.plaque_file_label),
+            (self.browse_wavelength_button, self.wavelength_file_label),
+        ])
+
+    def setup(self):
+        self.update_filename_combobox()
+
+    def setup_browse_files(self, button_label_tuples):
+        @QtCore.pyqtSlot()
+        def browse_and_check(file_label):
+            file_name, _ = QtGui.QFileDialog.getOpenFileName(self)
+            file_label.set_file(file_name)
+            # Check to see if all files have been populated before enabling report button
+            all_labels = [x[1] for x in button_label_tuples]
+            form_complete = reduce(lambda acc, cur: acc and cur.get_file() != None, all_labels, True)
+            self.generate_report_button.setEnabled(form_complete)
+
+        for button, label in button_label_tuples:
+            button.clicked.connect(partial(browse_and_check, label))
+
+    @QtCore.pyqtSlot()
+    def update_filename_combobox(self):
+        self.filename_combobox.clear()
+        file_list = [os.path.basename(f) for f in sorted(glob(os.path.join(
+            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))]
+        self.filename_combobox.addItems(file_list)
+        self.filename_combobox.setCurrentIndex(len(file_list)-1)
+
+    @QtCore.pyqtSlot()
+    def start(self):
+        if not self.generate_report_button.isEnabled():
+            return
+
+        # Check file to analyze is closed
+        filename = self.filename_combobox.currentText()
+        if self.instrument.log_active and filename == self.instrument.log_filename:
+            self.instrument.signal.warning.emit('Stop logging to analyze data.')
+            return
+
+        # Disable button
+        self.generate_report_button.setText('Processing ...')
+        self.generate_report_button.setEnabled(False)
+
+        # Start worker
+        self.worker = Process(name='HyperNavWorker', target=HyperNavCalibrateWidget.run, args=(
+            self.instrument.serial_number,
+            self.instrument.prt_sbs_sn,
+            self.instrument.sbd_sbs_sn,
+            self.instrument.log_path,
+            filename,
+            self.queue,
+            self.lamp_file_label.get_file(),
+            self.plaque_file_label.get_file(),
+            self.wavelength_file_label.get_file(),
+        ))
+        self.worker.start()
+        # Start join thread
+        Thread(target=self._join, daemon=True).start()
+
+    @staticmethod
+    def run(
+        hn_sn,
+        prt_sn,
+        sbd_sn,
+        path,
+        filename,
+        queue,
+        lamp_file_path,
+        plaque_file_path,
+        wavelength_file_path
+    ):
+        print(
+            hn_sn,
+            prt_sn,
+            sbd_sn,
+            path,
+            filename,
+            queue,
+            lamp_file_path,
+            plaque_file_path,
+            wavelength_file_path
+        )
+
+        ## What is hypernav_run_file?
+        ## What are the files being fed into Sat?
+
+        # calibration_report(lamp_file_path, plaque_file_path, wavelength_file_path, )
+
 
     def _join(self):
         if self.worker is None:
