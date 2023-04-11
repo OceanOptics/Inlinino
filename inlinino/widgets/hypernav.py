@@ -11,7 +11,8 @@ import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
 from functools import reduce, partial
 
-from inlinino.instruments.hypernav import HyperNav
+# TODO move read_manufacturer_pixel_registration to io as static function
+from inlinino.instruments.hypernav import HyperNav, read_manufacturer_pixel_registration
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.monitor import MonitorWidget
@@ -474,23 +475,31 @@ class HyperNavCalibrateWidget(GenericWidget):
         plaque_file_path,
         wavelength_file_path
     ):
-        print(
-            hn_sn,
-            prt_sn,
-            sbd_sn,
-            path,
-            filename,
-            queue,
-            lamp_file_path,
-            plaque_file_path,
-            wavelength_file_path
-        )
+        hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
+        data, meta = hn.read_inlinino(os.path.join(path, filename))
+        # Find HyperNav frame serial numbers
+        analyzed_sn = set([int(k[6:]) for k in meta['valid_frames'].keys() if
+                            True in [k.startswith(hdr) for hdr in ('SATYLZ', 'SATYDZ', 'SATXLZ', 'SATXDZ')]])
 
-        ## What is hypernav_run_file?
-        ## What are the files being fed into Sat?
+        wl_data = read_manufacturer_pixel_registration(wavelength_file_path)
 
-        # calibration_report(lamp_file_path, plaque_file_path, wavelength_file_path, )
-
+        warning_sn = []
+        for sn in analyzed_sn:
+            if sn not in (prt_sn, sbd_sn):
+                warning_sn.append(sn)
+            calibration_report(
+                sn,
+                data,
+                lamp_file_path,
+                plaque_file_path,
+                wl_data,
+                0.5,
+                1.3
+            )
+        if warning_sn:
+            queue.put((filename, 'warning', ', '.join([f'{sn:04d}' for sn in warning_sn])))
+        else:
+            queue.put((filename, 'ok'))
 
     def _join(self):
         if self.worker is None:
