@@ -9,19 +9,17 @@ from multiprocessing import Process, Queue
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
-from functools import reduce, partial
 
-# TODO move read_manufacturer_pixel_registration to io as static function
-from inlinino.instruments.hypernav import HyperNav, read_manufacturer_pixel_registration
+from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
+from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
-from inlinino.widgets.shared.file_label import FileLabel
 
 try:
     from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-        spec_board_report, GRAPH_CFG, calibration_report
+        spec_board_report, GRAPH_CFG
     from hypernav.io import HyperNav as HyperNavIO
 except IndexError:
     HyperNavIO = None
@@ -391,38 +389,12 @@ class HyperNavCalibrateWidget(GenericWidget):
         return 'hypernav_calibrate_widget'
 
     def __init__(self, instrument: HyperNav):
-        self.worker = None
-        self.queue = Queue()
         super().__init__(instrument)
         self.generate_report_button.clicked.connect(self.start)
         self.instrument.signal.status_update.connect(self.update_filename_combobox)
-        self.generate_report_button.setEnabled(False)
-
-        self.lamp_file_label = FileLabel(self.filename_lamp_label)
-        self.plaque_file_label = FileLabel(self.filename_plaque_label)
-        self.wavelength_file_label = FileLabel(self.filename_wavelength_label)
-
-        self.setup_browse_files([
-            (self.browse_lamp_button, self.lamp_file_label),
-            (self.browse_plaque_button, self.plaque_file_label),
-            (self.browse_wavelength_button, self.wavelength_file_label),
-        ])
 
     def setup(self):
         self.update_filename_combobox()
-
-    def setup_browse_files(self, button_label_tuples):
-        @QtCore.pyqtSlot()
-        def browse_and_check(file_label):
-            file_name, _ = QtGui.QFileDialog.getOpenFileName(self)
-            file_label.set_file(file_name)
-            # Check to see if all files have been populated before enabling report button
-            all_labels = [x[1] for x in button_label_tuples]
-            form_complete = reduce(lambda acc, cur: acc and cur.get_file() != None, all_labels, True)
-            self.generate_report_button.setEnabled(form_complete)
-
-        for button, label in button_label_tuples:
-            button.clicked.connect(partial(browse_and_check, label))
 
     @QtCore.pyqtSlot()
     def update_filename_combobox(self):
@@ -434,87 +406,11 @@ class HyperNavCalibrateWidget(GenericWidget):
 
     @QtCore.pyqtSlot()
     def start(self):
-        if not self.generate_report_button.isEnabled():
-            return
-
         # Check file to analyze is closed
         filename = self.filename_combobox.currentText()
         if self.instrument.log_active and filename == self.instrument.log_filename:
             self.instrument.signal.warning.emit('Stop logging to analyze data.')
             return
 
-        # Disable button
-        self.generate_report_button.setText('Processing ...')
-        self.generate_report_button.setEnabled(False)
-
-        # Start worker
-        self.worker = Process(name='HyperNavWorker', target=HyperNavCalibrateWidget.run, args=(
-            self.instrument.serial_number,
-            self.instrument.prt_sbs_sn,
-            self.instrument.sbd_sbs_sn,
-            self.instrument.log_path,
-            filename,
-            self.queue,
-            self.lamp_file_label.get_file(),
-            self.plaque_file_label.get_file(),
-            self.wavelength_file_label.get_file(),
-        ))
-        self.worker.start()
-        # Start join thread
-        Thread(target=self._join, daemon=True).start()
-
-    @staticmethod
-    def run(
-        hn_sn,
-        prt_sn,
-        sbd_sn,
-        path,
-        filename,
-        queue,
-        lamp_file_path,
-        plaque_file_path,
-        wavelength_file_path
-    ):
-        hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
-        data, meta = hn.read_inlinino(os.path.join(path, filename))
-        # Find HyperNav frame serial numbers
-        analyzed_sn = set([int(k[6:]) for k in meta['valid_frames'].keys() if
-                            True in [k.startswith(hdr) for hdr in ('SATYLZ', 'SATYDZ', 'SATXLZ', 'SATXDZ')]])
-
-        wl_data = read_manufacturer_pixel_registration(wavelength_file_path)
-
-        warning_sn = []
-        for sn in analyzed_sn:
-            if sn not in (prt_sn, sbd_sn):
-                warning_sn.append(sn)
-            calibration_report(
-                sn,
-                data,
-                lamp_file_path,
-                plaque_file_path,
-                wl_data,
-                0.5,
-                1.3
-            )
-        if warning_sn:
-            queue.put((filename, 'warning', ', '.join([f'{sn:04d}' for sn in warning_sn])))
-        else:
-            queue.put((filename, 'ok'))
-
-    def _join(self):
-        if self.worker is None:
-            return
-        self.worker.join()
-        # Check if job finished properly
-        try:
-            result = self.queue.get_nowait()
-        except queue.Empty:
-            result = ('error', 'No results from worker.')
-        if result[1] == 'warning':
-            self.instrument.signal.warning.emit(f'Unexpected head serial number(s) {result[2]} in "{result[0]}".')
-        elif result[1] == 'error':
-            self.instrument.signal.warning.emit(f'The error "{result[2]}" occurred while analyzing "{result[0]}".\n'
-                                                f'Unable to generate report.')
-        # Reset buttons
-        self.generate_report_button.setText('Generate Report')
-        self.generate_report_button.setEnabled(True)
+        dialog = HyperNavCalibrateDialogWidget(self, self.instrument, filename)
+        dialog.exec()
