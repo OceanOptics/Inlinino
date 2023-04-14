@@ -13,6 +13,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
+from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
 
@@ -45,13 +46,18 @@ class HyperNavCalWidget(GenericWidget):
     def __init__(self, instrument: HyperNav):
         # widget variables (init before super() due to setup)
         self.time_last_tx = 0
-        self.widgets = {'serial_monitor': MonitorWidget(instrument),
-                        'frame_view': MetadataWidget(instrument),
-                        'characterize': HyperNavCharacterizeDMWidget(instrument)}  # TODO if HyperNAVIO is not None, load this widget
-                        # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
+        self.widgets = {
+            'serial_monitor': MonitorWidget(instrument),
+            'frame_view': MetadataWidget(instrument),
+            # TODO if HyperNAVIO is not None, load this widget
+            'characterize': HyperNavCharacterizeDMWidget(instrument),
+            'calibrate': HyperNavCalibrateWidget(instrument),
+            # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
+        }
         super().__init__(instrument)
         # Add widgets
         self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
+        self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
         self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
         self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
         # Connect signals (must be after super() as required ui to be loaded)
@@ -376,3 +382,35 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
         # Reset buttons
         self.generate_report_button.setText('Generate Report')
         self.generate_report_button.setEnabled(True)
+
+class HyperNavCalibrateWidget(GenericWidget):
+    @classproperty
+    def __snake_name__(cls) -> str:
+        return 'hypernav_calibrate_widget'
+
+    def __init__(self, instrument: HyperNav):
+        super().__init__(instrument)
+        self.generate_report_button.clicked.connect(self.start)
+        self.instrument.signal.status_update.connect(self.update_filename_combobox)
+
+    def setup(self):
+        self.update_filename_combobox()
+
+    @QtCore.pyqtSlot()
+    def update_filename_combobox(self):
+        self.filename_combobox.clear()
+        file_list = [os.path.basename(f) for f in sorted(glob(os.path.join(
+            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))]
+        self.filename_combobox.addItems(file_list)
+        self.filename_combobox.setCurrentIndex(len(file_list)-1)
+
+    @QtCore.pyqtSlot()
+    def start(self):
+        # Check file to analyze is closed
+        filename = self.filename_combobox.currentText()
+        if self.instrument.log_active and filename == self.instrument.log_filename:
+            self.instrument.signal.warning.emit('Stop logging to analyze data.')
+            return
+
+        dialog = HyperNavCalibrateDialogWidget(self, self.instrument, filename)
+        dialog.exec()
