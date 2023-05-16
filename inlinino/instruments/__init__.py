@@ -8,6 +8,7 @@ import serial
 import usb.core
 import usb.backend.libusb1
 import hid
+from inlinino.app_signal import InstrumentSignals
 
 from inlinino.log import Log, LogText
 from inlinino import PATH_TO_RESOURCES
@@ -25,7 +26,7 @@ class Instrument:
                            'variable_names', 'variable_units', 'variable_precision']
     DATA_TIMEOUT = 60  # seconds
 
-    def __init__(self, uuid, cfg, signal=None, setup=True):
+    def __init__(self, uuid, cfg, signal: InstrumentSignals = None, setup=True):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Communication Interface
@@ -173,11 +174,13 @@ class Instrument:
             self._thread.start()
             # Signal to UI
             self.signal.status_update.emit()
+            self.signal.port_opened.emit()
 
     def close(self, wait_thread_join=True):
         if self.alive:
             self.alive = False
             self.signal.status_update.emit()
+            self.signal.port_closed.emit()
             self._interface.stop()
             if wait_thread_join:
                 timeout = self._interface.timeout if self._interface.timeout is not None else 1

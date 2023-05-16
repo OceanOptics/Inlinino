@@ -19,7 +19,8 @@ from inlinino.widgets.metadata import MetadataWidget
 
 try:
     from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-        spec_board_report, GRAPH_CFG
+        spec_board_report
+    from hypernav.viz import GRAPH_CFG
     from hypernav.io import HyperNav as HyperNavIO
 except IndexError:
     HyperNavIO = None
@@ -64,6 +65,7 @@ class HyperNavCalWidget(GenericWidget):
         self.instrument.signal.warning.connect(self.warning_message_box)
         self.instrument.signal.cfg_update.connect(self.update_set_cfg_value)
         self.instrument.signal.cfg_update.connect(self.update_set_head_value)
+        self.instrument.signal.port_opened.connect(self.handle_port_open)
         # Control
         self.instrument.signal.toggle_command_mode.connect(self.toggle_control)
         self.ctrl_get_cfg.clicked.connect(self.get_cfg)
@@ -131,6 +133,11 @@ class HyperNavCalWidget(GenericWidget):
         parameter = self.ctrl_set_parameter.currentText()
         value = self.ctrl_set_value.text()
         self.tx(f'set {parameter} {value}')
+
+
+    @QtCore.pyqtSlot()
+    def handle_port_open(self):
+        self.get_cfg()
 
     @QtCore.pyqtSlot(str)
     def update_set_cfg_value(self, parameter):
