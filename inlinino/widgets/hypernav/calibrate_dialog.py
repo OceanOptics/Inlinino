@@ -1,21 +1,17 @@
 import os.path
-import queue
-import re
 from threading import Thread
 from multiprocessing import Process, Queue
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 from functools import reduce, partial
+from hypernav.calibrate import CalibrationResult, CalibrationError, CalibrationPlotter, CalibrationFileWriter
+from hypernav.viz import set_plotly_template
 
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.widgets.shared.file_label import FileLabel
 from inlinino import PATH_TO_RESOURCES
 
-try:
-    from hypernav.calibrate import calibration_report
-    from hypernav.io import HyperNav as HyperNavIO
-except IndexError:
-    HyperNavIO = None
+CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
     def __init__(self, parent, instrument: HyperNav, log_file_name: str):
@@ -75,73 +71,38 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
 
         # Start worker
         self.worker = Process(name='HyperNavWorker', target=HyperNavCalibrateDialogWidget.run, args=(
-            self.instrument.serial_number,
-            self.instrument.prt_sbs_sn,
-            self.instrument.sbd_sbs_sn,
-            self.instrument.log_path,
-            self.log_file_name,
             self.queue,
-            self.lamp_label.get_file(),
-            self.plaque_label.get_file(),
-            self.wavelength_label.get_file(),
-            float(self.lamp_calibration_distance_input.toPlainText()),
-            float(self.lamp_to_plaque_distance_input.toPlainText())
+            CalibrationResult(
+                self.instrument.prt_sbs_sn, # OR sbd_sbs_sn
+                'port', # OR starboard
+                self.instrument.get_local_cfg('SPCPRTSN'), # OR SPCSBDSN
+                'chan',
+                os.path.join(self.instrument.log_path, self.log_file_name),
+                self.lamp_label.get_file(),
+                self.plaque_label.get_file(),
+                self.wavelength_label.get_file(),
+                float(self.lamp_calibration_distance_input.toPlainText()),
+                float(self.lamp_to_plaque_distance_input.toPlainText())
+            )
         ))
         self.worker.start()
         # Start join thread
         Thread(target=self._join, daemon=True).start()
 
     @staticmethod
-    def run(
-        hn_sn,
-        prt_sn,
-        sbd_sn,
-        path,
-        filename,
-        queue,
-        lamp_file_path,
-        plaque_file_path,
-        wavelength_file_path,
-        fel_lamp_calibration_distance_meters,
-        fel_lamp_to_plaque_distance_meters
-    ):
-        hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
-        data, meta = hn.read_inlinino(os.path.join(path, filename))
-        light_sn_list = list(hdr for hdr in meta['valid_frames'].keys() if re.match("^SAT[XY]LZ.*", hdr))
-        dark_sn_list = list(hdr for hdr in meta['valid_frames'].keys() if re.match("^SAT[XY]DZ.*", hdr))
+    def run(queue: Queue, result: CalibrationResult):
+        try:
+            set_plotly_template()
+            plotter = CalibrationPlotter(result)
+            fig = plotter.plot()
+            fig.show()
 
-        # Find HyperNav frame serial numbers
-
-        if not light_sn_list:
-            queue.put(('error', 'no valid light frames '))
-            return
-
-        if not dark_sn_list:
-            queue.put(('error', 'no valid dark frames'))
-            return
-
-        light_sn = light_sn_list[0]
-        dark_sn = dark_sn_list[0]
-
-        warning_sn = []
-        for sn in set([int(k[6:]) for k in [ light_sn, dark_sn ]]):
-            if sn not in (prt_sn, sbd_sn):
-                warning_sn.append(sn)
-        if warning_sn:
-            queue.put(('warning', 'Unexpected head serial number(s) ' + ', '.join(warning_sn)))
-
-        warnings = calibration_report(
-            data[light_sn],
-            data[dark_sn],
-            lamp_file_path,
-            plaque_file_path,
-            wavelength_file_path,
-            fel_lamp_calibration_distance_meters,
-            fel_lamp_to_plaque_distance_meters
-        )
-
-        for warning in warnings:
-            queue.put(('warning', warning))
+            writer = CalibrationFileWriter(result, os.path.join(CURRENT_DIR, '../../../data'))
+            writer.write_cal_files()
+        except CalibrationError as err:
+            queue.put(('error', err.message))
+        except Exception as err:
+            queue.put(('error', f"Unexpected {err=}, {type(err)=}"))
 
     def _join(self):
         if self.worker is None:
