@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>select_channel_widget</class>
+ <widget class="QWidget" name="select_channel_widget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>151</width>
+    <height>170</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Select Channel</string>
+  </property>
+  <layout class="QVBoxLayout" name="layout">
+   <item>
+    <widget class="QGroupBox" name="group_box_active_timeseries_variables">
+     <property name="title">
+      <string>Select Channel(s)</string>
+     </property>
+     <layout class="QVBoxLayout" name="group_box_active_timeseries_variables_layout">
+      <item>
+       <widget class="QLineEdit" name="variables_search">
+        <property name="placeholderText">
+         <string>Search Channel</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QListView" name="list_variables">
+        <property name="sizeAdjustPolicy">
+         <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

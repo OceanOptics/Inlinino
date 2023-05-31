@@ -9,12 +9,12 @@ from collections import namedtuple
 import numpy as np
 import pySatlantic.instrument as pySat
 
-from inlinino import COLOR_SET, __version__
+from inlinino import __version__
 from inlinino.log import Log, LogBinary
 from inlinino.instruments import Instrument
 
 
-PacketMaker = namedtuple('SatlanticPacket', ['frame', 'frame_header'])
+SatPacket = namedtuple('SatlanticPacket', ['frame', 'frame_header'])
 
 
 class Satlantic(Instrument):
@@ -25,8 +25,13 @@ class Satlantic(Instrument):
     KEYS_TO_IGNORE = ['CRLF_TERMINATOR', 'TERMINATOR']
     KEYS_TO_NOT_DISPLAY = KEYS_TO_IGNORE + ['DATEFIELD', 'TIMEFIELD', 'CHECK_SUM']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
+        if 'setup' in kwargs.keys():
+            setup=kwargs['setup']
+            super().__init__(uuid, cfg, signal, *args, **kwargs)
+        else:
+            setup=True
+            super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
         self.frame_headers_idx = []
@@ -34,24 +39,25 @@ class Satlantic(Instrument):
         self._max_buffer_length = 2**18  # Need larger buffer for HyperNAV
         self.default_serial_baudrate = 115200  # for HyperNAV
         self.default_serial_timeout = 5
-        # Init Channels to Plot Plugin
-        self.plugin_active_timeseries_variables = True
-        self.plugin_active_timeseries_variables_names = []
-        self.plugin_active_timeseries_variables_selected = []
+        # Init Channels to Plot Widget
+        self.widget_select_channel_enabled = True
+        self.widget_active_timeseries_variables_names = []
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
         self.active_timeseries_variables = {}  # dict of each frame header
-        # Init Spectrum Plot Plugin
+        # Init Spectrum Plot Widget
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = {}
         self.spectrum_plot_trace_names = []
         self.spectrum_plot_x_values = []
         # Init Secondary Dock
-        self.plugin_metadata_enabled = True
-        # Init Metadata Data Plugin
-        self.plugin_metadata_keys = []
-        self.plugin_metadata_frame_counters = []
+        self.widget_metadata_enabled = True
+        # Init Metadata Data Widget
+        self.widget_metadata_keys = []
+        self.widget_metadata_frame_counters = []
         # Setup
-        self.init_setup()
+        if setup:
+            self.setup(cfg)
 
     def setup(self, cfg):
         self.logger.debug('Setup')
@@ -62,38 +68,39 @@ class Satlantic(Instrument):
         for f in self.REQUIRED_CFG_FIELDS:
             if f not in cfg.keys():
                 raise ValueError(f'Missing field %s' % f)
-        # Parse Calibration Files
-        self._parser = pySat.Instrument()
-        if isinstance(cfg['tdf_files'], list):
-            for f, i in zip(cfg['tdf_files'], cfg['immersed']):
-                if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS:
-                    raise pySat.CalibrationFileExtensionError(f'File extension incorrect: {f}')
-                self.logger.debug(f'Reading [immersed={i}] {f}')
-                foo = pySat.Parser(f, i)
-                self._parser.cal[foo.frame_header] = foo
-                self._parser.max_frame_header_length = max(self._parser.max_frame_header_length, len(foo.frame_header))
-        elif isinstance(cfg['tdf_files'], str):
-            empty_sip, i = True, 0
-            archive = zipfile.ZipFile(cfg['tdf_files'], 'r')
-            dirsip = os.path.join(os.path.dirname(cfg['tdf_files']),
-                                  os.path.splitext(os.path.basename(cfg['tdf_files']))[0])
-            if not os.path.exists(dirsip):
-                os.mkdir(dirsip)
-            archive.extractall(path=dirsip)
-            for f in zip(archive.namelist()):
-                if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS \
-                        or os.path.basename(f)[0] == '.':
-                    continue
-                empty_sip, i = False, i + 1
-                self.logger.debug(f"Reading [immersed={cfg['immersed'][i]}] {f}")
-                foo = pySat.Parser(os.path.join(dirsip, f), cfg['immersed'][i])
-                self._parser.cal[foo.frame_header] = foo
-                self._parser.max_frame_header_length = max(self._parser.max_frame_header_length,
-                                                           len(foo.frame_header))
-            if empty_sip:
-                raise pySat.CalibrationFileEmptyError('No calibration file found in sip')
-        else:
-            raise ValueError('Expect list or str for tdf_files')
+        if 'tdf_files' in cfg.keys() and 'immersed' in cfg.keys():  # Needed for child HyperNav which has custom parser
+            # Parse Calibration Files
+            self._parser = pySat.Instrument()
+            if isinstance(cfg['tdf_files'], list):
+                for f, i in zip(cfg['tdf_files'], cfg['immersed']):
+                    if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS:
+                        raise pySat.CalibrationFileExtensionError(f'File extension incorrect: {f}')
+                    self.logger.debug(f'Reading [immersed={i}] {f}')
+                    foo = pySat.Parser(f, i)
+                    self._parser.cal[foo.frame_header] = foo
+                    self._parser.max_frame_header_length = max(self._parser.max_frame_header_length, len(foo.frame_header))
+            elif isinstance(cfg['tdf_files'], str):
+                empty_sip, i = True, 0
+                archive = zipfile.ZipFile(cfg['tdf_files'], 'r')
+                dirsip = os.path.join(os.path.dirname(cfg['tdf_files']),
+                                      os.path.splitext(os.path.basename(cfg['tdf_files']))[0])
+                if not os.path.exists(dirsip):
+                    os.mkdir(dirsip)
+                archive.extractall(path=dirsip)
+                for f in zip(archive.namelist()):
+                    if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS \
+                            or os.path.basename(f)[0] == '.':
+                        continue
+                    empty_sip, i = False, i + 1
+                    self.logger.debug(f"Reading [immersed={cfg['immersed'][i]}] {f}")
+                    foo = pySat.Parser(os.path.join(dirsip, f), cfg['immersed'][i])
+                    self._parser.cal[foo.frame_header] = foo
+                    self._parser.max_frame_header_length = max(self._parser.max_frame_header_length,
+                                                               len(foo.frame_header))
+                if empty_sip:
+                    raise pySat.CalibrationFileEmptyError('No calibration file found in sip')
+            else:
+                raise ValueError('Expect list or str for tdf_files')
         for v in self._parser.cal.values():
             if v.baudrate is not None:
                 self.default_serial_baudrate = v.baudrate
@@ -105,7 +112,8 @@ class Satlantic(Instrument):
         self.serial_number = cfg['serial_number']
         logger_cfg = {'path': cfg['log_path'], 'filename_prefix': self.bare_log_prefix}
         self._log_raw = RawLogger(logger_cfg, self.signal.status_update)
-        self._log_prod = ProdLogger(logger_cfg, self._parser.cal)
+        self._log_prod = ProdLogger(logger_cfg, self._parser.cal, self._log_raw.get_file_timestamp)
+        # _log_raw must be enabled in order for get_file_timestamp to work
         self.log_raw_enabled = True
         self.log_prod_enabled = cfg['log_products']
         # Update variable for Spectrum Plot
@@ -121,10 +129,10 @@ class Satlantic(Instrument):
                 self.frame_headers_idx[head] = i
         # TODO if no core variables disable spectrum plot widget
         # Update Active Timeseries Variables
-        self.plugin_active_timeseries_variables_names = []
+        self.widget_active_timeseries_variables_names = []
         self.active_timeseries_variables = []
         for head, cal in self._parser.cal.items():
-            self.plugin_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
+            self.widget_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
             # Append middle core variable to timeseries if instruments with few wavelength
             if cal.core_variables and len(cal.core_variables) < 500:
                 varnames = [f'{head}_{cal.key[cal.core_variables[int(len(cal.core_variables)/2)]]}']
@@ -137,18 +145,18 @@ class Satlantic(Instrument):
             else:
                 continue
             for varname in varnames:
-                self.plugin_active_timeseries_variables_selected.append(varname)
+                self.widget_active_timeseries_variables_selected.append(varname)
                 self.active_timeseries_variables.append(self.active_timeseries_unpack_variable_name(varname))
-        # Update Metadata Plugin
-        self.plugin_metadata_keys = []
-        self.plugin_metadata_frame_counters = []
+        # Update Metadata Widget
+        self.widget_metadata_keys = []
+        self.widget_metadata_frame_counters = []
         for head, cal in self._parser.cal.items():
             if cal.core_variables:
                 fields = [cal.key[i] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
             else:
                 fields = [k for k in cal.key if k not in self.KEYS_TO_NOT_DISPLAY]
-            self.plugin_metadata_keys.append((head, fields))
-            self.plugin_metadata_frame_counters.append(0)
+            self.widget_metadata_keys.append((head, fields))
+            self.widget_metadata_frame_counters.append(0)
         # Update User Interface (include spectrum plot)
         self.signal.status_update.emit()  # Doesn't run on initial setup because signals are not connected
 
@@ -164,32 +172,32 @@ class Satlantic(Instrument):
             if unknown_bytes:
                 # Log bytes in raw files
                 if self.log_raw_enabled and self._log_active:
-                    self._log_raw.write(PacketMaker(unknown_bytes, None), timestamp)
+                    self._log_raw.write(SatPacket(unknown_bytes, None), timestamp)
             if packet:
-                self.handle_packet(PacketMaker(packet, frame_header), timestamp)
+                try:
+                    self.handle_packet(SatPacket(packet, frame_header), timestamp)
+                except pySat.ParserError as e:
+                    self.signal.packet_corrupted.emit()
+                    self.logger.warning(e)
+                    self.logger.debug(packet)
 
-    def parse(self, packet: PacketMaker):
-        try:
-            data, valid_frame = self._parser.parse_frame(packet.frame, packet.frame_header, flag_get_auxiliary_variables=True)
-        except pySat.ParserError as e:
-            self.signal.packet_corrupted.emit()
-            self.logger.warning(e)
-            self.logger.debug(packet)
+    def parse(self, packet: SatPacket):
+        data, valid_frame = self._parser.parse_frame(packet.frame, packet.frame_header, flag_get_auxiliary_variables=True)
         if not valid_frame:
             self.signal.packet_corrupted.emit()
-        return PacketMaker(data, packet.frame_header)
+        return SatPacket(data, packet.frame_header)
 
-    def handle_data(self, data: PacketMaker, timestamp: float):
+    def handle_data(self, data: SatPacket, timestamp: float):
         cal = self._parser.cal[data.frame_header]
-        # Update Metadata Plugin
+        # Update Metadata Widget
         metadata = [(None, None)] * len(self.frame_headers_idx)
         idx = self.frame_headers_idx[data.frame_header]
-        self.plugin_metadata_frame_counters[idx] += 1
+        self.widget_metadata_frame_counters[idx] += 1
         if cal.core_variables:
             values = [data.frame[cal.key[i]] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
         else:
             values = [data.frame[k] for k in cal.key if k not in self.KEYS_TO_NOT_DISPLAY]
-        metadata[idx] = (self.plugin_metadata_frame_counters[idx], values)
+        metadata[idx] = (self.widget_metadata_frame_counters[idx], values)
         self.signal.new_meta_data.emit(metadata)
         # Update Timeseries
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
@@ -215,19 +223,19 @@ class Satlantic(Instrument):
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def udpate_active_timeseries_variables(self, name:str, state: bool):
-        if not ((state and name not in self.plugin_active_timeseries_variables_selected) or
-                (not state and name in self.plugin_active_timeseries_variables_selected)):
+    def udpate_active_timeseries_variables(self, name: str, state: bool):
+        if not ((state and name not in self.widget_active_timeseries_variables_selected) or
+                (not state and name in self.widget_active_timeseries_variables_selected)):
             return
         frame_header, key, idx = self.active_timeseries_unpack_variable_name(name)
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
             try:
                 if state:
                     self.active_timeseries_variables.append((frame_header, key, idx))
-                    self.plugin_active_timeseries_variables_selected.append(name)
+                    self.widget_active_timeseries_variables_selected.append(name)
                 else:
                     del self.active_timeseries_variables[self.active_timeseries_variables.index((frame_header, key, idx))]
-                    del self.plugin_active_timeseries_variables_selected[self.plugin_active_timeseries_variables_selected.index(name)]
+                    del self.widget_active_timeseries_variables_selected[self.widget_active_timeseries_variables_selected.index(name)]
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -248,7 +256,8 @@ class ProdLogger:
     Similar format as Satlantic SatCon output
     :return:
     """
-    def __init__(self, log_cfg, cal):
+    def __init__(self, log_cfg, cal, file_timestamp_getter=None):
+        self.get_file_timestamp = file_timestamp_getter
         self._log = {}
         self._frame_keys = {}
         self._frame_core_var = {}
@@ -300,6 +309,16 @@ class ProdLogger:
             return l.filename
 
     @property
+    def file_length(self):
+        for l in self._log.values():
+            return l.file_length
+
+    @file_length.setter
+    def file_length(self, value):
+        for l in self._log.values():
+            l.file_length = value
+
+    @property
     def FILE_EXT(self) -> str:
         return Log.FILE_EXT
 
@@ -307,15 +326,22 @@ class ProdLogger:
         for l in self._log.values():
             l.update_cfg(cfg)
 
-    def write(self, packet: PacketMaker, timestamp: float):
-        data = []
-        for k, c in zip(self._frame_keys[packet.frame_header], self._frame_core_var[packet.frame_header]):
-            if c:
-                data.append(np.array2string(packet.frame[k], separator=',', threshold=np.inf, max_line_width=np.inf)[1:-1])
-            else:
-                data.append(packet.frame[k])
-        # values = packet.frame.values()  # Assume dictionary keep order which isn't the case with older python version
-        self._log[packet.frame_header].write(data, timestamp)
+    @staticmethod
+    def format_core_variable(array):
+        return np.array2string(array, separator=',', threshold=np.inf, max_line_width=np.inf)[1:-1]
+
+    def write(self, packet: SatPacket, timestamp: float):
+        if isinstance(packet.frame, list):
+            data = packet.frame
+        else:
+            data = []
+            for k, c in zip(self._frame_keys[packet.frame_header], self._frame_core_var[packet.frame_header]):
+                if c:
+                    data.append(self.format_core_variable(packet.frame[k]))
+                else:
+                    data.append(packet.frame[k])
+            # values = packet.frame.values()  # Assume dictionary keep order which isn't the case with older python version
+        self._log[packet.frame_header].write(data, timestamp, self.get_file_timestamp())
 
     def close(self):
         for l in self._log.values():
@@ -361,5 +387,5 @@ class RawLogger(LogBinary):
         return pack('!ii', int(strftime('%Y%j', gmtime(s))),
                     int('{}{:03d}'.format(strftime('%H%M%S', gmtime(s)), int(ms * 1000))))[1:]
 
-    def write(self, packet: PacketMaker, timestamp: float):
+    def write(self, packet: SatPacket, timestamp: float):
         super().write(packet.frame, timestamp)

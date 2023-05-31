@@ -4,16 +4,16 @@ Inlinino
 [![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)](https://www.python.org/downloads/)
 [![Documentation Status](https://readthedocs.org/projects/inlinino/badge/?version=latest)](https://inlinino.readthedocs.io/en/latest/?badge=latest)
 
-Inlinino is an open-source software data logger for oceanographers. It primarily log measurements from optical instruments deployed on research vessels during month long campaigns. Secondarily, it  provides real-time visualization, which helps users troubleshoot instruments in the field and ensure collection of quality data. Inlinino is designed to interface with either serial (RS-232) or analog instruments. The data received is logged in a timestamped raw format (as communicated by the instrument) or in a comma separated file (csv) for easy importation in data analysis software. Typically, a new log file is created every hour for simplicity of post-processing and easy backups. Instruments supported are: SeaBird TSG, Satlantic PAR, WET Labs ECO sensors (e.g. ECO-BB3, ECO-FLBBCD, ECO-BBFL2, ECO-3X1M, ECO-BB9, ECO-BBRT), WET Labs ACS, Sequoia LISST, and analog sensors through a data acquisition system (DataQ DI-1100 ). Other instruments can be added via the user interface if they output simple ascii data frame, otherwise the code is intended to be modular to support new instruments. 
+Inlinino is an open-source software data logger for oceanographers. It primarily logs measurements from optical instruments deployed on research vessels during month long campaigns. Secondarily, it provides real-time visualization, which helps users troubleshoot instruments in the field and ensure collection of quality data. Inlinino is designed to interface with either analog, serial, USB, UDP instruments. The data received is timestamped and logged as received (raw) and/or in a comma separated file (csv) for easy importation in data analysis software. Typically, a new log file is created every hour for simplicity of post-processing and backups. Instruments supported are: SeaBird TSG (SBE-45 + SBE-38), Biospherical Instruments Inc. PAR, WET Labs ECO instruments (e.g. ECO-BB3, ECO-FLBBCD), WET Labs ACS, Satlantic instruments (e.g. HyperOCR, HyperPro, HyperSAS, HyperNAV, Suna), Sequoia Scientific LISST, Sequoia Scientific HyperBB, NMEA, and analog sensors through a data acquisition system (DataQ DI-1100, Ontrak ADU100, and ADU200). Other instruments can be added via the user interface if they output simple ascii data frame, otherwise the code is intended to be modular to support new instruments. 
      
 The documentation of the project is available at [http://inlinino.readthedocs.io](http://inlinino.readthedocs.io/en/latest/).
 
-Appropriate citation is:
+Cite as:
 Haentjens, N. and Boss, E., 2020. Inlinino: A Modular Software Data Logger for Oceanography. DIY Oceanography. DOI: [10.5670/oceanog.2020.112](https://doi.org/10.5670/oceanog.2020.112)
 
 
 ### Installation
-Inlinino was bundled into a Windows executable and a macOS application. Both are available for download with a quick start guide in the [documentation](https://inlinino.readthedocs.io/en/latest/quick_start.html). Otherwise Inlinino can be installed from source using the setup.py file available on this repository, following the instructions below.
+Inlinino was bundled into a Windows executable and a macOS application. Both are available for download with a quick start guide in the [documentation](https://inlinino.readthedocs.io/en/latest/quick_start.html). Otherwise, Inlinino can be installed from source using the setup.py file available on this repository, following the instructions below.
 
 Download Inlinino code.
  
@@ -25,7 +25,7 @@ To install Inlinino (tested with python 3.8 only, should work with newer python 
 
     pip install -r requirements.txt
 
-To use Ontrak ADU on Windows additional dll and python modules are needed. Note that in ontrack
+To use Ontrak ADU on Windows additional dll and python modules are needed. Note that in resources/ontrack the path to the dll need to be edited with `os.path.join(PATH_TO_RESOURCES, 'ontrak', 'AduHid')`.
     
     wget https://www.ontrak.net/images/adu_python_dll.zip
     unzip adu_python_dll.zip

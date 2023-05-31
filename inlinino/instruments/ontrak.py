@@ -76,8 +76,8 @@ class Ontrak(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, *args, setup=False, **kwargs)
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
+        super().__init__(uuid, cfg, signal, *args, setup=False, **kwargs)
         # Instrument Specific attributes
         # Relay
         self.relay_enabled = True
@@ -88,6 +88,7 @@ class Ontrak(Instrument):
         self.relay_on_duration = 10      # minutes
         self.relay_off_duration = 30     # minutes
         self._relay_interval_start = None
+        self._relay_hourly_skip_before = 0
         self._relay_cached_position = None
         # Event Counter(s) / Flowmeter(s)
         self.event_counter_channels = [0]
@@ -100,14 +101,15 @@ class Ontrak(Instrument):
         self._analog_calibration_interval = 3600  # seconds
         # Refresh rate
         self.refresh_rate = 2  # Hz
-        # Init Auxiliary Data Plugin
-        self.plugin_aux_data_enabled = True
-        self.plugin_aux_data_variable_names = []
-        # Init Flow Control Plugin
-        self.plugin_instrument_control_enabled = True
-        self.plugin_pump_control_enabled = True
+        # Init Auxiliary Data Widget
+        self.widget_aux_data_enabled = True
+        self.widget_aux_data_variable_names = []
+        # Init Flow Control Widget
+        self.widget_flow_control_enabled = True
+        self.widget_pump_control_enabled = True
+        self.widgets_to_load = ['FlowControlWidget', 'PumpControlWidget']
         # Setup
-        self.init_setup()
+        self.setup(cfg)
 
     def setup(self, cfg, raw_logger=LogText):
         # Set specific attributes
@@ -124,16 +126,16 @@ class Ontrak(Instrument):
             raise ValueError('relay0_mode not supported. Supported models are: Switch and Pump')
         self.relay_mode = cfg['relay0_mode']
         if not self.relay_enabled:
-            self.plugin_instrument_control_enabled = False
-            self.plugin_pump_control_enabled = False
+            self.widget_flow_control_enabled = False
+            self.widget_pump_control_enabled = False
         elif self.relay_mode == 'Switch':
-            self.plugin_instrument_control_enabled = True
-            self.plugin_pump_control_enabled = False
+            self.widget_flow_control_enabled = True
+            self.widget_pump_control_enabled = False
             self.relay_status = RELAY_HOURLY
         elif self.relay_mode == 'Pump':
-            self.plugin_instrument_control_enabled = False
-            self.plugin_pump_control_enabled = True
-            self.relay_status = RELAY_INTERVAL
+            self.widget_flow_control_enabled = False
+            self.widget_pump_control_enabled = True
+            self.relay_status = RELAY_HOURLY
         self._relay_interval_start = None
         self._relay_cached_position = None
         if 'event_counter_channels_enabled' not in cfg.keys():
@@ -169,19 +171,19 @@ class Ontrak(Instrument):
         cfg['terminator'] = None  # Not Applicable
         # Set standard configuration and check cfg input
         super().setup(cfg, raw_logger)
-        # Update Auxiliary Plugin
-        self.plugin_aux_data_variable_names = []
+        # Update Auxiliary Widget
+        self.widget_aux_data_variable_names = []
         if self.relay_enabled:
             if self.relay_mode == 'Switch':
-                self.plugin_aux_data_variable_names.append('Switch')
+                self.widget_aux_data_variable_names.append('Switch')
             elif self.relay_mode == 'Pump':
-                self.plugin_aux_data_variable_names.append('Pump')
+                self.widget_aux_data_variable_names.append('Pump')
             else:
-                self.plugin_aux_data_variable_names.append('Relay')
+                self.widget_aux_data_variable_names.append('Relay')
         for c in self.event_counter_channels:
-            self.plugin_aux_data_variable_names.append(f'Flow #{c} (L/min)')
+            self.widget_aux_data_variable_names.append(f'Flow #{c} (L/min)')
         for c in self.analog_channels:
-            self.plugin_aux_data_variable_names.append(f'Analog C{c} (V)')
+            self.widget_aux_data_variable_names.append(f'Analog C{c} (V)')
 
     def setup_interface(self, cfg):
         if 'interface' in cfg.keys():
@@ -252,6 +254,13 @@ class Ontrak(Instrument):
         self._interface.write('RPK0')
         value = self._interface.read()
         self._relay_cached_position = None if value is None else bool(value)
+        if self.relay_mode == 'Pump':
+            # Skip first hour
+            self._relay_hourly_skip_before = time() + 3600
+            # self._relay_interval_start = time() - self.relay_on_duration * 60  # Default to off on start
+        else:
+            self._relay_hourly_skip_before = 0
+        self._relay_interval_start = time()
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
@@ -300,14 +309,13 @@ class Ontrak(Instrument):
         elif self.relay_status == RELAY_HOURLY:
             minute = int(strftime('%M'))
             stop_at = self.relay_hourly_start_at + self.relay_on_duration
-            if (self.relay_hourly_start_at <= minute < stop_at < 60) or \
-                    (60 <= stop_at and (self.relay_hourly_start_at <= minute or minute < stop_at % 60)):
+            if ((self.relay_hourly_start_at <= minute < stop_at < 60) or \
+                    (60 <= stop_at and (self.relay_hourly_start_at <= minute or minute < stop_at % 60))) and \
+                    self._relay_hourly_skip_before < time():
                 set_relay = True
             else:
                 set_relay = False
         elif self.relay_status == RELAY_INTERVAL:
-            if self._relay_interval_start is None:
-                self._relay_interval_start = time()
             delta = ((time() - self._relay_interval_start) / 60) % (self.relay_on_duration + self.relay_off_duration)
             set_relay = (delta < self.relay_on_duration)
         else:

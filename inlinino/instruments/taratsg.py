@@ -7,16 +7,16 @@ class TaraTSG(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, *args, **kwargs)
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
+        super().__init__(uuid, cfg, signal, *args, **kwargs)
 
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 3
 
-        # Auxiliary Data Plugin
-        self.plugin_aux_data_enabled = True
-        self.plugin_aux_data_variable_names = ['Temp. 1 (ºC)', 'Temp. 2 (ºC)', 'Cond. 1 (S/m)', 'Salinity (psu)']
+        # Auxiliary Data widget
+        self.widget_aux_data_enabled = True
+        self.widget_aux_data_variable_names = ['Temp. 1 (ºC)', 'Temp. 2 (ºC)', 'Cond. 1 (S/m)', 'Salinity (psu)']
 
     def setup(self, cfg):
         # Overload cfg with Tara TSG specific parameters
