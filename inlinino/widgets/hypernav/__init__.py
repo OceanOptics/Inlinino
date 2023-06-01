@@ -19,9 +19,10 @@ from inlinino.widgets.metadata import MetadataWidget
 
 try:
     from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-        spec_board_report, GRAPH_CFG
+        spec_board_report
+    from hypernav.viz import GRAPH_CFG
     from hypernav.io import HyperNav as HyperNavIO
-except IndexError:
+except ImportError:
     HyperNavIO = None
 
 UPASS = u'\u2705'
@@ -51,13 +52,13 @@ class HyperNavCalWidget(GenericWidget):
             'frame_view': MetadataWidget(instrument),
             # TODO if HyperNAVIO is not None, load this widget
             'characterize': HyperNavCharacterizeDMWidget(instrument),
-            'calibrate': HyperNavCalibrateWidget(instrument),
+            # 'calibrate': HyperNavCalibrateWidget(instrument),  # Temporary diable calibrate as not fully implemented yet
             # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
         }
         super().__init__(instrument)
         # Add widgets
         self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
-        self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
+        # self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')  # Temporary diable calibrate as not fully implemented yet
         self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
         self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
         # Connect signals (must be after super() as required ui to be loaded)
@@ -382,6 +383,7 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
         # Reset buttons
         self.generate_report_button.setText('Generate Report')
         self.generate_report_button.setEnabled(True)
+
 
 class HyperNavCalibrateWidget(GenericWidget):
     @classproperty
