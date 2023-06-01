@@ -25,6 +25,10 @@ To install Inlinino (tested with python 3.8 only, should work with newer python 
 
     pip install -r requirements.txt
 
+On Ubuntu, PyQt5 should also be installed with apt:
+
+    sudo apt install python3-pyqt5
+
 To use Ontrak ADU on Windows additional dll and python modules are needed. Note that in resources/ontrack the path to the dll need to be edited with `os.path.join(PATH_TO_RESOURCES, 'ontrak', 'AduHid')`.
     
     wget https://www.ontrak.net/images/adu_python_dll.zip
