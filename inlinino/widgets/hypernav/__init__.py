@@ -19,9 +19,10 @@ from inlinino.widgets.metadata import MetadataWidget
 
 try:
     from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-        spec_board_report, GRAPH_CFG
+        spec_board_report
+    from hypernav.viz import GRAPH_CFG
     from hypernav.io import HyperNav as HyperNavIO
-except IndexError:
+except ImportError:
     HyperNavIO = None
 
 UPASS = u'\u2705'
@@ -382,6 +383,7 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
         # Reset buttons
         self.generate_report_button.setText('Generate Report')
         self.generate_report_button.setEnabled(True)
+
 
 class HyperNavCalibrateWidget(GenericWidget):
     @classproperty

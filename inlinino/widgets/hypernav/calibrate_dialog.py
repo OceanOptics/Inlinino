@@ -17,6 +17,7 @@ try:
 except IndexError:
     HyperNavIO = None
 
+
 class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
     def __init__(self, parent, instrument: HyperNav, log_file_name: str):
         self.worker = None

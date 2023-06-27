@@ -122,11 +122,13 @@ class Satlantic(Instrument):
         self.spectrum_plot_trace_names = []
         self.spectrum_plot_x_values = []
         self.frame_headers_idx = {}
-        for i, (head, cal) in enumerate(self._parser.cal.items()):
+        idx = 0
+        for head, cal in self._parser.cal.items():
             if cal.core_variables:
                 self.spectrum_plot_trace_names.append(f'{head} {cal.core_groupname}')  # TODO Add Units
                 self.spectrum_plot_x_values.append(np.array([float(cal.id[i]) for i in cal.core_variables]))
-                self.frame_headers_idx[head] = i
+                self.frame_headers_idx[head] = idx
+                idx += 1
         # TODO if no core variables disable spectrum plot widget
         # Update Active Timeseries Variables
         self.widget_active_timeseries_variables_names = []
