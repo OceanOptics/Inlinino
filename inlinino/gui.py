@@ -97,28 +97,8 @@ class MainWindow(QtGui.QMainWindow):
         self.signal_clock = QtCore.QTimer()
         self.signal_clock.timeout.connect(self.set_clock)
         self.signal_clock.start(1000)
-        # Alarm message box for data timeout
-        self.alarm_sound = QtMultimedia.QMediaPlayer()
-        self.alarm_playlist = QtMultimedia.QMediaPlaylist(self.alarm_sound)
-        for file in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'alarm*.wav'))):
-            self.alarm_playlist.addMedia(QtMultimedia.QMediaContent(QtCore.QUrl.fromLocalFile(file)))
-        if self.alarm_playlist.mediaCount() < 1:
-            logger.warning('No alarm sounds available: disabled alarm')
-        self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
-        self.alarm_sound.setPlaylist(self.alarm_playlist)
-        # self.alarm_sound.setMedia(QtMultimedia.QMediaContent(QtCore.QUrl.fromLocalFile(
-        #     os.path.join(PATH_TO_RESOURCES, 'alarm-arcade.wav'))))
-        self.alarm_message_box_active = False
-        self.alarm_message_box = QtWidgets.QMessageBox()
-        self.alarm_message_box.setIcon(QtWidgets.QMessageBox.Warning)
-        self.alarm_message_box.setWindowTitle("Data Timeout Alarm")
-        self.alarm_message_box.setText("An error with the serial connection occured or "
-                                       "no data was received in the past minute.\n\n"
-                                       "Does the instrument receive power?\n"
-                                       "Are the serial cable and serial to USB adapter connected?\n"
-                                       "Is the instruments set to continuously send data?\n")
-        self.alarm_message_box.setStandardButtons(QtWidgets.QMessageBox.Ignore)
-        self.alarm_message_box.buttonClicked.connect(self.alarm_message_box_button_clicked)
+        # Set Alarm: data timeout
+        self.alarm_message_box = MessageBoxAlarm(self)
         # Widgets variables
         self.widget_metadata = None
         self.widgets = []
@@ -484,43 +464,73 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot(bool)
     def on_data_timeout(self, active):
-        if active and not self.alarm_message_box_active:
-            # Start alarm and Open message box
-            self.alarm_playlist.setCurrentIndex(0)
-            self.alarm_sound.play()
-            self.alarm_message_box.open()
-            getattr(self.alarm_message_box, 'raise')
-            self.alarm_message_box_active = True
-        elif not active and self.alarm_message_box_active:
-            # Stop alarm and Close message box
-            self.alarm_sound.stop()
-            self.alarm_message_box.close()
-            self.alarm_message_box_active = False
-
-    def alarm_message_box_button_clicked(self, button):
-        if button.text() == 'Ignore':
-            logger.info('Ignored alarm')
-            self.alarm_sound.stop()
-            self.alarm_message_box.close()
-            self.alarm_message_box_active = False
+        if active and not self.alarm_message_box.active:
+            self.alarm_message_box.show(self.instrument.name, self.instrument.interface_name)
+        elif not active and self.alarm_message_box.active:
+            self.alarm_message_box.hide()
 
     def closeEvent(self, event):
-        msg = QtGui.QMessageBox(self)
-        msg.setIcon(QtGui.QMessageBox.Question)
-        msg.setText("Are you sure you want to exit?")
+        icon, txt = QtGui.QMessageBox.Question, "Are you sure you want to exit?"
         if self.instrument.widget_hypernav_cal_enabled:
-            txt = self.instrument.check_sbs_sn()
-            if txt:
-                msg.setIcon(QtGui.QMessageBox.Warning)
-                msg.setText(txt + "\nDo you want to exit anyway?")
-        msg.setWindowTitle("Inlinino: Closing Application")
-        msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-        msg.setDefaultButton(QtGui.QMessageBox.No)
+            sbs_txt = self.instrument.check_sbs_sn()
+            if sbs_txt:
+                icon, txt = QtGui.QMessageBox.Warning, txt + "\nDo you want to exit anyway?"
+        msg = QtGui.QMessageBox(icon, "Inlinino: Closing Application", txt,
+                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, self)
+        msg.setWindowModality(QtCore.Qt.WindowModal)
         if msg.exec_() == QtGui.QMessageBox.Yes:
             QtGui.QApplication.instance().closeAllWindows()  # NEEDED IF OTHER WINDOWS OPEN BY SPECIFIC INSTRUMENTS
             event.accept()
         else:
             event.ignore()
+
+
+class MessageBoxAlarm(QtWidgets.QMessageBox):
+    TEXT = "An error occurred with the serial connection or " \
+           "no data was received in the past minute.\n" \
+           "  + Is the instrument powered?\n" \
+           "  + Is the communication cable (e.g. serial, usb, ethernet) connected?\n" \
+           "  + Is the instruments configured properly (e.g. automatically send data)?\n"
+
+    def __init__(self, parent):
+        super().__init__(QtWidgets.QMessageBox.Warning, "Inlinino: Data Timeout Alarm",
+                         self.TEXT, QtWidgets.QMessageBox.Ignore, parent)
+        self.setWindowModality(QtCore.Qt.WindowModal)
+        self.active = False
+        self.buttonClicked.connect(self.ignore)
+
+        # Setup Sound
+        self.alarm_sound = QtMultimedia.QMediaPlayer()
+        self.alarm_playlist = QtMultimedia.QMediaPlaylist(self.alarm_sound)
+        for file in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'alarm*.wav'))):
+            self.alarm_playlist.addMedia(QtMultimedia.QMediaContent(QtCore.QUrl.fromLocalFile(file)))
+        if self.alarm_playlist.mediaCount() < 1:
+            logger.warning('No alarm sounds available: disabled alarm')
+        self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
+        self.alarm_sound.setPlaylist(self.alarm_playlist)
+
+    def show(self, instrument_name=None, interface_name=None):
+        if not self.active:
+            txt = ""
+            if instrument_name is not None:
+                txt += f"Instument: {instrument_name}\n"
+            if interface_name is not None:
+                txt += f"Port: {interface_name}\n\n"
+            self.setText(txt + self.TEXT)
+            super().show()
+            self.alarm_playlist.setCurrentIndex(0)
+            self.alarm_sound.play()
+            self.active = True
+
+    def hide(self):
+        if self.active:
+            self.alarm_sound.stop()
+            super().hide()
+            self.active = False
+
+    def ignore(self):
+        logger.info('Ignored alarm')
+        self.hide()
 
 
 class DialogStartUp(QtGui.QDialog):
@@ -555,12 +565,10 @@ class DialogStartUp(QtGui.QDialog):
         index = self.combo_box_instrument_to_delete.currentIndex()
         uuid = self.instrument_uuids[index]
         instrument = self.combo_box_instrument_to_delete.currentText()
-        msg = QtGui.QMessageBox(self)
-        msg.setIcon(QtGui.QMessageBox.Warning)
-        msg.setWindowTitle(f"Inlinino: Delete {instrument}")
-        msg.setText(f"Are you sure to delete instrument: {instrument} ?")
-        msg.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-        msg.setDefaultButton(QtGui.QMessageBox.No)
+        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, f"Inlinino: Delete {instrument}",
+                                f"Are you sure to delete instrument: {instrument} ?",
+                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, self)
+        msg.setWindowModality(QtCore.Qt.WindowModal)
         if msg.exec_() == QtGui.QMessageBox.Yes:
             CFG.read()
             if uuid not in CFG.instruments.keys():
@@ -926,16 +934,13 @@ class DialogInstrumentSetup(QtGui.QDialog):
                             return False
         return True
 
-    @staticmethod
-    def notification(message, details=None):
-        msg = QtGui.QMessageBox()
-        msg.setIcon(QtGui.QMessageBox.Warning)
-        msg.setText(message)
-        # msg.setInformativeText("This is additional information")
+    def notification(self, message, details=None):
+        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: Setup Instrument Warning",
+                                message,
+                                QtGui.QMessageBox.Ok, self)
         if details:
             msg.setDetailedText(str(details))
-        msg.setWindowTitle("Inlinino: Setup Instrument Warning")
-        msg.setStandardButtons(QtGui.QMessageBox.Ok)
+        msg.setWindowModality(QtCore.Qt.WindowModal)
         msg.exec_()
 
 

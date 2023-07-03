@@ -14,7 +14,7 @@ from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
-from inlinino.widgets.file_explorer_widget import FileExplorerWidget
+from inlinino.widgets.file_explorer import FileExplorerWidget
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
 
