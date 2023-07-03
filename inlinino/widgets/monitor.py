@@ -32,8 +32,5 @@ class MonitorWidget(GenericWidget):
         cmd = self.command_field.text()
         if not cmd:
             self.instrument.signal.warning.emit('No command to send (field empty).')
-        elif not self.instrument.alive:
-            self.instrument.signal.warning.emit('Instrument must be connected before sending commands.')
-        else:
-            self.instrument.interface_write(f'{cmd}\r\n'.encode('utf8', errors='replace'))
+        elif self.instrument.send_cmd(cmd):
             self.command_field.setText('')

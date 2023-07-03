@@ -348,6 +348,10 @@ class Interface:
     def timeout(self) -> int:
         raise NotImplementedError
 
+    @timeout.setter
+    def timeout(self, value):
+        raise NotImplementedError
+
     @property
     def name(self) -> str:
         raise NotImplementedError
@@ -384,6 +388,10 @@ class SerialInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._serial.timeout
+
+    @timeout.setter
+    def timeout(self, value: int):
+        self._serial.timeout = value
 
     @property
     def name(self) -> str:
@@ -426,6 +434,9 @@ class SerialInterface(Interface):
             return self._serial.read(self._serial.in_waiting or 1 if size is None else size)
         except serial.SerialException as e:
             raise InterfaceException(e)
+
+    def read_until(self, expected=b'\n', size=None):
+        return self._serial.read_until(expected=expected, size=size)
 
     def write(self, data):
         self._serial.write(data)
@@ -491,6 +502,10 @@ class USBInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._timeout / 1000  # in seconds
+
+    @timeout.setter
+    def timeout(self, value: float):
+        self._timeout = int(value * 1000)
 
     @property
     def name(self) -> str:
@@ -566,6 +581,10 @@ class USBHIDInterface(Interface):
     def timeout(self) -> int:
         return self._timeout / 1000  # in seconds
 
+    @timeout.setter
+    def timeout(self, value: float):
+        self._timeout = int(value*1000)
+
     @property
     def name(self) -> str:
         if self.is_open:
@@ -601,16 +620,14 @@ def get_spy_interface(interface: Interface, echo=True):
         def __init__(self, signal, max_buffer=2 ** 20):
             super().__init__()
             self.signal = signal
-            # self.read_queue = b''
-            # self.write_queue = b''
-            # self.max_buffer = max_buffer
+            self.spy_enabled = True
 
         def read(self, *args, **kwargs):
             buffer = super().read(*args, **kwargs)
             # self.read_queue += buffer
             # if len(self.read_queue) > self.max_buffer:
             #     self.read_queue = self.read_queue[-self.max_buffer:]
-            if len(buffer) > 0:
+            if self.spy_enabled and len(buffer) > 0:
                 self.signal.read.emit(buffer)
             return buffer
 
@@ -618,19 +635,8 @@ def get_spy_interface(interface: Interface, echo=True):
             # self.write_queue += data
             # if len(self.write_queue) > self.max_buffer:
             #     self.write_queue = self.write_queue[-self.max_buffer:]
-            if echo:
+            if self.spy_enabled and echo:
                 self.signal.write.emit(data)
             return super().write(data)
-
-        # def spy_read_read(self):
-        #     # TODO Add thread lock
-        #     buffer = self.read_queue
-        #     self.read_queue = b''
-        #     return buffer
-        #
-        # def spy_read_write(self):
-        #     buffer = self.write_queue
-        #     self.write_queue = b''
-        #     return buffer
 
     return Spy

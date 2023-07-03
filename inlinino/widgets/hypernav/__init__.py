@@ -8,12 +8,13 @@ from time import time, sleep
 from multiprocessing import Process, Queue
 
 import numpy as np
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
+from inlinino.widgets.file_explorer_widget import FileExplorerWidget
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
 
@@ -46,19 +47,20 @@ class HyperNavCalWidget(GenericWidget):
 
     def __init__(self, instrument: HyperNav):
         # widget variables (init before super() due to setup)
-        self.time_last_tx = 0
         self.widgets = {
             'serial_monitor': MonitorWidget(instrument),
             'frame_view': MetadataWidget(instrument),
             # TODO if HyperNAVIO is not None, load this widget
             'characterize': HyperNavCharacterizeDMWidget(instrument),
-            'calibrate': HyperNavCalibrateWidget(instrument),
-            # 'characterize': HyperNavCharacterizeRTWidget(instrument)}
+            # 'calibrate': HyperNavCalibrateWidget(instrument),
+            # 'characterize': HyperNavCharacterizeRTWidget(instrument)},
+            'file_explorer': FileExplorerWidget(instrument)
         }
         super().__init__(instrument)
         # Add widgets
         self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
-        self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
+        # self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
+        self.tw_top.addTab(self.widgets['file_explorer'], 'File Explorer')
         self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
         self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
         # Connect signals (must be after super() as required ui to be loaded)
@@ -91,7 +93,10 @@ class HyperNavCalWidget(GenericWidget):
 
     @QtCore.pyqtSlot(str)
     def warning_message_box(self, message):
-        QtGui.QMessageBox.warning(self, "Inlinino: HyperNavCal", message, QtGui.QMessageBox.Ok)
+        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: HyperNav",
+                                message, QtGui.QMessageBox.Ok, parent=self)
+        msg.setWindowModality(QtCore.Qt.WindowModal)
+        msg.exec_()
 
     """
     Control
@@ -109,29 +114,13 @@ class HyperNavCalWidget(GenericWidget):
         self.ctrl_cal.setEnabled(enable)
         self.instrument.command_mode = enable
 
-    def tx(self, cmd: str, check_timing=True):
-        """
-        Append terminator, encode, and send command
-        :param cmd:
-        :return:
-        """
-        if not self.instrument.alive:
-            self.warning_message_box('Instrument must be connected before sending commands.')
-            return False
-        if check_timing and time() - self.time_last_tx < 0.5:
-            self.warning_message_box('Wait at least one second between command transmission.')
-            return False
-        self.instrument.interface_write(f'{cmd}\r\n'.encode('utf8', errors='replace'))
-        self.time_last_tx = time()
-        return True
-
     def get_cfg(self):
-        self.tx('get cfg')
+        self.instrument.send_cmd('get cfg')
 
     def set_cfg(self):
         parameter = self.ctrl_set_parameter.currentText()
         value = self.ctrl_set_value.text()
-        self.tx(f'set {parameter} {value}')
+        self.instrument.send_cmd(f'set {parameter} {value}')
 
     @QtCore.pyqtSlot(str)
     def update_set_cfg_value(self, parameter):
@@ -166,34 +155,34 @@ class HyperNavCalWidget(GenericWidget):
 
     def set_head(self, head):
         if head == 'BOTH':
-            if not self.tx(f'set FRMPRTSN {self.instrument.prt_sbs_sn}', check_timing=False):
+            if not self.instrument.send_cmd(f'set FRMPRTSN {self.instrument.prt_sbs_sn}', check_timing=False):
                 return
             sleep(0.1)
-            if not self.tx(f'set FRMSBDSN {self.instrument.sbd_sbs_sn}', check_timing=False):
+            if not self.instrument.send_cmd(f'set FRMSBDSN {self.instrument.sbd_sbs_sn}', check_timing=False):
                 return
         elif head == 'PRT':
-            if not self.tx(f'set FRMPRTSN {self.instrument.prt_sbs_sn}', check_timing=False):
+            if not self.instrument.send_cmd(f'set FRMPRTSN {self.instrument.prt_sbs_sn}', check_timing=False):
                 return
             sleep(0.1)
-            if not self.tx(f'set FRMSBDSN 0', check_timing=False):
+            if not self.instrument.send_cmd(f'set FRMSBDSN 0', check_timing=False):
                 return
         elif head == 'SBD':
-            if not self.tx(f'set FRMPRTSN 0', check_timing=False):
+            if not self.instrument.send_cmd(f'set FRMPRTSN 0', check_timing=False):
                 return
             sleep(0.1)
-            if not self.tx(f'set FRMSBDSN {self.instrument.sbd_sbs_sn}', check_timing=False):
+            if not self.instrument.send_cmd(f'set FRMSBDSN {self.instrument.sbd_sbs_sn}', check_timing=False):
                 return
         sleep(0.1)
         self.warning_message_box('Power cycle HyperNav to complete change in spectrometer sampling.')
 
     def start(self):
-        self.tx('start')
+        self.instrument.send_cmd('start')
 
     def stop(self):
-        self.tx('stop')
+        self.instrument.send_cmd('stop')
 
     def cal(self):
-        self.tx(f'cal {self.ctrl_int_time.currentText()},{self.ctrl_light_dark_ratio.value()}')
+        self.instrument.send_cmd(f'cal {self.ctrl_int_time.currentText()},{self.ctrl_light_dark_ratio.value()}')
 
 
     """
@@ -211,7 +200,7 @@ class HyperNavCalWidget(GenericWidget):
         if not cmd:
             self.warning_message_box('Command is empty.')
         else:
-            self.tx(cmd)
+            self.instrument.send_cmd(cmd)
             self.serial_monitor_command.setText('')
 
 

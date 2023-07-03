@@ -4,10 +4,12 @@ from copy import deepcopy
 from struct import unpack
 from typing import Union
 from time import time
+from dataclasses import dataclass, field
 
 import numpy as np
 import pySatlantic.instrument as pySat
 
+from inlinino.shared.tree import QFileItem
 from inlinino.instruments import get_spy_interface, SerialInterface
 from inlinino.instruments.satlantic import Satlantic, SatPacket, ProdLogger
 from inlinino.app_signal import HyperNavSignals, InterfaceSignals
@@ -27,7 +29,7 @@ class HyperNav(Satlantic):
     RE_CMD_TERMINATOR = re.compile(b'(' + re.escape(b'$Ok \r\n') +
                                    b'|' + re.escape(b'$Error: ') + b'[0-9\(\)]+' + re.escape(b'\r\n') + b')',
                                    re.IGNORECASE)
-    RE_IS_CMD = re.compile(b'cal|start|stop|get|set', re.IGNORECASE)
+    RE_IS_CMD = re.compile(b'cal|start|stop|get|set|list|dump', re.IGNORECASE)
     RE_IGNORE = re.compile(b'|'.join((re.escape(b'CMC <-'), b'Start data acquisition', b'SpecBrd', b'ERROR')))
     RE_CMD_LINE_TERMINATOR = re.compile(re.escape(CMD_TERMINATOR))  # Does not keep delimiter
     RE_CMD_CAL_START = re.compile(b'(cal|start)', re.IGNORECASE)
@@ -35,6 +37,8 @@ class HyperNav(Satlantic):
     RE_CMD_STOP = re.compile(b'(stop)', re.IGNORECASE)
     RE_CMD_GET = re.compile(b'(get)', re.IGNORECASE)
     RE_CMD_SET = re.compile(b'(set)', re.IGNORECASE)
+    RE_CMD_LIST = re.compile(b'(list)', re.IGNORECASE)
+    RE_CMD_DUMP = re.compile(b'(dump)', re.IGNORECASE)
 
     def __init__(self, uuid, cfg, signal: HyperNavSignals, *args, **kwargs):
         super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
@@ -53,8 +57,10 @@ class HyperNav(Satlantic):
                                          for k, v in self.default_telemetry_definition.items()}
         self._parser_re_terminator = {}
         self._cmd_buffered = b''
+        self._time_sent_last_cmd = 0
         self._command_mode = False  # only for interface purposes
         self._local_cfg = {'SENSTYPE': 'HyperNavRadiometer', 'SENSVERS': 'V1'}
+        self.local_file_system = MapFileSystem()
         self.prt_sbs_sn = 1001
         self.sbd_sbs_sn = 1002
         self.px_reg_path = {}
@@ -128,8 +134,22 @@ class HyperNav(Satlantic):
         for k, p in self._parser.cal.items():
             self._parser_re_terminator[k] = re.compile(b'(' + re.escape(p.frame_terminator_bytes) + b')')
 
-    def interface_write(self, data: bytes):
-        self._interface.write(data)
+    def send_cmd(self, cmd: str, check_timing=True):
+        """
+        Write command (cmd) to interface
+        :param cmd: command to send
+        :param check_timing:
+        :return:
+        """
+        if not self.alive:
+            self.signal.warning.emit('Instrument must be connected before sending commands.')
+            return False
+        if check_timing and time() - self._time_sent_last_cmd < 0.5:
+            self.signal.warning.emit('Wait at least one second between command transmission.')
+            return False
+        self._interface.write(f'{cmd}\r\n'.encode('utf8', errors='replace'))
+        self._time_sent_last_cmd = time()
+        return True
 
     def setup(self, cfg):
         # Get serial numbers
@@ -200,9 +220,16 @@ class HyperNav(Satlantic):
         # Check Complete last frame
         if headers[-1] == self.PROMPT:
             try:
-                f, sep, b = self.RE_CMD_TERMINATOR.split(frames[-1], 1)
-                frames[-1], self._buffer = f + sep, bytearray(b)
+                if self.RE_CMD_DUMP.match(frames[-1]):
+                    # Special command `dump` will typically be incomplete due to volume of data sent
+                    #   Keep all buffer in last frame
+                    self._buffer = bytearray()
+                else:
+                    # Complete last frame
+                    f, sep, b = self.RE_CMD_TERMINATOR.split(frames[-1], 1)
+                    frames[-1], self._buffer = f + sep, bytearray(b)
             except ValueError:
+                # Incomplete last frame
                 self._buffer = self._buffer[-len(headers[-1]) - len(frames[-1]):]
                 del headers[-1], frames[-1]
         else:
@@ -261,8 +288,13 @@ class HyperNav(Satlantic):
         """
         Parse command response
         :param response: bytearray containing prompt, command, and response (without delimiter $Ok)
-        :return:
+        :return: status True: ok | False: error
         """
+        # Special command `dump`
+        if self.RE_CMD_DUMP.match(response):
+            self.download(response)
+            return True
+        # Break into lines
         lines = self.RE_CMD_LINE_TERMINATOR.split(response)
         # Clean Response
         lines = [l for l in lines if l and not self.RE_IGNORE.match(l)]
@@ -283,8 +315,8 @@ class HyperNav(Satlantic):
         if self.RE_STATUS_ERROR.match(status):
             self.logger.warning(f'Command error: {status}')
             return False
-        if not self.RE_STATUS_OK.match(status):
-            self.logger.warning('Command response unexpected.')
+        if not self.RE_STATUS_OK.match(status) and not self.RE_CMD_DUMP.match(cmd):
+            self.logger.warning(f'Command response unexpected: {status}')
             return False
         # Handle Command
         if self.RE_CMD_CAL_START.match(cmd):
@@ -309,10 +341,65 @@ class HyperNav(Satlantic):
                 self.set_local_cfg(param, value)
         elif self.RE_CMD_SET.match(cmd):
             self.set_local_cfg(*cmd[3:].strip().split(b' '))
+        elif self.RE_CMD_LIST.match(cmd):
+            if not lines[1].startswith(b'DIR name is'):
+                self.signal.warning.emit(f'Invalid absolute path: {lines[1]}')
+                return False
+            self.local_file_system.add_files(
+                abs_path=lines[1].decode('ASCII').rsplit(' ', 1)[1],
+                files=[l.decode('ASCII') for l in lines[3:-2]]  # Skip abs_path line, header line, total item listed line, blank line
+            )
+            self.signal.cmd_list.emit()
         else:
             self.logger.warning(f'Command {cmd} not supported by Inlinino.')
             return False
         return True
+
+    def download(self, response):
+        """
+        Takes over interface to read data directly
+            blocking self._run
+
+        :return:
+        """
+        try:
+            # Get command
+            cmd, rx = response.split(HyperNav.CMD_TERMINATOR, 1)
+            # TODO Handle Errors
+            # Read data
+            if b'$' in rx:  # All data in command response
+                data_hex, self._buffer = rx.split(b'$', 1)
+            else:  # Read more data
+                # Disable spy interface timeout
+                timeout = self._interface.timeout
+                self._interface.timeout = None
+                self._interface.spy_enabled = False
+                # Read data until dump is complete
+                data_hex = self._interface.read_until(b'$')  # This command must run
+                # Re-enable interface timeout
+                self._interface.spy_enabled = True
+                self._interface.timeout = timeout
+                # Log data received
+                if self.log_raw_enabled and self._log_active:
+                    self._log_raw.write(SatPacket(data_hex, None), timestamp=None)
+                # Concatenate data
+                data_hex = rx + data_hex[:-1]
+            # Get remote path & create local directories
+            args = cmd.strip().split(b' ')
+            remote_path = args[2].decode('ASCII').strip(' 0:\\').split(self.local_file_system.SEP)
+            local_path = os.path.join(self._log_raw.path, *remote_path[:-1])
+            os.makedirs(local_path, exist_ok=True)
+            # Write to file
+            filename = os.path.join(local_path, remote_path[-1])
+            with open(filename, 'wb') as f:
+                data_bin = bytearray.fromhex(data_hex.replace(b' ', b'').decode())
+                f.write(data_bin)
+            # Signal download is over
+            self.signal.cmd_dump.emit(len(data_bin))
+        except Exception as e:
+            self.logger.warning(e)
+            self.signal.cmd_dump.emit(-2)
+            self.signal.warning.emit(f'An error occured while downloading file:\n{e}\n')
 
     def parse(self, packet: SatPacket):
         """
@@ -392,6 +479,60 @@ class HyperNav(Satlantic):
         frame_header, key = name.split('_', 1)
         idx = self._parser_key_map[frame_header][key]
         return frame_header, key, idx
+
+
+class MapFileSystem:
+    ROOT = '0:'
+    SEP = r'\\'
+    CASE_SENSITIVE = True
+
+    def __init__(self, root: str = '0:'):
+        self.fs = QFileItem(root, True)
+
+    def reset(self):
+        self.fs = QFileItem(MapFileSystem.ROOT, True)
+
+    def walk(self, abs_path: str, strict=True):
+        abs_path = (abs_path.lower() if MapFileSystem.CASE_SENSITIVE else abs_path).split(MapFileSystem.SEP)
+        cwd = self.fs
+        for file_name in abs_path[1:]:
+            for d in cwd.files:
+                if file_name == d.name:
+                    if not d.is_dir:
+                        raise ValueError(f'Not a directory: {file_name}')
+                    cwd = d
+                    break
+            else:
+                if strict:
+                    raise ValueError(f'No such file or directory: {file_name}')
+                else:
+                    cwd.addChild(QFileItem(file_name, True))
+        return cwd
+
+    def add_files(self, abs_path: str, files: list):
+        cwd = self.walk(abs_path, strict=False)
+        cwd.add_files([QFileItem.from_line(f.lower() if MapFileSystem.CASE_SENSITIVE else f) for f in files])
+
+    def explore(self, cwd=None, level=1):
+        """
+        Return folder to list until all directories within the level specified are explored
+        :param cwd: current working directory
+        :param level: level to explore
+        :return:
+        """
+        if cwd is None:
+            cwd = self.fs
+        if cwd.is_dir and not cwd.is_listed:
+            return cwd.name
+        if level > 0:
+            for child in cwd.files:
+                explore = self.explore(child, level-1)
+                if explore is not None:
+                    return cwd.name + MapFileSystem.SEP + explore
+        return None
+
+    def join(self, *args):
+        return MapFileSystem.SEP.join(args)
 
 
 def hypernav_telemetry_definition(pixel_registration=None):

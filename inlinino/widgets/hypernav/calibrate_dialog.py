@@ -12,7 +12,7 @@ from inlinino.widgets.shared.file_label import FileLabel
 from inlinino import PATH_TO_RESOURCES
 
 try:
-    from hypernav.calibrate import calibration_report
+    # from hypernav.calibrate import calibration_report
     from hypernav.io import HyperNav as HyperNavIO
 except IndexError:
     HyperNavIO = None
@@ -131,18 +131,18 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
         if warning_sn:
             queue.put(('warning', 'Unexpected head serial number(s) ' + ', '.join(warning_sn)))
 
-        warnings = calibration_report(
-            data[light_sn],
-            data[dark_sn],
-            lamp_file_path,
-            plaque_file_path,
-            wavelength_file_path,
-            fel_lamp_calibration_distance_meters,
-            fel_lamp_to_plaque_distance_meters
-        )
+        # warnings = calibration_report(
+        #     data[light_sn],
+        #     data[dark_sn],
+        #     lamp_file_path,
+        #     plaque_file_path,
+        #     wavelength_file_path,
+        #     fel_lamp_calibration_distance_meters,
+        #     fel_lamp_to_plaque_distance_meters
+        # )
 
-        for warning in warnings:
-            queue.put(('warning', warning))
+        # for warning in warnings:
+        #     queue.put(('warning', warning))
 
     def _join(self):
         if self.worker is None:

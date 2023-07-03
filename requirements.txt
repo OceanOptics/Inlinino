@@ -12,3 +12,4 @@ hidapi>=0.11
 setuptools
 plotly
 kaleido
+wakepy
