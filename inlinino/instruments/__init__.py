@@ -215,7 +215,7 @@ class Instrument:
                                 self.signal.alarm.emit(False)
                     except Exception as e:
                         self.logger.warning(e)
-                        raise e
+                        # raise e
                 else:
                     if data_received is not None and \
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
@@ -640,3 +640,78 @@ def get_spy_interface(interface: Interface, echo=True):
             return super().write(data)
 
     return Spy
+
+
+def _generate_crc16_table():
+    """Generate a crc16 lookup table.
+
+    .. note:: This will only be generated once
+    """
+    result = []
+    for byte in range(256):
+        crc = 0x0000
+        for _ in range(8):
+            if (byte ^ crc) & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+            byte >>= 1
+        result.append(crc)
+    return result
+
+
+class ModbusProtocol:
+    CRC16_TABLE = _generate_crc16_table()
+
+    def __init__(self, address: bytearray = b'\x01'):
+        self.address = address
+
+    def request(self, register: int, quantity_of_registers: int = 1, function: bytearray = b'\x03') ->bytearray:
+        frame = self.address + function + register.to_bytes(2, 'big') + quantity_of_registers.to_bytes(2, 'big')
+        frame += self.compute_crc(frame).to_bytes(2, 'big')
+        return frame
+
+    def handle_response(self, response: bytearray) -> bytearray:
+        if self.compute_crc(response[:-2]) != int.from_bytes(response[-2:], 'big'):
+            raise ValueError('Invalid CRC.')
+        address = response[0:1]  # Keep as bytearray
+        if address != self.address:
+            raise ValueError('Invalid address.')
+        code = response[1]
+        if code == 0x83:  # Error Code
+            exception_code = response[2]
+            if exception_code == 0x01:
+                raise ValueError('Function code not supported.')
+            elif exception_code == 0x02:
+                raise ValueError('Invalid starting address or quantity of registers.')
+            elif exception_code == 0x03:
+                raise ValueError('Invalid quantity of registers.')
+            elif exception_code == 0x04:
+                raise ValueError('Unable to read multiple registers.')
+            else:
+                raise ValueError('Error occurred.')
+        if code != 0x03:  # Function Read Holding Register
+            raise NotImplementedError(f'Function code {hex(code)} not implemented.')
+        byte_count = response[2]
+        return response[3:3 + byte_count]
+
+    @staticmethod
+    def compute_crc(data: bytearray) -> int:  # pylint: disable=invalid-name
+        """Compute a crc16 on the passed in string.
+        source: pymodbus
+
+        For modbus, this is only used on the binary serial protocols (in this
+        case RTU).
+
+        The difference between modbus's crc16 and a normal crc16
+        is that modbus starts the crc value out at 0xffff.
+
+        :param data: The data to create a crc16 of
+        :returns: The calculated CRC
+        """
+        crc = 0xFFFF
+        for data_byte in data:
+            idx = ModbusProtocol.CRC16_TABLE[(crc ^ int(data_byte)) & 0xFF]
+            crc = ((crc >> 8) & 0xFF) ^ idx
+        swapped = ((crc << 8) & 0xFF00) | ((crc >> 8) & 0x00FF)
+        return swapped

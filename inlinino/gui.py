@@ -21,6 +21,7 @@ from inlinino.cfg import CFG
 from inlinino.instruments import Instrument, SerialInterface, SocketInterface, USBInterface, USBHIDInterface, \
     InterfaceException
 from inlinino.instruments.acs import ACS
+from inlinino.instruments.apogee import ApogeeQuantumSensor
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
 from inlinino.instruments.hypernav import HyperNav
@@ -1075,6 +1076,8 @@ class DialogSerialConnection(QtGui.QDialog):
         baudrate, bytesize, parity, stopbits, timeout = '19200', '8 bits', 'none', '1', 2
         if hasattr(instrument, 'default_serial_baudrate'):
             baudrate = str(instrument.default_serial_baudrate)
+        if hasattr(instrument, 'default_serial_parity'):
+            parity = str(instrument.default_serial_parity)
         if hasattr(instrument, 'default_serial_timeout'):
             timeout = instrument.default_serial_timeout
         if instrument.uuid in CFG.interfaces.keys():
@@ -1150,8 +1153,8 @@ class DialogSerialConnection(QtGui.QDialog):
         raise ValueError('serial stop bits not defined')
 
     @property
-    def timeout(self) -> int:
-        return int(self.sb_timeout.value())
+    def timeout(self) -> float:
+        return self.sb_timeout.value()
 
 
 class DialogSocketConnection(QtGui.QDialog):
@@ -1285,8 +1288,8 @@ class App(QtGui.QApplication):
         instrument_loaded = False
         while not instrument_loaded:
             try:
-                instrument_class = {'generic': Instrument, 'acs': ACS, 'dataq': DATAQ, 'hyperbb': HyperBB,
-                                    'hypernav': HyperNav,
+                instrument_class = {'generic': Instrument, 'acs': ACS, 'apogee': ApogeeQuantumSensor,
+                                    'dataq': DATAQ, 'hyperbb': HyperBB, 'hypernav': HyperNav,
                                     'lisst': LISST, 'nmea': NMEA, 'ontrak': Ontrak, 'satlantic': Satlantic,
                                     'sunav1': SunaV1, 'sunav2': SunaV2, 'taratsg': TaraTSG}
                 instrument_signal = HyperNavSignals if instrument_module_name == 'hypernav' else InstrumentSignals
