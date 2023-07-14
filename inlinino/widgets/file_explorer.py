@@ -81,8 +81,14 @@ class FileExplorerWidget(GenericWidget):
         msg.setWindowModality(QtCore.Qt.WindowModal)
         if msg.exec_() == QtGui.QMessageBox.Yes:
             dialog = DialogDownloadFiles(self, items)
-            # dialog.show()
-            dialog.exec_()
+            status = dialog.exec_()
+            if not dialog.exec_():  # 0: reject | 1: accept
+                # User cancelled
+                self.instrument.signal.warning.emit(
+                    'Data download cancelled. HyperNav is still transmitting data, '
+                    'wait for prompt to appear in "Serial Monitor" or power cycle HyperNav '
+                    'before sending new commands\n'
+                )
     #
     # def delete(self):
     #     raise NotImplementedError('Not Implemented.')
@@ -100,7 +106,7 @@ class DialogDownloadFiles(QtGui.QDialog):
         self.idx = 0
 
         self.button_box.button(QtGui.QDialogButtonBox.Close).clicked.connect(self.accept)
-        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.accept)
+        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         self.instrument.signal.cmd_list.connect(self.expand_folder)
         self.instrument.signal.cmd_dump.connect(self.next)
 

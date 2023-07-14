@@ -29,12 +29,12 @@ class HyperNav(Satlantic):
     RE_CMD_TERMINATOR = re.compile(b'(' + re.escape(b'$Ok \r\n') +
                                    b'|' + re.escape(b'$Error: ') + b'[0-9\(\)]+' + re.escape(b'\r\n') + b')',
                                    re.IGNORECASE)
-    RE_IS_CMD = re.compile(b'cal|start|stop|get|set|list|dump', re.IGNORECASE)
+    RE_IS_CMD = re.compile(b'cal|start|(?<!(?:DAQ|SLG))stop|get|set|list|dump', re.IGNORECASE)
     RE_IGNORE = re.compile(b'|'.join((re.escape(b'CMC <-'), b'Start data acquisition', b'SpecBrd', b'ERROR')))
     RE_CMD_LINE_TERMINATOR = re.compile(re.escape(CMD_TERMINATOR))  # Does not keep delimiter
     RE_CMD_CAL_START = re.compile(b'(cal|start)', re.IGNORECASE)
     # RE_CMD_START = re.compile(b'(start)', re.IGNORECASE)
-    RE_CMD_STOP = re.compile(b'(stop)', re.IGNORECASE)
+    RE_CMD_STOP = re.compile(b'((?<!(?:DAQ|SLG))stop)', re.IGNORECASE)  # Ignore SLGStop or DAQStop in findall
     RE_CMD_GET = re.compile(b'(get)', re.IGNORECASE)
     RE_CMD_SET = re.compile(b'(set)', re.IGNORECASE)
     RE_CMD_LIST = re.compile(b'(list)', re.IGNORECASE)
@@ -297,7 +297,16 @@ class HyperNav(Satlantic):
         # Break into lines
         lines = self.RE_CMD_LINE_TERMINATOR.split(response)
         # Clean Response
-        lines = [l for l in lines if l and not self.RE_IGNORE.match(l)]
+        ll = []
+        for l in lines:
+            if l:
+                if self.RE_IGNORE.match(l):
+                    cmds = self.RE_IS_CMD.findall(l)
+                    if cmds:
+                        ll.append(cmds[-1] + l.split(cmds[-1], 1)[-1])
+                else:
+                    ll.append(l)
+        lines[:] = ll
         # Validate Response
         if len(lines) == 0:  # Ignored all input
             return True
@@ -363,9 +372,13 @@ class HyperNav(Satlantic):
         :return:
         """
         try:
-            # Get command
-            cmd, rx = response.split(HyperNav.CMD_TERMINATOR, 1)
-            # TODO Handle Errors
+            # Get command line
+            while True:
+                lines = response.split(HyperNav.CMD_TERMINATOR, 1)
+                if len(lines) == 2:  # Received complete command line
+                    cmd, rx = lines
+                    break
+                response += self._interface.read()
             # Read data
             if b'$' in rx:  # All data in command response
                 data_hex, self._buffer = rx.split(b'$', 1)

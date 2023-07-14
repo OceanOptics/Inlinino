@@ -95,7 +95,8 @@ class HyperNavCalWidget(GenericWidget):
     def warning_message_box(self, message):
         msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: HyperNav",
                                 message, QtGui.QMessageBox.Ok, parent=self)
-        msg.setWindowModality(QtCore.Qt.WindowModal)
+        if self.isActiveWindow():
+            msg.setWindowModality(QtCore.Qt.WindowModal)
         msg.exec_()
 
     """
