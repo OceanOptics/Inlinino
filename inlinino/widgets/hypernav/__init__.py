@@ -50,16 +50,17 @@ class HyperNavCalWidget(GenericWidget):
         self.widgets = {
             'serial_monitor': MonitorWidget(instrument),
             'frame_view': MetadataWidget(instrument),
-            # TODO if HyperNAVIO is not None, load this widget
-            'characterize': HyperNavCharacterizeDMWidget(instrument),
-            # 'calibrate': HyperNavCalibrateWidget(instrument),
-            # 'characterize': HyperNavCharacterizeRTWidget(instrument)},
             'file_explorer': FileExplorerWidget(instrument)
         }
+        if HyperNavIO is not None:
+            self.widgets['characterize'] = HyperNavCharacterizeDMWidget(instrument)
+            # self.widgets['characterize'] = HyperNavCharacterizeRTWidget(instrument)
+            self.widgets['calibrate'] = HyperNavCalibrateWidget(instrument)
         super().__init__(instrument)
         # Add widgets
-        self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
-        # self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
+        if HyperNavIO is not None:
+            self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
+            self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
         self.tw_top.addTab(self.widgets['file_explorer'], 'File Explorer')
         self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
         self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
@@ -315,6 +316,8 @@ class HyperNavCharacterizeDMWidget(GenericWidget):
     def start(self):
         if not self.generate_report_button.isEnabled():
             return
+        if HyperNavIO is None:
+            self.instrument.warning.emit('Package `HyperNav` required.')
         # Check file to analyze is closed
         filename = self.filename_combobox.currentText()
         if self.instrument.log_active and filename == self.instrument.log_filename:

@@ -52,7 +52,7 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QPushButton" name="button_browse_px_reg_stb">
+       <widget class="QPushButton" name="button_browse_px_reg_sbd">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
@@ -341,7 +341,7 @@
   <tabstop>button_browse_px_reg_prt</tabstop>
   <tabstop>le_sbd_sbs_sn</tabstop>
   <tabstop>le_optional_px_reg_path_sbd</tabstop>
-  <tabstop>button_browse_px_reg_stb</tabstop>
+  <tabstop>button_browse_px_reg_sbd</tabstop>
  </tabstops>
  <resources/>
  <connections>

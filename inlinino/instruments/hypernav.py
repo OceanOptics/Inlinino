@@ -634,6 +634,7 @@ def ocr504_telemetry_definition():
 def read_manufacturer_pixel_registration(filename):
     """
     Read coefficients from manufacturer (.cgs file) and compute pixel registration
+    # DUPLICATED FUNCTION from hypernav.calibrate.wavelength_registration to avoid import from hypernav library
     :param filename:
     :return:
     """
