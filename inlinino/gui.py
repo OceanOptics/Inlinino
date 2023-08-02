@@ -24,10 +24,12 @@ from inlinino.instruments.acs import ACS
 from inlinino.instruments.apogee import ApogeeQuantumSensor
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
+from inlinino.instruments.hydroscat import HydroScat
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
-from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface
+# TODO: temporarily commented!
+#from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface
 from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG
@@ -644,7 +646,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
             caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
 
-    def act_browse_calibration_file(self):  # Specific to Suna
+    def act_browse_calibration_file(self):  # Specific to Suna and HydroScat
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
             caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')
         self.le_calibration_file.setText(file_name)
@@ -741,7 +743,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_save(self):
         # Read form
-        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or 'le_' in a]
+        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or 'le_' in a or 'sb_' in a]
         empty_fields = list()
         for f in fields:
             field_prefix, field_name = f.split('_', 1)
@@ -751,7 +753,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
             field_pretty_name = field_name.replace('_', ' ').title()
             if f in ['combobox_interface', 'combobox_model', *[f'combobox_relay{i}_mode' for i in range(4)]]:
                 self.cfg[field_name] = self.__dict__[f].currentText()
-            elif field_prefix == 'le':
+            elif field_prefix in ['le', 'sb']:
                 value = getattr(self, f).text().strip()
                 if not field_optional and not value:
                     empty_fields.append(field_pretty_name)
@@ -766,6 +768,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         # if len(value) > 3 and (value[:1] == "b'" and value[-1] == "'"):
                         #     value = bytes(value[2:-1], 'ascii')
                         value = value.strip().encode(self.ENCODING).decode('unicode_escape').encode(self.ENCODING)
+                    elif field_prefix == 'sb':
+                        # a spinbox will contain either an int or float
+                        try:
+                            value = int(value)
+                        except ValueError:
+                            value = float(value)
                     else:
                         value.strip()
                 except:
@@ -846,6 +854,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'ontrak':
+            next
             self.cfg['model'] = self.combobox_model.currentText()
             self.cfg['relay0_enabled'] = self.checkbox_relay0_enabled.isChecked()
             self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors'] = [], []
@@ -1000,6 +1009,12 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                     getattr(self, 'combobox_' + k).setCurrentIndex(0)
                 else:
                     getattr(self, 'combobox_' + k).setCurrentIndex(1)
+            elif hasattr(self, 'sb_' + k):
+                # spinner boxes
+                getattr(self, 'sb_' + k).setValue(self.cfg[k])
+            elif hasattr(self, 'cb_' + k):
+                # check boxes
+                getattr(self, 'cb_' + k).setChecked(self.cfg[k])
         # Populate special fields specific to each module
         if self.cfg['module'] == 'dataq':
             for c in self.cfg['channels_enabled']:
@@ -1290,8 +1305,11 @@ class App(QtGui.QApplication):
             try:
                 instrument_class = {'generic': Instrument, 'acs': ACS, 'apogee': ApogeeQuantumSensor,
                                     'dataq': DATAQ, 'hyperbb': HyperBB, 'hypernav': HyperNav,
-                                    'lisst': LISST, 'nmea': NMEA, 'ontrak': Ontrak, 'satlantic': Satlantic,
-                                    'sunav1': SunaV1, 'sunav2': SunaV2, 'taratsg': TaraTSG}
+                                    'lisst': LISST, 'nmea': NMEA,
+                                    #'ontrak': Ontrak,
+                                    'satlantic': Satlantic,
+                                    'sunav1': SunaV1, 'sunav2': SunaV2, 'taratsg': TaraTSG,
+                                    "hydroscat": HydroScat}
                 instrument_signal = HyperNavSignals if instrument_module_name == 'hypernav' else InstrumentSignals
                 if instrument_module_name not in instrument_class.keys():
                     logger.critical('Instrument module not supported')

@@ -217,6 +217,9 @@ class Instrument:
                         self.logger.warning(e)
                         # raise e
                 else:
+                    # we may want to write to the interface even when no data has been read!
+                    self.write_to_interface()
+                    
                     if data_received is not None and \
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
                         self.logger.error(f'No data received during the past {timestamp - data_received:.2f} seconds')

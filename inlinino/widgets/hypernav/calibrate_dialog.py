@@ -13,7 +13,9 @@ from inlinino import PATH_TO_RESOURCES
 
 try:
     # from hypernav.calibrate import calibration_report
-    from hypernav.io import HyperNav as HyperNavIO
+    # TODO: temporarily commented!
+    #from hypernav.io import HyperNav as HyperNavIO
+    pass
 except IndexError:
     HyperNavIO = None
 

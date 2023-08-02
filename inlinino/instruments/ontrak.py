@@ -8,7 +8,9 @@ from inlinino.instruments import Instrument, USBInterface, USBHIDInterface, Inte
 from inlinino.log import LogText
 
 if platform.system() == 'Windows':
-    from inlinino.resources.ontrak import aduhid
+    # TODO: temporarily commented!
+#    from inlinino.resources.ontrak import aduhid
+    pass
 else:
     aduhid = None
 
