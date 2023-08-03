@@ -1,11 +1,5 @@
 import os.path
-import queue
-
-from threading import Thread
-
-from glob import glob
-from time import time, sleep
-from multiprocessing import Process, Queue
+from time import sleep
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -13,7 +7,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.satlantic import SatPacket
 from inlinino.widgets import GenericWidget, classproperty
-from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
+from inlinino.widgets.hypernav.analyze import HyperNavAnalyzeWidget
 from inlinino.widgets.file_explorer import FileExplorerWidget
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
@@ -53,19 +47,19 @@ class HyperNavCalWidget(GenericWidget):
             'file_explorer': FileExplorerWidget(instrument)
         }
         if HyperNavIO is not None:
-            self.widgets['characterize'] = HyperNavCharacterizeDMWidget(instrument)
-            # self.widgets['characterize'] = HyperNavCharacterizeRTWidget(instrument)
-            self.widgets['calibrate'] = HyperNavCalibrateWidget(instrument)
+            self.widgets['analyze'] = HyperNavAnalyzeWidget(instrument)
+            # self.widgets['characterize'] = HyperNavCharacterizeDMWidget(instrument)
         super().__init__(instrument)
         # Add widgets
-        if HyperNavIO is not None:
-            self.tw_top.addTab(self.widgets['characterize'], 'Characterize')
-            self.tw_top.addTab(self.widgets['calibrate'], 'Calibrate')
         self.tw_top.addTab(self.widgets['file_explorer'], 'File Explorer')
+        if HyperNavIO is not None:
+            self.tw_top.addTab(self.widgets['analyze'], 'Analyze')
         self.tw_bottom.addTab(self.widgets['serial_monitor'], 'Serial Monitor')
         self.tw_bottom.addTab(self.widgets['frame_view'], 'Frame View')
         # Connect signals (must be after super() as required ui to be loaded)
-        self.instrument.signal.warning.connect(self.warning_message_box)
+        self.instrument.signal.warning[str].connect(self.warning_message_box)  # Default signal
+        self.instrument.signal.warning[str, str].connect(self.warning_message_box)
+        self.instrument.signal.warning[str, str, str].connect(self.warning_message_box)
         self.instrument.signal.cfg_update.connect(self.update_set_cfg_value)
         self.instrument.signal.cfg_update.connect(self.update_set_head_value)
         # Control
@@ -93,9 +87,19 @@ class HyperNavCalWidget(GenericWidget):
         self.widgets['frame_view'].clear()
 
     @QtCore.pyqtSlot(str)
-    def warning_message_box(self, message):
-        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: HyperNav",
+    @QtCore.pyqtSlot(str, str)
+    @QtCore.pyqtSlot(str, str, str)
+    def warning_message_box(self, message, informative_text='', icon='warning'):
+        if icon in ('error', 'critical'):
+            icon = QtWidgets.QMessageBox.Critical
+        elif icon in ('info', 'information'):
+            icon = QtWidgets.QMessageBox.Information
+        else:
+            icon = QtWidgets.QMessageBox.Warning
+        msg = QtGui.QMessageBox(icon, "Inlinino: HyperNav",
                                 message, QtGui.QMessageBox.Ok, parent=self)
+        if informative_text:
+            msg.setInformativeText(informative_text)
         if self.isActiveWindow():
             msg.setWindowModality(QtCore.Qt.WindowModal)
         msg.exec_()
@@ -286,126 +290,3 @@ class HyperNavCharacterizeRTWidget(GenericWidget):
             # self.lt_px_reg_test.setText(UPASS if test.pixel_registration else UFAIL)
             self.lt_peak_value.setText(f'{stats.range:.0f}')
             self.lt_peak_test.setText(UPASS if test.range else UFAIL)
-
-
-class HyperNavCharacterizeDMWidget(GenericWidget):
-
-    @classproperty
-    def __snake_name__(cls) -> str:
-        return 'hypernav_characterize_dm_widget'
-
-    def __init__(self, instrument: HyperNav):
-        self.worker = None
-        self.queue = Queue()
-        super().__init__(instrument)
-        self.generate_report_button.clicked.connect(self.start)
-        self.instrument.signal.status_update.connect(self.update_filename_combobox)
-
-    def setup(self):
-        self.update_filename_combobox()
-
-    @QtCore.pyqtSlot()
-    def update_filename_combobox(self):
-        self.filename_combobox.clear()
-        file_list = [os.path.basename(f) for f in sorted(glob(os.path.join(
-            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))]
-        self.filename_combobox.addItems(file_list)
-        self.filename_combobox.setCurrentIndex(len(file_list)-1)
-
-    @QtCore.pyqtSlot()
-    def start(self):
-        if not self.generate_report_button.isEnabled():
-            return
-        if HyperNavIO is None:
-            self.instrument.warning.emit('Package `HyperNav` required.')
-        # Check file to analyze is closed
-        filename = self.filename_combobox.currentText()
-        if self.instrument.log_active and filename == self.instrument.log_filename:
-            self.instrument.signal.warning.emit('Stop logging to analyze data.')
-            return
-        # Disable button
-        self.generate_report_button.setText('Processing ...')
-        self.generate_report_button.setEnabled(False)
-        # Start worker
-        self.worker = Process(name='HyperNavWorker', target=HyperNavCharacterizeDMWidget.run, args=(
-            self.instrument.serial_number, self.instrument.prt_sbs_sn, self.instrument.sbd_sbs_sn,
-            self.instrument.log_path, filename, self.queue
-        ))
-        self.worker.start()
-        # Start join thread
-        Thread(target=self._join, daemon=True).start()
-
-    @staticmethod
-    def run(hn_sn, prt_sn, sbd_sn, path, filename, queue):
-        try:
-            hn = HyperNavIO(sn=hn_sn, prt_head_sn=prt_sn, stb_head_sn=sbd_sn)
-            data, meta = hn.read_inlinino(os.path.join(path, filename))
-            # Find HyperNav frame serial numbers
-            analyzed_sn = set([int(k[6:]) for k in meta['valid_frames'].keys() if
-                               True in [k.startswith(hdr) for hdr in ('SATYLZ', 'SATYDZ', 'SATXLZ', 'SATXDZ')]])
-            warning_sn = []
-            for sn in analyzed_sn:
-                if sn not in (prt_sn, sbd_sn):
-                    warning_sn.append(sn)
-                ref = os.path.splitext(filename)[0]
-                report = spec_board_report(data, ref, sn)
-                dpi = 96
-                report.write_image(os.path.join(path, f"{ref}_SBSSN{sn:04}.pdf"), width=dpi * 11, height=dpi * 8.5)
-                report.show(config=GRAPH_CFG)
-            if warning_sn:
-                queue.put((filename, 'warning', ', '.join([f'{sn:04d}' for sn in warning_sn])))
-            else:
-                queue.put((filename, 'ok'))
-        except Exception as e:
-            queue.put((filename, 'error', e))
-
-    def _join(self):
-        if self.worker is None:
-            return
-        self.worker.join()
-        # Check if job finished properly
-        try:
-            result = self.queue.get_nowait()
-        except queue.Empty:
-            result = ('error', 'No results from worker.')
-        if result[1] == 'warning':
-            self.instrument.signal.warning.emit(f'Unexpected head serial number(s) {result[2]} in "{result[0]}".')
-        elif result[1] == 'error':
-            self.instrument.signal.warning.emit(f'The error "{result[2]}" occurred while analyzing "{result[0]}".\n'
-                                                f'Unable to generate report.')
-        # Reset buttons
-        self.generate_report_button.setText('Generate Report')
-        self.generate_report_button.setEnabled(True)
-
-
-class HyperNavCalibrateWidget(GenericWidget):
-    @classproperty
-    def __snake_name__(cls) -> str:
-        return 'hypernav_calibrate_widget'
-
-    def __init__(self, instrument: HyperNav):
-        super().__init__(instrument)
-        self.generate_report_button.clicked.connect(self.start)
-        self.instrument.signal.status_update.connect(self.update_filename_combobox)
-
-    def setup(self):
-        self.update_filename_combobox()
-
-    @QtCore.pyqtSlot()
-    def update_filename_combobox(self):
-        self.filename_combobox.clear()
-        file_list = [os.path.basename(f) for f in sorted(glob(os.path.join(
-            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))]
-        self.filename_combobox.addItems(file_list)
-        self.filename_combobox.setCurrentIndex(len(file_list)-1)
-
-    @QtCore.pyqtSlot()
-    def start(self):
-        # Check file to analyze is closed
-        filename = self.filename_combobox.currentText()
-        if self.instrument.log_active and filename == self.instrument.log_filename:
-            self.instrument.signal.warning.emit('Stop logging to analyze data.')
-            return
-
-        dialog = HyperNavCalibrateDialogWidget(self, self.instrument, filename)
-        dialog.exec()

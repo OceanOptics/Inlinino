@@ -1,11 +1,12 @@
 import os.path
-from threading import Thread
-from multiprocessing import Process, Queue
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 
-from inlinino.instruments.hypernav import HyperNav
 from inlinino import PATH_TO_RESOURCES, package_dir
+from inlinino.shared.worker import Worker
+from inlinino.instruments.hypernav import HyperNav
+
+
 
 try:
     from hypernav.io import HyperNav as HyperNavIO
@@ -14,18 +15,18 @@ except ModuleNotFoundError:
     HyperNavIO = None
 
 
-class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
+class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
     def __init__(self, parent, instrument: HyperNav, log_file_name: str):
-        self.worker = None
-        self.queue = Queue()
         self.instrument = instrument
-        super().__init__(parent)
+        super().__init__(parent=parent, fun=calibrate, signal=instrument.signal.warning)
+        if parent.isActiveWindow():
+            self.setWindowModality(QtCore.Qt.WindowModal)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, "widget_hypernav_calibrate_dialog.ui"), self)
 
         self.le_log_file.setText(log_file_name)
 
         self.run_button = self.button_box.addButton("Run", QtGui.QDialogButtonBox.ActionRole)
-        self.run_button.clicked.connect(self.start_clicked)
+        self.run_button.clicked.connect(self.start)
         self.button_box.button(QtGui.QDialogButtonBox.Close).clicked.connect(self.accept)
 
         self.browse_lamp_button.clicked.connect(self.browse_lamp_file)
@@ -69,15 +70,11 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
         self.le_head_sn.setText(str(self.instrument.get_head_sbs_sn(head)))
 
     @QtCore.pyqtSlot()
-    def start_clicked(self):
+    def start(self):
         for f in [f for f in self.__dict__.keys() if f.startswith('le_')]:
             if not getattr(self, f).text():
                 self.instrument.signal.warning.emit('All fields must be field.')
                 return
-
-        if HyperNavIO is None:
-            self.instrument.warning.emit('Package `HyperNav` required.')
-
         # Disable button
         self.run_button.setText('Processing ...')
         self.run_button.setEnabled(False)
@@ -85,6 +82,7 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
         if self.cb_software.currentText() == 'legacy':
             # Execute legacy function
             try:
+                # Calls external executable so no need for Thread
                 calibrate_legacy(
                     self.instrument.log_path,
                     os.path.join(self.instrument.log_path, self.le_log_file.text()),
@@ -100,15 +98,18 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
                     log_filename=os.path.join(package_dir, 'log', 'calibrate.log')
                 )
             except SystemError as e:
-                self.instrument.signal.warning.emit(f"Error running legacy calibration: {e}")
+                self.instrument.signal.warning[str, str, str].emit(f"Error running 'legacy' calibration.",
+                                                                   str(e), 'error')
             except Exception as e:
-                self.instrument.signal.warning.emit(f"{e}")
+                self.instrument.signal.warning[str, str, str].emit(f"Error while analyzing '{self.le_log_file.text()}'."
+                                                                   , str(e), 'error')
             # Reset buttons
             self.run_button.setEnabled(True)
             self.run_button.setText('Run')
         elif self.cb_software.currentText() == 'python':
-            # Start worker
-            self.worker = Process(name='HyperNavWorker', target=HyperNavCalibrateDialogWidget.run, args=(
+            # Execute Python Code
+            super().start(
+                self.le_log_file.text(),
                 self.instrument.log_path,
                 os.path.join(self.instrument.log_path, self.le_log_file.text()),
                 self.le_lamp_path.text(),
@@ -121,40 +122,14 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog):
                 self.le_operator.text(),
                 self.lamp_to_plaque_distance.value(),
                 self.lamp_calibration_distance.value(),
-                self.queue,
-            ))
-            self.worker.start()
-            # Start join thread
-            Thread(target=self._join, daemon=True).start()
+            )
         else:
             self.instrument.signal.warning.emit(f'Calibration software `{self.cb_software}` not available.')
             # Reset buttons
             self.run_button.setEnabled(True)
             self.run_button.setText('Run')
 
-    @staticmethod
-    def run(output_path, raw_path, lamp_path, plaque_path, wavelength_path,
-            hypernav_sn, head_side, head_sn, spec_sn, operator,
-            fel_lamp_to_plaque_distance_meters, fel_lamp_calibration_distance_meters,
-            queue):
-        try:
-            calibrate(output_path, raw_path, lamp_path, plaque_path, wavelength_path,
-                      hypernav_sn, head_side, head_sn, spec_sn, operator,
-                      fel_lamp_to_plaque_distance_meters, fel_lamp_calibration_distance_meters)
-        except Exception as e:
-            queue.put(('error', str(e)))
-
-    def _join(self):
-        if self.worker is None:
-            return
-        self.worker.join()
-        while not self.queue.empty():
-            level, message = self.queue.get_nowait()
-            if level == 'warning':
-                self.instrument.signal.warning.emit(f'Warning while analyzing "{self.le_log_file.text()}"\n\n{message}')
-            elif level == 'error':
-                self.instrument.signal.warning.emit(f"An error occurred while analyzing {self.le_log_file.text()}\n\n"
-                                                    f"{message}")
-        # Reset buttons
+    def join(self):
+        super().join()
         self.run_button.setEnabled(True)
         self.run_button.setText('Run')

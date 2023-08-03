@@ -19,7 +19,7 @@ class HyperNavSignals(InstrumentSignals):
     cfg_update = QtCore.pyqtSignal(str)
     cmd_list = QtCore.pyqtSignal()
     cmd_dump = QtCore.pyqtSignal(int)
-    warning = QtCore.pyqtSignal(str)
+    warning = QtCore.pyqtSignal([str], [str, str], [str, str, str])
     alarm = None  # Disable data timeout
 
 
