@@ -58,11 +58,12 @@ class HydroScat(Instrument):
         # Overload cfg with HydroScat specific parameters
         try:
             cfg['variable_names'] = self.hydroscat.channel_names()
-            cfg['variable_units'] = ['beta' for n in range(1, len(cfg['variable_names'])+1)]
-            cfg['variable_precision'] = ['%.9f' for n in range(1, len(cfg['variable_names'])+1)]
-            cfg['terminator'] = b'\r\n'
         except:
-            self.logger.error("** Error reading channel information!")
+            cfg['variable_names'] = []
+
+        cfg['variable_units'] = ['beta' for n in range(1, len(cfg['variable_names'])+1)]
+        cfg['variable_precision'] = ['%.9f' for n in range(1, len(cfg['variable_names'])+1)]
+        cfg['terminator'] = b'\r\n'
 
         # Set standard configuration and check cfg input
         super().setup(cfg)
