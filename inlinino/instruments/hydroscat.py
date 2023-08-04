@@ -56,11 +56,7 @@ class HydroScat(Instrument):
                             verbose=True)
         
         # Overload cfg with HydroScat specific parameters
-        try:
-            cfg['variable_names'] = self.hydroscat.channel_names()
-        except:
-            cfg['variable_names'] = []
-
+        cfg['variable_names'] = self.hydroscat.channel_names()
         cfg['variable_units'] = ['beta' for n in range(1, len(cfg['variable_names'])+1)]
         cfg['variable_precision'] = ['%.9f' for n in range(1, len(cfg['variable_names'])+1)]
         cfg['terminator'] = b'\r\n'
