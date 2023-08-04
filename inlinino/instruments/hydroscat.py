@@ -88,16 +88,14 @@ class HydroScat(Instrument):
 
 
     def log_start(self):
-        super().log_start()
         if self.state == "IDLE":
             self.state = "START"
-
+        super().log_start()
 
     def log_stop(self):
-        super().log_stop()
         if self.state == "RUNNING":
             self.state = "STOP"
-
+        super().log_stop()
 
     def close(self, *args, **kwargs):
         if self.alive:
