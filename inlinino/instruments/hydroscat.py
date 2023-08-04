@@ -99,6 +99,7 @@ class HydroScat(Instrument):
 
     def close(self, *args, **kwargs):
         if self.alive:
+            self.hydroscat.stop_command()
             self.state = "IDLE"
             sleep(self._interface.timeout)
         super().close(*args, **kwargs)
