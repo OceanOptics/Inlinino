@@ -72,16 +72,16 @@ class HydroScat(Instrument):
 
         # Set standard configuration and check cfg input
         super().setup(cfg)
-        self.logger.info("setup !!")
+        self.logger.info("setup")
 
 
     def init_interface(self):
         self.hydroscat.date_command()
-        self.logger.info("DATE command !!")
+        self.logger.info("DATE command")
         self.hydroscat.flourescence_command()
-        self.logger.info("Flourescence command !!")
+        self.logger.info("Flourescence command")
         self.hydroscat.burst_command()
-        self.logger.info("BURST command !!")
+        self.logger.info("BURST command")
         self.state = "READY"
 
     # State machine: IDLE => READY => START => RUNNING => STOP => IDLE => ...
@@ -89,11 +89,11 @@ class HydroScat(Instrument):
     def write_to_interface(self):
         if self.state == "START":
             self.hydroscat.start_command()
-            self.logger.info("START command !!")
+            self.logger.info("START command")
             self.state = "RUNNING"
         elif self.state == "STOP":
             self.hydroscat.stop_command()
-            self.logger.info("STOP command !!")
+            self.logger.info("STOP command")
             self.state = "READY"
 
 
@@ -119,31 +119,35 @@ class HydroScat(Instrument):
     # def close(self, wait_thread_join=True):
     #     if self.alive:
     #         self.hydroscat.stop_command()
-    #         self.logger.info("STOP command !!")
+    #         self.logger.info("STOP command")
     #         self.state = "IDLE"
     #     super().close(wait_thread_join)
+
 
     def parse(self, packet):
         data = [None] * len(self.widget_active_timeseries_variables_selected)
         if self.state == "RUNNING":
             raw_packet = packet.decode()
-            self.logger.info("{} !!".format(raw_packet))
+            self.logger.info("{}".format(raw_packet))
             if raw_packet[0:2] in ["*T", "*D"]:
                 self.logger.info("data packet")
                 data_dict = self.hydroscat.rawline2datadict(raw_packet)
-                if self.active_timeseries_variables_lock.acquire(timeout=0.5):
+                # ensure only one thread updates active timeseries variables
+                if self.active_timeseries_variables_lock.acquire(timeout=0.25):
                     try:
                         data = [data_dict[var_name] for var_name in data_dict
                                 if var_name in self.widget_active_timeseries_variables_selected]
                     finally:
                         self.active_timeseries_variables_lock.release()
+                else:
+                    self.logger.error('Unable to acquire lock to update active timeseries variables')
 
         return data
 
+
     def handle_data(self, data, timestamp):
-        if data is not None:
+        if all([datum is not None for datum in data]):
             super().handle_data(data, timestamp)
-            self.logger.info("handle_data !!")
 
             # Format and signal aux data
             # TODO: instead, allfields(not None)
@@ -153,30 +157,11 @@ class HydroScat(Instrument):
                 self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
                                             '%.4f' % self.hydroscat.aux_data["Depth"],
                                             '%s' % date_time])
-                self.logger.info("aux data !!")
+                self.logger.info("aux data")
 
 
     def udpate_active_timeseries_variables(self, name, active):
-        # if not ((active and name not in self.widget_active_timeseries_variables_selected) or
-        #         (not active and name in self.widget_active_timeseries_variables_selected)):
-        #     return
-        # if self.active_timeseries_variables_lock.acquire(timeout=0.25):
-        #     try:
-        #         index = self.widget_active_timeseries_variables_names.index(name)
-        #         self.active_timeseries_angles[index] = active
-        #         #self.widget_active_timeseries_variables_selected[index] = active
-        #     finally:
-        #         self.active_timeseries_variables_lock.release()
-        # else:
-        #     self.logger.error('Unable to acquire lock to update active timeseries variables')
-        # Update list of active variables for GUI keeping the order
-        # self.widget_active_timeseries_variables_selected = \
-        #     [var_name for var_name in \
-        #      self.widget_active_timeseries_variables_names if name == var_name and active]
-        
-        # print(self.widget_active_timeseries_variables_names)
-        # print(self.widget_active_timeseries_variables_selected)
-
+        # ensure only one thread updates active timeseries variables
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
             try:
                 self.active_variables[name] = active
@@ -184,5 +169,3 @@ class HydroScat(Instrument):
                     [name for name in self.active_variables if self.active_variables[name]]
             finally:
                 self.active_timeseries_variables_lock.release()
-        print("done")
-        
