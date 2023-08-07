@@ -4,12 +4,10 @@ import aquasense.hydroscat
 
 from datetime import datetime
 
-from inlinino.instruments import InterfaceException
-
 import io
 
-import threading
 from time import sleep
+
 
 class HydroScat(Instrument):
 
@@ -31,6 +29,9 @@ class HydroScat(Instrument):
         # Auxiliary Data Plugin
         self.widget_aux_data_enabled = True
         self.widget_aux_data_variable_names = ['Temp. (ºC)', 'Depth (m)', 'Time']
+
+        # Init Channels to Plot widget
+        self.widget_select_channel_enabled = False
 
         # Device command state machine
         self.state = "IDLE"
@@ -60,6 +61,10 @@ class HydroScat(Instrument):
         cfg['variable_units'] = ['beta' for n in range(1, len(cfg['variable_names'])+1)]
         cfg['variable_precision'] = ['%.9f' for n in range(1, len(cfg['variable_names'])+1)]
         cfg['terminator'] = b'\r\n'
+
+        # Active Timeseries Variables
+        # self.widget_active_timeseries_variables_names = cfg['variable_names']
+        # self.widget_active_timeseries_variables_selected = False*cfg['variable_names']
 
         # Set standard configuration and check cfg input
         super().setup(cfg)
