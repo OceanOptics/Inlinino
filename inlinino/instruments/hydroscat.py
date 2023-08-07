@@ -9,7 +9,7 @@ from inlinino.instruments import InterfaceException
 import io
 
 import threading
-from time import time, sleep
+from time import sleep
 
 class HydroScat(Instrument):
 
@@ -42,7 +42,7 @@ class HydroScat(Instrument):
 
         # TODO: fix out, serial_mode, num_channels (need a setup UI widget)
         # TODO: instead of verbose, could pass a logger object
-        # TODO: is burst mode used?
+        # TODO: do we need burst mode?
         self.hydroscat = aquasense.hydroscat.HydroScat(
                             cal_path=cfg["calibration_file"], source=source,
                             out=None, sep=None, num_channels=8, serial_mode=False,
@@ -73,8 +73,9 @@ class HydroScat(Instrument):
         self.logger.info("Flourescence command !!")
         self.hydroscat.burst_command()
         self.logger.info("BURST command !!")
+        self.state = "READY"
 
-    # State machine: IDLE => START => RUNNING => STOP => IDLE => START => RUNNING ...
+    # State machine: IDLE => READY => START => RUNNING => STOP => IDLE => ...
 
     def write_to_interface(self):
         if self.state == "START":
@@ -84,25 +85,34 @@ class HydroScat(Instrument):
         elif self.state == "STOP":
             self.hydroscat.stop_command()
             self.logger.info("STOP command !!")
-            self.state = "IDLE"
+            self.state = "READY"
 
 
     def log_start(self):
-        if self.state == "IDLE":
+        if self.state == "READY":
             self.state = "START"
         super().log_start()
+
 
     def log_stop(self):
         if self.state == "RUNNING":
             self.state = "STOP"
         super().log_stop()
 
-    def close(self, *args, **kwargs):
+
+    def open(self, **kwargs):
+        super().open(**kwargs)
         if self.alive:
-            self.hydroscat.stop_command()
-            self.state = "IDLE"
-            sleep(self._interface.timeout)
-        super().close(*args, **kwargs)
+            while self.state != "READY":
+                sleep(0.1)
+
+
+    # def close(self, wait_thread_join=True):
+    #     if self.alive:
+    #         self.hydroscat.stop_command()
+    #         self.logger.info("STOP command !!")
+    #         self.state = "IDLE"
+    #     super().close(wait_thread_join)
 
 
     def parse(self, packet):
