@@ -84,7 +84,10 @@ class HydroScat(Instrument):
         self.logger.info("BURST command")
         self.state = "READY"
 
-    # State machine: IDLE => READY => START => RUNNING => STOP => IDLE => ...
+    # State machine: start_state =>
+    #                IDLE =open button=> READY =start button=> START =/start command=>
+    #                RUNNING =stop button=> STOP =/stop command=> READY =close button=>
+    #                IDLE => ...
 
     def write_to_interface(self):
         if self.state == "START":
