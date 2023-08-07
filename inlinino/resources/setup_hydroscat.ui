@@ -129,9 +129,9 @@
   <widget class="QDialogButtonBox" name="button_box">
    <property name="geometry">
     <rect>
-     <x>150</x>
+     <x>180</x>
      <y>460</y>
-     <width>75</width>
+     <width>141</width>
      <height>23</height>
     </rect>
    </property>
@@ -219,7 +219,7 @@
     <string>Burst Mode on/off</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>9</x>
