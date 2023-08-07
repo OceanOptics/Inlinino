@@ -13,11 +13,10 @@ from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
 
 try:
-    from hypernav.calibrate import compute_dark_stats, compute_light_stats, grade_dark_frames, grade_light_frames, \
-        spec_board_report
-    from hypernav.viz import GRAPH_CFG
+    from hypernav.calibrate.graders import compute_stats, grade_dark_frames, grade_light_frames
     from hypernav.io import HyperNav as HyperNavIO
 except ImportError:
+    compute_stats, grade_dark_frames, grade_light_frames = None, None, None
     HyperNavIO = None
 
 UPASS = u'\u2705'
@@ -272,7 +271,7 @@ class HyperNavCharacterizeRTWidget(GenericWidget):
         n_obs = np.sum(np.any(~np.isnan(self.lu[data.frame_header]), axis=1))
         # Update Dark
         if data.frame_header[4] == 'D':
-            stats = compute_dark_stats(self.lu[data.frame_header])
+            stats = compute_stats(self.lu[data.frame_header], range_baseline='min')
             test = grade_dark_frames(stats)
             self.dark_tests.setTitle(f'Dark Tests (n={n_obs})')
             self.dt_spec_shape_value.setText(f'{stats.range:.1f}')
@@ -283,7 +282,7 @@ class HyperNavCharacterizeRTWidget(GenericWidget):
             self.dt_noise_level_test.setText(UPASS if test.noise else UFAIL)
         # Update Light
         if data.frame_header[4] == 'L':
-            stats = compute_light_stats(self.lu[data.frame_header])
+            stats = compute_stats(self.lu[data.frame_header])
             test = grade_light_frames(stats)
             self.light_tests.setTitle(f'Light Tests (n={n_obs})')
             # self.lt_px_reg_offset.setText(f'{stats.pixel_registration:.2f}')

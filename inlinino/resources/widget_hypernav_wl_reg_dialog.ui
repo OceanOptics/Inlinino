@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>528</width>
-    <height>378</height>
+    <height>412</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -357,6 +357,26 @@
         </item>
        </widget>
       </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="toolTip">
+         <string>Shift wavelength before computing wavelength registration. This is required only if peaks detected by HyperNav with the manufacturer wavelength registration are too far (&gt;5 nm) from the peaksof the light source (e.g. HgAr).</string>
+        </property>
+        <property name="text">
+         <string>Shift Wavelength Pre-Registration</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="sb_wl_shift">
+        <property name="toolTip">
+         <string>Shift wavelength before computing wavelength registration. This is required only if peaks detected by HyperNav with the manufacturer wavelength registration are too far (&gt;5 nm) from the peaksof the light source (e.g. HgAr).</string>
+        </property>
+        <property name="minimum">
+         <double>-99.989999999999995</double>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
@@ -388,6 +408,19 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>le_raw_filename</tabstop>
+  <tabstop>browse_wavelength_button</tabstop>
+  <tabstop>le_wavelength_path</tabstop>
+  <tabstop>cb_head_side</tabstop>
+  <tabstop>le_head_sn</tabstop>
+  <tabstop>le_spec_sn</tabstop>
+  <tabstop>le_hypernav_sn</tabstop>
+  <tabstop>le_operator</tabstop>
+  <tabstop>cb_software_2</tabstop>
+  <tabstop>cb_software</tabstop>
+  <tabstop>sb_wl_shift</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

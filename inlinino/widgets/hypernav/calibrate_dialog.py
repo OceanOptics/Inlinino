@@ -32,6 +32,7 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
         self.browse_lamp_button.clicked.connect(self.browse_lamp_file)
         self.browse_plaque_button.clicked.connect(self.browse_plaque_file)
         self.browse_wavelength_button.clicked.connect(self.browse_wavelength_file)
+        self.browse_history_cal_button.clicked.connect(self.browse_history_cal_dir)
 
         self.cb_head_side.currentTextChanged.connect(self.set_head)
         self.set_head(self.cb_head_side.currentText())
@@ -65,6 +66,11 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
         except:
             pass
 
+    @QtCore.pyqtSlot()
+    def browse_history_cal_dir(self):
+        self.le_history_cal_path.setText(QtGui.QFileDialog.getExistingDirectory(
+            caption='Choose historical calibration directory'))
+
     @QtCore.pyqtSlot(str)
     def set_head(self, head):
         self.le_head_sn.setText(str(self.instrument.get_head_sbs_sn(head)))
@@ -72,6 +78,8 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
     @QtCore.pyqtSlot()
     def start(self):
         for f in [f for f in self.__dict__.keys() if f.startswith('le_')]:
+            if f in ['le_history_cal_path']:
+                continue
             if not getattr(self, f).text():
                 self.instrument.signal.warning.emit('All fields must be field.')
                 return
@@ -95,6 +103,8 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
                     int(self.le_spec_sn.text()),
                     self.lamp_to_plaque_distance.value(),
                     self.lamp_calibration_distance.value(),
+                    'show+pdf',
+                    self.le_history_cal_path.text(),
                     log_filename=os.path.join(package_dir, 'log', 'calibrate.log')
                 )
             except SystemError as e:
@@ -122,6 +132,8 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
                 self.le_operator.text(),
                 self.lamp_to_plaque_distance.value(),
                 self.lamp_calibration_distance.value(),
+                'show+pdf',
+                self.le_history_cal_path.text()
             )
         else:
             self.instrument.signal.warning.emit(f'Calibration software `{self.cb_software}` not available.')

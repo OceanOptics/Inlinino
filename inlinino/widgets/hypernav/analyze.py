@@ -3,13 +3,15 @@ from glob import glob
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 
+from hypernav.calibrate.reports import write_report_to_pdf
 from inlinino import PATH_TO_RESOURCES
 from inlinino.shared.worker import Worker
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
 try:
-    from hypernav.calibrate import spec_board_report, register_wavelengths
+    from hypernav.calibrate.reports import spec_board_report
+    from hypernav.calibrate import register_wavelengths
     from hypernav.io import HyperNav as HyperNavIO
     from hypernav.viz import GRAPH_CFG
 except ImportError:
@@ -102,9 +104,8 @@ class CharacterizeDM(Worker):
                 warning_sn.append(sn)
             ref = os.path.splitext(filename)[0]
             report = spec_board_report(data, ref, sn)
-            dpi = 96
             target_filename = os.path.join(path, f"{ref}_SBSSN{sn:04}.pdf")
-            report.write_image(target_filename, width=dpi * 11, height=dpi * 8.5)
+            write_report_to_pdf(target_filename, report)
             report.show(config=GRAPH_CFG)
             reports_generated.append(target_filename)
         if warning_sn:
@@ -180,6 +181,8 @@ class HyperNavWavelengthRegistrationDialogWidget(QtWidgets.QDialog, Worker):
             self.cb_head_side.currentText(),
             int(self.le_head_sn.text()),
             int(self.le_spec_sn.text()),
+            self.sb_wl_shift.value(),
+            'show+pdf',
         )
 
     def join(self):
