@@ -6,6 +6,7 @@ from datetime import datetime
 
 import io
 
+from threading import Lock
 from time import sleep
 
 
@@ -31,7 +32,8 @@ class HydroScat(Instrument):
         self.widget_aux_data_variable_names = ['Temp. (ºC)', 'Depth (m)', 'Time']
 
         # Init Channels to Plot widget
-        self.widget_select_channel_enabled = False
+        self.widget_select_channel_enabled = True
+        self.active_timeseries_variables_lock = Lock()
 
         # Device command state machine
         self.state = "IDLE"
@@ -41,7 +43,8 @@ class HydroScat(Instrument):
         source = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
                                                     self._interface._serial))
 
-        # TODO: fix out, serial_mode, num_channels (need a setup UI widget)
+        # TODO: fix out, serial_mode
+        # TODO: num_channels (setup UI widget or needed? => can't we just get this from .cal file?)
         # TODO: instead of verbose, could pass a logger object
         # TODO: do we need burst mode?
         self.hydroscat = aquasense.hydroscat.HydroScat(
@@ -63,8 +66,9 @@ class HydroScat(Instrument):
         cfg['terminator'] = b'\r\n'
 
         # Active Timeseries Variables
-        # self.widget_active_timeseries_variables_names = cfg['variable_names']
-        # self.widget_active_timeseries_variables_selected = False*cfg['variable_names']
+        self.active_variables = {var_name:True for var_name in cfg['variable_names']}
+        self.widget_active_timeseries_variables_names = cfg['variable_names']
+        self.widget_active_timeseries_variables_selected = cfg['variable_names']
 
         # Set standard configuration and check cfg input
         super().setup(cfg)
@@ -119,30 +123,66 @@ class HydroScat(Instrument):
     #         self.state = "IDLE"
     #     super().close(wait_thread_join)
 
-
     def parse(self, packet):
-        data = [None] * len(self.variable_names)
+        data = [None] * len(self.widget_active_timeseries_variables_selected)
         if self.state == "RUNNING":
             raw_packet = packet.decode()
             self.logger.info("{} !!".format(raw_packet))
-            if raw_packet[0:2] in ["*T", "*D", "*H"]:
+            if raw_packet[0:2] in ["*T", "*D"]:
                 self.logger.info("data packet")
                 data_dict = self.hydroscat.rawline2datadict(raw_packet)
-                if raw_packet[0:2] != "*H":
-                    data = [n for n in data_dict.values()][2:]
+                if self.active_timeseries_variables_lock.acquire(timeout=0.5):
+                    try:
+                        data = [data_dict[var_name] for var_name in data_dict
+                                if var_name in self.widget_active_timeseries_variables_selected]
+                    finally:
+                        self.active_timeseries_variables_lock.release()
 
         return data
 
-
     def handle_data(self, data, timestamp):
-        super().handle_data(data, timestamp)
-        self.logger.info("handle_data !!")
-        # Format and signal aux data
-        # TODO: instead, allfields(not None)
-        if self.hydroscat.aux_data["Time"] is not None:
-            # TODO: fix old formats!
-            date_time = datetime.strftime(datetime.fromtimestamp(int(self.hydroscat.aux_data["Time"])), format="%m/%d/%Y %H:%M:%S")
-            self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
-                                           '%.4f' % self.hydroscat.aux_data["Depth"],
-                                           '%s' % date_time])
-            self.logger.info("aux data !!")
+        if data is not None:
+            super().handle_data(data, timestamp)
+            self.logger.info("handle_data !!")
+
+            # Format and signal aux data
+            # TODO: instead, allfields(not None)
+            if self.hydroscat.aux_data["Time"] is not None:
+                # TODO: fix old formats!
+                date_time = datetime.strftime(datetime.fromtimestamp(int(self.hydroscat.aux_data["Time"])), format="%m/%d/%Y %H:%M:%S")
+                self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
+                                            '%.4f' % self.hydroscat.aux_data["Depth"],
+                                            '%s' % date_time])
+                self.logger.info("aux data !!")
+
+
+    def udpate_active_timeseries_variables(self, name, active):
+        # if not ((active and name not in self.widget_active_timeseries_variables_selected) or
+        #         (not active and name in self.widget_active_timeseries_variables_selected)):
+        #     return
+        # if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+        #     try:
+        #         index = self.widget_active_timeseries_variables_names.index(name)
+        #         self.active_timeseries_angles[index] = active
+        #         #self.widget_active_timeseries_variables_selected[index] = active
+        #     finally:
+        #         self.active_timeseries_variables_lock.release()
+        # else:
+        #     self.logger.error('Unable to acquire lock to update active timeseries variables')
+        # Update list of active variables for GUI keeping the order
+        # self.widget_active_timeseries_variables_selected = \
+        #     [var_name for var_name in \
+        #      self.widget_active_timeseries_variables_names if name == var_name and active]
+        
+        # print(self.widget_active_timeseries_variables_names)
+        # print(self.widget_active_timeseries_variables_selected)
+
+        if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+            try:
+                self.active_variables[name] = active
+                self.widget_active_timeseries_variables_selected = \
+                    [name for name in self.active_variables if self.active_variables[name]]
+            finally:
+                self.active_timeseries_variables_lock.release()
+        print("done")
+        
