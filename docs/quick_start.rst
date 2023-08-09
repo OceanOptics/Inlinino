@@ -28,6 +28,9 @@ Inlinino is available for Windows and macOS, the packaged executable can be down
 
 Advance users or developers can setup the software directly from source (`GitHub Repository <https://github.com/OceanOptics/Inlinino/>`__).
 
+.. note::
+      OUTDATED DOCUMENTATION! PASC is deprecated and replaced by DataQ or ADU data acquisition hardware (DAQ). Several new instruments are supported including HyperBB, HyperNAV, HyperOCR, Suna and more. Nonetheless, the user experience is very similar and current documentation still applies to most features.
+
 .. contents:: Table of Contents
 
 Startup Menu
