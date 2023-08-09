@@ -14,6 +14,8 @@ class HydroScat(Instrument):
 
     REQUIRED_CFG_FIELDS = ['calibration_file', 'model', 'serial_number', 'module',
                            'log_path', 'log_raw', 'log_products',
+                           'burst_mode',
+                           'sleep_on_memory_full',
                            'fluorescence',
                            'start_delay', 'warmup_time',
                            'burst_duration', 'burst_cycle',
@@ -29,7 +31,7 @@ class HydroScat(Instrument):
 
         # Auxiliary Data Plugin
         self.widget_aux_data_enabled = True
-        self.widget_aux_data_variable_names = ['Temp. (ºC)', 'Depth (m)', 'Time']
+        self.widget_aux_data_variable_names = ['Temp. (ºC)', 'Depth (m)', 'Voltage (V)', 'Time']
 
         # Init Channels to Plot widget
         self.widget_select_channel_enabled = True
@@ -42,14 +44,14 @@ class HydroScat(Instrument):
     def setup(self, cfg):
         source = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
                                                     self._interface._serial))
-
         # TODO: fix out, serial_mode
         # TODO: num_channels (setup UI widget or needed? => can't we just get this from .cal file?)
         # TODO: instead of verbose, could pass a logger object
-        # TODO: do we need burst mode?
         self.hydroscat = aquasense.hydroscat.HydroScat(
                             cal_path=cfg["calibration_file"], source=source,
                             out=None, sep=None, num_channels=8, serial_mode=False,
+                            burst_mode=cfg["burst_mode"],
+                            sleep_on_memory_full=cfg["sleep_on_memory_full"],
                             fluorescence_control=cfg["fluorescence"],
                             start_delay=cfg["start_delay"],
                             warmup_time=cfg["warmup_time"],
@@ -60,16 +62,19 @@ class HydroScat(Instrument):
                             verbose=True)
         
         # Overload cfg with HydroScat specific parameters
-        cfg['variable_names'] = self.hydroscat.channel_names()
-        cfg['variable_units'] = ['beta' for n in range(1, len(cfg['variable_names'])+1)]
-        cfg['variable_precision'] = ['%.9f' for n in range(1, len(cfg['variable_names'])+1)]
+        cfg['variable_names'] = ["Depth", "Voltage"] + self.hydroscat.channel_names()
+        cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(3, len(cfg['variable_names'])+1)]
+        cfg['variable_precision'] = ['%.3f', '%.3f'] + ['%.9f' for n in range(3, len(cfg['variable_names'])+1)]
         cfg['terminator'] = b'\r\n'
 
         # Active Timeseries Variables
         self.active_variables = {var_name:True for var_name in cfg['variable_names']}
+        self.active_variables["Depth"] = False
+        self.active_variables["Voltage"] = False
         self.widget_active_timeseries_variables_names = cfg['variable_names']
-        self.widget_active_timeseries_variables_selected = cfg['variable_names']
-
+        self.widget_active_timeseries_variables_selected = \
+                    [name for name in self.active_variables if self.active_variables[name]]
+        
         # Set standard configuration and check cfg input
         super().setup(cfg)
         self.logger.info("setup")
@@ -132,18 +137,23 @@ class HydroScat(Instrument):
         if self.state == "RUNNING":
             raw_packet = packet.decode()
             self.logger.info("{}".format(raw_packet))
-            if raw_packet[0:2] in ["*T", "*D"]:
+            if raw_packet[0:2] in ["*T", "*D", "*H"]:
                 self.logger.info("data packet")
                 data_dict = self.hydroscat.rawline2datadict(raw_packet)
-                # ensure only one thread updates active timeseries variables
-                if self.active_timeseries_variables_lock.acquire(timeout=0.25):
-                    try:
-                        data = [data_dict[var_name] for var_name in data_dict
-                                if var_name in self.widget_active_timeseries_variables_selected]
-                    finally:
-                        self.active_timeseries_variables_lock.release()
-                else:
-                    self.logger.error('Unable to acquire lock to update active timeseries variables')
+                if raw_packet[0:2] != "*H":
+                    # ensure only one thread updates active timeseries variables
+                    if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+                        try:
+                            data = []
+                            for var_name in self.widget_active_timeseries_variables_selected:
+                                if var_name == "Voltage":
+                                    data.append(self.hydroscat.aux_data[var_name])
+                                else:
+                                    data.append(data_dict[var_name])
+                        finally:
+                            self.active_timeseries_variables_lock.release()
+                    else:
+                        self.logger.error('Unable to acquire lock to update active timeseries variables')
 
         return data
 
@@ -159,6 +169,7 @@ class HydroScat(Instrument):
                 date_time = datetime.strftime(datetime.fromtimestamp(int(self.hydroscat.aux_data["Time"])), format="%m/%d/%Y %H:%M:%S")
                 self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
                                             '%.4f' % self.hydroscat.aux_data["Depth"],
+                                            '%.4f' % self.hydroscat.aux_data["Voltage"],
                                             '%s' % date_time])
                 self.logger.info("aux data")
 

@@ -216,7 +216,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Burst Mode on/off</string>
+    <string>Burst Mode</string>
    </property>
   </widget>
   <widget class="QWidget" name="layoutWidget">
@@ -329,6 +329,19 @@
      </widget>
     </item>
    </layout>
+  </widget>
+  <widget class="QCheckBox" name="cb_sleep_on_memory_full">
+   <property name="geometry">
+    <rect>
+     <x>280</x>
+     <y>160</y>
+     <width>200</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Sleep on Memory Full</string>
+   </property>
   </widget>
  </widget>
  <tabstops>
