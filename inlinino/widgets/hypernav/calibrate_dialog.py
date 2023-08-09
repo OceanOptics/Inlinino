@@ -2,10 +2,9 @@ import os.path
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 
-from inlinino import PATH_TO_RESOURCES, package_dir
+from inlinino import PATH_TO_RESOURCES
 from inlinino.shared.worker import Worker
 from inlinino.instruments.hypernav import HyperNav
-
 
 
 try:
@@ -99,13 +98,12 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
                     self.le_wavelength_path.text(),
                     int(self.le_hypernav_sn.text()),
                     self.cb_head_side.currentText(),
-                    self.le_head_sn.text(),
+                    int(self.le_head_sn.text()),
                     int(self.le_spec_sn.text()),
                     self.lamp_to_plaque_distance.value(),
                     self.lamp_calibration_distance.value(),
                     'show+pdf',
-                    self.le_history_cal_path.text(),
-                    log_filename=os.path.join(package_dir, 'log', 'calibrate.log')
+                    self.le_history_cal_path.text()
                 )
             except SystemError as e:
                 self.instrument.signal.warning[str, str, str].emit(f"Error running 'legacy' calibration.",
