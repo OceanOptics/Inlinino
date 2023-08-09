@@ -3,14 +3,13 @@ from glob import glob
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 
-from hypernav.calibrate.reports import write_report_to_pdf
 from inlinino import PATH_TO_RESOURCES
 from inlinino.shared.worker import Worker
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
 try:
-    from hypernav.calibrate.reports import spec_board_report
+    from hypernav.calibrate.reports import spec_board_report, write_report_to_pdf
     from hypernav.calibrate import register_wavelengths
     from hypernav.io import HyperNav as HyperNavIO
     from hypernav.viz import GRAPH_CFG
