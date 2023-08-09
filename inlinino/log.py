@@ -65,6 +65,9 @@ class Log:
         else:
             self.filename = self.filename_prefix + '_<date>_<time>' + suffix + '.' + self.FILE_EXT
 
+    def get_file_timestamp(self):
+        return self._file_timestamp
+
     def write_header(self):
         if self.variable_names:
             self._file.write('time,' + ','.join(x for x in self.variable_names) + '\n')
@@ -95,14 +98,14 @@ class Log:
             # Create new file
             self.open(timestamp)
 
-    def write(self, data, timestamp):
+    def write(self, data, timestamp, file_timestamp=None):
         """
         Write data to file
         :param data: list of values
         :param timestamp: date and time associated with the data frame
         :return:
         """
-        self._smart_open(timestamp)
+        self._smart_open(file_timestamp if file_timestamp else timestamp)
         if self.variable_precision:
             self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
                              ',' + ','.join(p % d for p, d in zip(self.variable_precision, data)) + '\n')

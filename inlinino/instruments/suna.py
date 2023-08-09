@@ -1,7 +1,6 @@
 from collections import namedtuple
 
 from inlinino.instruments import Instrument
-import pyqtgraph as pg
 import numpy as np
 
 
@@ -44,8 +43,8 @@ class SunaV2(Instrument):
                       float, float, float, float, float,
                       float, float, float, float, int]
 
-    def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
+        super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Suna Specific Attributes
         self.df_maker = None
         self.wavelength = np.array([c for c in range(self.N_CHANNELS)])
@@ -54,19 +53,19 @@ class SunaV2(Instrument):
         self.default_serial_baudrate = 57600
         self.default_serial_timeout = 5
         #   frame_format: FULL_ASCII (others mode: NONE, FULL_BINARY, REDUCED_BINARY, CONCENTRATION_ASCII)
-        # Auxiliary Data Plugin
-        self.plugin_aux_data_enabled = True
-        self.plugin_aux_data_variable_names = self.get_aux_names()
+        # Auxiliary Data widget
+        self.widget_aux_data_enabled = True
+        self.widget_aux_data_variable_names = self.get_aux_names()
         # Display only selected variables
-        self.plugin_active_timeseries_variables_selected = self.get_ts_names()
-        # Init Spectrum Plot Plugin
+        self.widget_active_timeseries_variables_selected = self.get_ts_names()
+        # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = dict(x_label_name='Channel', x_label_units='(#)',
                                               y_label_name='Signal', y_label_units='counts')
         self.spectrum_plot_trace_names = ['light', 'dark']
         self.spectrum_plot_x_values = [self.wavelength, self.wavelength]
         # Setup
-        self.init_setup()
+        self.setup(cfg)
 
     def setup(self, cfg):
         # TODO Load device file to retrieve wavelength registration, 0 spectrum, and tdf
@@ -122,7 +121,7 @@ class SunaV2(Instrument):
             # Update plots
             self.signal.new_ts_data.emit(self.get_ts(raw), timestamp)
             self.signal.new_spectrum_data.emit([np.array(raw[self.CHANNELS_START_IDX:self.CHANNELS_END_IDX]), None])
-            # Update Auxiliary Data Plugin
+            # Update Auxiliary Data widget
             self.signal.new_aux_data.emit(self.get_aux(raw))
         elif 'D' in raw.header:  # Dark (SATSDF)
             # Update spectrum plot

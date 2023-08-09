@@ -11,31 +11,31 @@ class HyperBB(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
+        super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
         self.signal_reconstructed = None
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 1
-        # Init Auxiliary Data Plugin
-        self.plugin_aux_data_enabled = True
-        self.plugin_aux_data_variable_names = ['Scan WL. (nm)', 'Gain', 'LED Temp. (ºC)', 'Water Temp. (ºC)',
+        # Init Auxiliary Data widget
+        self.widget_aux_data_enabled = True
+        self.widget_aux_data_variable_names = ['Scan WL. (nm)', 'Gain', 'LED Temp. (ºC)', 'Water Temp. (ºC)',
                                                'Pressure (dBar)', 'Ref Zero Flag']
-        # Select Channels to Plot Plugin
-        self.plugin_active_timeseries_variables = True
-        self.plugin_active_timeseries_variables_names = []
-        self.plugin_active_timeseries_variables_selected = []
+        # Select Channels to Plot widget
+        self.widget_select_channel_enabled = True
+        self.widget_active_timeseries_variables_names = []
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
         self.active_timeseries_wavelength = None
-        # Init Spectrum Plot Plugin
+        # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = dict(y_label_name='bb', y_label_units='m<sup>-1</sup>')
         self.spectrum_plot_trace_names = ['bb']
         self.spectrum_plot_x_values = []
         # Setup
-        self.init_setup()
+        self.setup(cfg)
 
     def setup(self, cfg):
         # Set HyperBB specific attributes
@@ -55,7 +55,7 @@ class HyperBB(Instrument):
         # Update wavelengths for Spectrum Plot
         self.spectrum_plot_x_values = [self._parser.wavelength]
         # Update Active Timeseries Variables
-        self.plugin_active_timeseries_variables_names = ['beta(%d)' % x for x in self._parser.wavelength]
+        self.widget_active_timeseries_variables_names = ['beta(%d)' % x for x in self._parser.wavelength]
         self.active_timeseries_wavelength = np.zeros(len(self._parser.wavelength), dtype=bool)
         for wl in np.arange(450, 700, 50):
             channel_name = 'beta(%d)' % self._parser.wavelength[np.argmin(np.abs(self._parser.wavelength - wl))]
@@ -94,19 +94,19 @@ class HyperBB(Instrument):
                 self.signal.packet_logged.emit()
 
     def udpate_active_timeseries_variables(self, name, state):
-        if not ((state and name not in self.plugin_active_timeseries_variables_selected) or
-                (not state and name in self.plugin_active_timeseries_variables_selected)):
+        if not ((state and name not in self.widget_active_timeseries_variables_selected) or
+                (not state and name in self.widget_active_timeseries_variables_selected)):
             return
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                index = self.plugin_active_timeseries_variables_names.index(name)
+                index = self.widget_active_timeseries_variables_names.index(name)
                 self.active_timeseries_wavelength[index] = state
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update active timeseries variables')
         # Update list of active variables for GUI keeping the order
-        self.plugin_active_timeseries_variables_selected = \
+        self.widget_active_timeseries_variables_selected = \
             ['beta(%d)' % wl for wl in self._parser.wavelength[self.active_timeseries_wavelength]]
 
 

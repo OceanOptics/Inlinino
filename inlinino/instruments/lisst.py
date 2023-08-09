@@ -1,5 +1,4 @@
 from inlinino.instruments import Instrument
-import pyqtgraph as pg
 import configparser
 import numpy as np
 from time import sleep
@@ -13,31 +12,31 @@ class LISST(Instrument):
                            'log_path', 'log_raw', 'log_products',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
-        super().__init__(uuid, signal, setup=False, *args, **kwargs)
+    def __init__(self, uuid, cfg, signal, *args, **kwargs):
+        super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Instrument Specific attributes
         self._parser = None
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 10
-        # Init Auxiliary Data Plugin
-        self.plugin_aux_data_enabled = True
-        self.plugin_aux_data_variables_selected = []
-        self.plugin_aux_data_variable_names = []
-        # Init Channels to Plot Plugin
-        self.plugin_active_timeseries_variables = True
-        self.plugin_active_timeseries_variables_names = []
-        self.plugin_active_timeseries_variables_selected = []
+        # Init Auxiliary Data widget
+        self.widget_aux_data_enabled = True
+        self.widget_aux_data_variables_selected = []
+        self.widget_aux_data_variable_names = []
+        # Init Channels to Plot widget
+        self.widget_select_channel_enabled = True
+        self.widget_active_timeseries_variables_names = []
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
         self.active_timeseries_angles = None
-        # Init Spectrum Plot Plugin
+        # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = dict(x_label_name='log10(theta)', x_label_units='',
                                               y_label_name='beta', y_label_units='1/m/sr')
         self.spectrum_plot_trace_names = ['beta']
         self.spectrum_plot_x_values = []
         # Setup
-        self.init_setup()
+        self.setup(cfg)
 
     def setup(self, cfg):
         # Set LISST specific attributes
@@ -66,15 +65,15 @@ class LISST(Instrument):
         # Update wavelengths for Spectrum Plot (plot is updated after the initial instrument setup or button click)
         self.spectrum_plot_x_values = [np.log10(self._parser.angles)]
         # Update Active Timeseries Variables
-        self.plugin_active_timeseries_variables_names = ['beta(%.5f)' % x for x in self._parser.angles]
+        self.widget_active_timeseries_variables_names = ['beta(%.5f)' % x for x in self._parser.angles]
         self.active_timeseries_angles = np.zeros(len(self._parser.angles), dtype=bool)
         for theta in [0.08, 0.32, 1.28, 5.12]:
             channel_name = 'beta(%.5f)' % self._parser.angles[np.argmin(np.abs(self._parser.angles - theta))]
             self.udpate_active_timeseries_variables(channel_name, True)
-        # Update Auxiliary Plugin
-        self.plugin_aux_data_variables_selected = [0, 3, 5]
-        self.plugin_aux_data_variable_names = [self._parser.aux_labels[i] + ' (' + self._parser.aux_units[i] + ')'
-                                               for i in self.plugin_aux_data_variables_selected]
+        # Update Auxiliary widget
+        self.widget_aux_data_variables_selected = [0, 3, 5]
+        self.widget_aux_data_variable_names = [self._parser.aux_labels[i] + ' (' + self._parser.aux_units[i] + ')'
+                                               for i in self.widget_aux_data_variables_selected]
 
     def parse(self, packet):
         return (self._parser.unpack_packet(packet),)
@@ -93,7 +92,7 @@ class LISST(Instrument):
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update timeseries plot')
-        self.signal.new_aux_data.emit(self.format_aux_data([data[i+1] for i in self.plugin_aux_data_variables_selected]))
+        self.signal.new_aux_data.emit(self.format_aux_data([data[i+1] for i in self.widget_aux_data_variables_selected]))
         self.signal.new_spectrum_data.emit([beta])
         # Log raw beta and calibrated aux
         if self.log_prod_enabled and self._log_active:
@@ -124,19 +123,19 @@ class LISST(Instrument):
         return ['%.2f' % v for v in data]
 
     def udpate_active_timeseries_variables(self, name, state):
-        if not ((state and name not in self.plugin_active_timeseries_variables_selected) or
-                (not state and name in self.plugin_active_timeseries_variables_selected)):
+        if not ((state and name not in self.widget_active_timeseries_variables_selected) or
+                (not state and name in self.widget_active_timeseries_variables_selected)):
             return
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
             try:
-                index = self.plugin_active_timeseries_variables_names.index(name)
+                index = self.widget_active_timeseries_variables_names.index(name)
                 self.active_timeseries_angles[index] = state
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
             self.logger.error('Unable to acquire lock to update active timeseries variables')
         # Update list of active variables for GUI keeping the order
-        self.plugin_active_timeseries_variables_selected = \
+        self.widget_active_timeseries_variables_selected = \
             ['beta(%.5f)' % theta for theta in self._parser.angles[self.active_timeseries_angles]]
 
 

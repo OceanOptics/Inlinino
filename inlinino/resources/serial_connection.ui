@@ -31,6 +31,13 @@
      <property name="labelAlignment">
       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
      </property>
+     <item row="0" column="0">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Port</string>
+       </property>
+      </widget>
+     </item>
      <item row="0" column="1">
       <widget class="QComboBox" name="cb_port">
        <property name="sizePolicy">
@@ -180,20 +187,6 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="label_5">
-       <property name="text">
-        <string>Stop bit(s)</string>
-       </property>
-      </widget>
-     </item>
-     <item row="5" column="0">
-      <widget class="QLabel" name="label_6">
-       <property name="text">
-        <string>Timeout</string>
-       </property>
-      </widget>
-     </item>
      <item row="3" column="1">
       <widget class="QComboBox" name="cb_parity">
        <property name="minimumSize">
@@ -232,6 +225,13 @@
        </item>
       </widget>
      </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="label_5">
+       <property name="text">
+        <string>Stop bit(s)</string>
+       </property>
+      </widget>
+     </item>
      <item row="4" column="1">
       <widget class="QComboBox" name="cb_stopbits">
        <property name="minimumSize">
@@ -260,23 +260,23 @@
        </item>
       </widget>
      </item>
-     <item row="5" column="1">
-      <widget class="QSpinBox" name="sb_timeout">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-family:'Lato,proxima-nova,Helvetica Neue,Arial,sans-serif'; color:#404040; background-color:#fcfcfc;&quot;&gt;Set a read timeout value&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-       <property name="maximum">
-        <number>60</number>
-       </property>
-       <property name="value">
-        <number>2</number>
+     <item row="5" column="0">
+      <widget class="QLabel" name="label_6">
+       <property name="text">
+        <string>Timeout</string>
        </property>
       </widget>
      </item>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Port</string>
+     <item row="5" column="1">
+      <widget class="QDoubleSpinBox" name="sb_timeout">
+       <property name="minimum">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>60.000000000000000</double>
+       </property>
+       <property name="value">
+        <double>2.000000000000000</double>
        </property>
       </widget>
      </item>

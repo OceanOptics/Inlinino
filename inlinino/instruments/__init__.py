@@ -10,7 +10,7 @@ import usb.backend.libusb1
 import hid
 
 from inlinino.log import Log, LogText
-from inlinino import CFG, PATH_TO_RESOURCES
+from inlinino import PATH_TO_RESOURCES
 import logging
 
 
@@ -25,7 +25,7 @@ class Instrument:
                            'variable_names', 'variable_units', 'variable_precision']
     DATA_TIMEOUT = 60  # seconds
 
-    def __init__(self, uuid, signal=None, setup=True):
+    def __init__(self, uuid, cfg, signal=None, setup=True):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Communication Interface
@@ -57,21 +57,20 @@ class Instrument:
         self.variable_names = None
         self.variable_units = None
         self.variable_displayed = None
-        # Plugins
-        self.plugin_aux_data_enabled = False
-        self.plugin_active_timeseries_variables = False
+        # widgets
         self.spectrum_plot_enabled = False
-        self.plugin_metadata_enabled = False
-        self.plugin_instrument_control_enabled = False
-        self.plugin_pump_control_enabled = False
+        self.widget_aux_data_enabled = False
+        self.widget_flow_control_enabled = False
+        self.widget_hypernav_cal_enabled = False
+        self.widget_metadata_enabled = False
+        self.widget_pump_control_enabled = False
+        self.widget_select_channel_enabled = False
+        self.widgets_to_load = []  # To load widgets disabled on setup
 
         # Load cfg
         self.uuid = uuid
         if setup:
-            self.init_setup()
-
-    def init_setup(self):
-        self.setup(CFG.instruments[self.uuid].copy())
+            self.setup(cfg)
 
     @property
     def name(self) -> str:
@@ -87,14 +86,19 @@ class Instrument:
         return self._interface.name
 
     @property
+    def interface_signal(self):
+        return self._interface.signal
+
+    @property
     def bare_log_prefix(self) -> str:
         return self.model + self.serial_number
 
     @property
     def secondary_dock_widget_enabled(self) -> bool:
-        return self.plugin_metadata_enabled or \
-            self.plugin_instrument_control_enabled or \
-            self.plugin_pump_control_enabled
+        return self.widget_metadata_enabled or \
+            self.widget_flow_control_enabled or \
+            self.widget_pump_control_enabled or \
+            self.widget_hypernav_cal_enabled
 
     def setup(self, cfg, raw_logger=LogText):
         self.logger.debug('Setup')
@@ -207,7 +211,8 @@ class Instrument:
                         data_received = timestamp
                         if data_timeout_flag:
                             data_timeout_flag = False
-                            self.signal.alarm.emit(False)
+                            if self.signal.alarm is not None:
+                                self.signal.alarm.emit(False)
                     except Exception as e:
                         self.logger.warning(e)
                         # raise e
@@ -216,12 +221,14 @@ class Instrument:
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
                         self.logger.error(f'No data received during the past {timestamp - data_received:.2f} seconds')
                         data_timeout_flag = True
-                        self.signal.alarm.emit(True)
+                        if self.signal.alarm is not None:
+                            self.signal.alarm.emit(True)
             except InterfaceException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
                 self.logger.error(e)
-                self.signal.alarm.emit(True)
+                if self.signal.alarm is not None:
+                    self.signal.alarm.emit(True)
                 break
         self.close(wait_thread_join=False)
 
@@ -274,13 +281,16 @@ class Instrument:
         self._log_raw.close()
         self._log_prod.close()
 
+    @property
     def log_active(self):
         return self._log_active
 
-    def log_get_path(self):
+    @property
+    def log_path(self):
         return self._log_raw.path
 
-    def log_get_filename(self):
+    @property
+    def log_filename(self):
         if self.log_raw_enabled or not self.log_prod_enabled:
             return self._log_raw.filename
         else:
@@ -338,6 +348,10 @@ class Interface:
     def timeout(self) -> int:
         raise NotImplementedError
 
+    @timeout.setter
+    def timeout(self, value):
+        raise NotImplementedError
+
     @property
     def name(self) -> str:
         raise NotImplementedError
@@ -356,7 +370,7 @@ class Interface:
     def close(self):
         pass
 
-    def read(self):
+    def read(self, size=None):
         pass
 
     def write(self, data):
@@ -374,6 +388,10 @@ class SerialInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._serial.timeout
+
+    @timeout.setter
+    def timeout(self, value: int):
+        self._serial.timeout = value
 
     @property
     def name(self) -> str:
@@ -416,6 +434,9 @@ class SerialInterface(Interface):
             return self._serial.read(self._serial.in_waiting or 1 if size is None else size)
         except serial.SerialException as e:
             raise InterfaceException(e)
+
+    def read_until(self, expected=b'\n', size=None):
+        return self._serial.read_until(expected=expected, size=size)
 
     def write(self, data):
         self._serial.write(data)
@@ -467,6 +488,7 @@ class USBInterface(Interface):
     Requirements: pyusb=1.0.2
     Warning: dll for windows might only be compatible with ontrak ADU devices
     """
+
     def __init__(self):
         self._device: usb.core.Device = None
         self._timeout = 200  # ms
@@ -480,6 +502,10 @@ class USBInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._timeout / 1000  # in seconds
+
+    @timeout.setter
+    def timeout(self, value: float):
+        self._timeout = int(value * 1000)
 
     @property
     def name(self) -> str:
@@ -529,7 +555,7 @@ class USBInterface(Interface):
 
     def read(self, size=1):
         # size is converted from bytes to bits
-        return self._device.read(self.read_endpoint, size*8, timeout=self._timeout)
+        return self._device.read(self.read_endpoint, size * 8, timeout=self._timeout)
 
     def write(self, data):
         return self._device.write(self.write_endpoint, data)
@@ -541,6 +567,7 @@ class USBHIDInterface(Interface):
     Does not require additional dll for windows
     Warning: bug have been encountered on windows
     """
+
     def __init__(self):
         self._device = hid.device()
         self._is_open = False
@@ -553,6 +580,10 @@ class USBHIDInterface(Interface):
     @property
     def timeout(self) -> int:
         return self._timeout / 1000  # in seconds
+
+    @timeout.setter
+    def timeout(self, value: float):
+        self._timeout = int(value*1000)
 
     @property
     def name(self) -> str:
@@ -582,3 +613,105 @@ class USBHIDInterface(Interface):
 
     def write(self, data):
         return self._device.write(data)
+
+
+def get_spy_interface(interface: Interface, echo=True):
+    class Spy(interface):
+        def __init__(self, signal, max_buffer=2 ** 20):
+            super().__init__()
+            self.signal = signal
+            self.spy_enabled = True
+
+        def read(self, *args, **kwargs):
+            buffer = super().read(*args, **kwargs)
+            # self.read_queue += buffer
+            # if len(self.read_queue) > self.max_buffer:
+            #     self.read_queue = self.read_queue[-self.max_buffer:]
+            if self.spy_enabled and len(buffer) > 0:
+                self.signal.read.emit(buffer)
+            return buffer
+
+        def write(self, data: bytes):
+            # self.write_queue += data
+            # if len(self.write_queue) > self.max_buffer:
+            #     self.write_queue = self.write_queue[-self.max_buffer:]
+            if self.spy_enabled and echo:
+                self.signal.write.emit(data)
+            return super().write(data)
+
+    return Spy
+
+
+def _generate_crc16_table():
+    """Generate a crc16 lookup table.
+
+    .. note:: This will only be generated once
+    """
+    result = []
+    for byte in range(256):
+        crc = 0x0000
+        for _ in range(8):
+            if (byte ^ crc) & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+            byte >>= 1
+        result.append(crc)
+    return result
+
+
+class ModbusProtocol:
+    CRC16_TABLE = _generate_crc16_table()
+
+    def __init__(self, address: bytearray = b'\x01'):
+        self.address = address
+
+    def request(self, register: int, quantity_of_registers: int = 1, function: bytearray = b'\x03') ->bytearray:
+        frame = self.address + function + register.to_bytes(2, 'big') + quantity_of_registers.to_bytes(2, 'big')
+        frame += self.compute_crc(frame).to_bytes(2, 'big')
+        return frame
+
+    def handle_response(self, response: bytearray) -> bytearray:
+        if self.compute_crc(response[:-2]) != int.from_bytes(response[-2:], 'big'):
+            raise ValueError('Invalid CRC.')
+        address = response[0:1]  # Keep as bytearray
+        if address != self.address:
+            raise ValueError('Invalid address.')
+        code = response[1]
+        if code == 0x83:  # Error Code
+            exception_code = response[2]
+            if exception_code == 0x01:
+                raise ValueError('Function code not supported.')
+            elif exception_code == 0x02:
+                raise ValueError('Invalid starting address or quantity of registers.')
+            elif exception_code == 0x03:
+                raise ValueError('Invalid quantity of registers.')
+            elif exception_code == 0x04:
+                raise ValueError('Unable to read multiple registers.')
+            else:
+                raise ValueError('Error occurred.')
+        if code != 0x03:  # Function Read Holding Register
+            raise NotImplementedError(f'Function code {hex(code)} not implemented.')
+        byte_count = response[2]
+        return response[3:3 + byte_count]
+
+    @staticmethod
+    def compute_crc(data: bytearray) -> int:  # pylint: disable=invalid-name
+        """Compute a crc16 on the passed in string.
+        source: pymodbus
+
+        For modbus, this is only used on the binary serial protocols (in this
+        case RTU).
+
+        The difference between modbus's crc16 and a normal crc16
+        is that modbus starts the crc value out at 0xffff.
+
+        :param data: The data to create a crc16 of
+        :returns: The calculated CRC
+        """
+        crc = 0xFFFF
+        for data_byte in data:
+            idx = ModbusProtocol.CRC16_TABLE[(crc ^ int(data_byte)) & 0xFF]
+            crc = ((crc >> 8) & 0xFF) ^ idx
+        swapped = ((crc << 8) & 0xFF00) | ((crc >> 8) & 0x00FF)
+        return swapped
