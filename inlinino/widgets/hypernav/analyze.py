@@ -37,7 +37,9 @@ class HyperNavAnalyzeWidget(GenericWidget):
     def update_filename_combobox(self):
         self.filename_combobox.clear()
         file_list = [os.path.basename(f) for f in sorted(glob(os.path.join(
-            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))]
+            self.instrument._log_raw.path, f'*.{self.instrument._log_raw.FILE_EXT}')))] + \
+            [os.path.basename(f) for f in sorted(glob(os.path.join(
+            self.instrument._log_raw.path, f'*.txt')))]
         self.filename_combobox.addItems(file_list)
         self.filename_combobox.setCurrentIndex(len(file_list)-1)
 

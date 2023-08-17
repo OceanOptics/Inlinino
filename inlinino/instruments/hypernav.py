@@ -176,6 +176,7 @@ class HyperNav(Satlantic):
                 pixel_reg_type.append('wavelength')
             elif os.path.splitext(cfg[path])[1] in self._parser.VALID_CAL_EXTENSIONS:
                 td = pySat.Parser(cfg[path])
+                td.frame_nfields = len(td.type) - (1 if td.type[-1] == 'TERMINATOR' else 0)
                 pixel_reg_type.append('wavelength')
             else:
                 raise pySat.CalibrationFileExtensionError(f'File extension incorrect: {cfg[path]}')

@@ -24,7 +24,7 @@ from inlinino.instruments.acs import ACS
 from inlinino.instruments.apogee import ApogeeQuantumSensor
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
-from inlinino.instruments.hypernav import HyperNav
+from inlinino.instruments.hypernav import HyperNav, read_manufacturer_pixel_registration
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
 from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface
@@ -898,7 +898,22 @@ class DialogInstrumentSetup(QtGui.QDialog):
             except ValueError:
                 self.notification('Starboard serial number must be an integer.')
                 return
-            # TODO Validate files received for pixel registration
+            try:
+                for path in (self.cfg['px_reg_path_prt'], self.cfg['px_reg_path_sbd']):
+                    if not path:
+                        continue
+                    elif os.path.splitext(path)[1] == '.cgs':
+                        read_manufacturer_pixel_registration(path)
+                    elif os.path.splitext(path)[1] in pySat.Instrument.VALID_CAL_EXTENSIONS:
+                        td = pySat.Parser(path)
+                        if not td.variable_frame_length:
+                            raise ValueError('Inlinino only supports SATY*Z files for hypernav.')
+                    else:
+                        raise ValueError(f'Invalid file extension, only support '
+                                         f'{", ".join(pySat.Instrument.VALID_CAL_EXTENSIONS)}and .cgs.')
+            except Exception as e:
+                self.notification('Error in HyperNav configuration.', e)
+                return
         # Update global instrument cfg
         CFG.read()  # Update local cfg if other instance updated cfg
         CFG.instruments[self.cfg_uuid] = self.cfg.copy()
