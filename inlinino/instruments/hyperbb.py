@@ -67,7 +67,7 @@ class HyperBB(Instrument):
         self.active_timeseries_wavelength = np.zeros(len(self._parser.wavelength), dtype=bool)
         for wl in np.arange(450, 700, 50):
             channel_name = 'beta(%d)' % self._parser.wavelength[np.argmin(np.abs(self._parser.wavelength - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+            self.update_active_timeseries_variables(channel_name, True)
 
     def parse(self, packet):
         return self._parser.parse(packet)
@@ -101,7 +101,7 @@ class HyperBB(Instrument):
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def udpate_active_timeseries_variables(self, name, state):
+    def update_active_timeseries_variables(self, name, state):
         if not ((state and name not in self.widget_active_timeseries_variables_selected) or
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return

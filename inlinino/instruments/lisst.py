@@ -69,7 +69,7 @@ class LISST(Instrument):
         self.active_timeseries_angles = np.zeros(len(self._parser.angles), dtype=bool)
         for theta in [0.08, 0.32, 1.28, 5.12]:
             channel_name = 'beta(%.5f)' % self._parser.angles[np.argmin(np.abs(self._parser.angles - theta))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+            self.update_active_timeseries_variables(channel_name, True)
         # Update Auxiliary widget
         self.widget_aux_data_variables_selected = [0, 3, 5]
         self.widget_aux_data_variable_names = [self._parser.aux_labels[i] + ' (' + self._parser.aux_units[i] + ')'
@@ -122,7 +122,7 @@ class LISST(Instrument):
     def format_aux_data(data):
         return ['%.2f' % v for v in data]
 
-    def udpate_active_timeseries_variables(self, name, state):
+    def update_active_timeseries_variables(self, name, state):
         if not ((state and name not in self.widget_active_timeseries_variables_selected) or
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return
