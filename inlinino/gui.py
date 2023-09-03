@@ -734,7 +734,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
         model = self.combobox_model.currentText()
         if model == 'ADU100':
             self.group_box_analog.setEnabled(True)
-        elif model == 'ADU200':
+        elif model in ('ADU200', 'ADU208'):
             self.group_box_analog.setEnabled(False)
         else:
             raise ValueError(f'Model {model} not supported.')
