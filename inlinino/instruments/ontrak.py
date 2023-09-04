@@ -115,8 +115,8 @@ class Ontrak(Instrument):
         # Set specific attributes
         if 'model' not in cfg.keys():
             raise ValueError('Missing field model')
-        if self.model and self.model not in ['ADU100', 'ADU200']:
-            raise ValueError('Model not supported. Supported models are: ADU100 and ADU200')
+        if self.model and self.model not in ['ADU100', 'ADU200', 'ADU208']:
+            raise ValueError('Model not supported. Supported models are: ADU100, ADU200, and ADU208')
         if 'relay0_enabled' not in cfg.keys():
             raise ValueError('Missing field relay0 enabled')
         self.relay_enabled = cfg['relay0_enabled']
@@ -145,12 +145,19 @@ class Ontrak(Instrument):
             raise ValueError('Missing field event counter k factors')
         self.event_counter_k_factors = cfg['event_counter_k_factors']
         self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
-        if 'analog_channels_enabled' not in cfg.keys():
-            raise ValueError('Missing field analog channels enabled')
-        self.analog_channels = cfg['analog_channels_enabled']
-        if 'analog_channels_gains' not in cfg.keys():
-            raise ValueError('Missing field analog channels gains')
-        self.analog_gains = cfg['analog_channels_gains']
+
+        if self.model == 'ADU100':
+            if 'analog_channels_enabled' not in cfg.keys():
+                raise ValueError('Missing field analog channels enabled')
+                self.analog_channels = cfg['analog_channels_enabled']
+            if 'analog_channels_gains' not in cfg.keys():
+                raise ValueError('Missing field analog channels gains')
+            self.analog_gains = cfg['analog_channels_gains']
+        else:
+            # Prevent loading analog channels for models that don't support it
+            #   => read_analog check if there is channel to reads otherwise
+            self.analog_channels = []
+            self.analog_gains = []
         self._analog_calibration_timestamp = None
         # Overload cfg with DATAQ specific parameters
         if self.relay_mode == 'Switch':
@@ -202,6 +209,8 @@ class Ontrak(Instrument):
                 product_id = 100
             elif self.model == 'ADU200':
                 product_id = 200
+            elif self.model == 'ADU208':
+                product_id = 208
             else:
                 raise ValueError('Model not supported.')
             super().open(vendor_id=self.VENDOR_ID, product_id=product_id, **kwargs)
@@ -296,7 +305,7 @@ class Ontrak(Instrument):
     def set_relay(self):
         """
         Set relay(s)
-        TODO work on interfacing relay 1, 2, and 3 on ADU200 (only relay 0) for now
+        TODO work on interfacing relay 1, 2, and 3 on ADU20X (only relay 0) for now
         :return:
         """
         if not self.relay_enabled:
@@ -334,7 +343,7 @@ class Ontrak(Instrument):
         timestamps, values = [], []
         for channel in self.event_counter_channels:
             self._interface.write(f'RC{channel}')  # Read and Clean Counter
-            timestamps.append(time())  # Get exact timestamp, needed to calculate flowrate
+            timestamps.append(time())  # Get exact timestamp, needed to calculate flow rate
             value = self._interface.read()
             values.append(float('nan') if value is None else value)
         return timestamps, values
