@@ -28,9 +28,6 @@ Inlinino is available for Windows and macOS, the packaged executable can be down
 
 Advance users or developers can setup the software directly from source (`GitHub Repository <https://github.com/OceanOptics/Inlinino/>`__).
 
-.. note::
-      OUTDATED DOCUMENTATION! PASC is deprecated and replaced by DataQ or ADU data acquisition hardware (DAQ). Several new instruments are supported including HyperBB, HyperNAV, HyperOCR, Suna and more. Nonetheless, the user experience is very similar and current documentation still applies to most features.
-
 .. contents:: Table of Contents
 
 Startup Menu
@@ -50,23 +47,26 @@ To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Wind
         3. The main Inlinino window will be loaded for the selected instrument.
 
 .. _qs-table-instr-supported:
-.. table:: Table 1. Type of instruments supported
+.. table:: Table 1. Instruments supported
 
     ======================================  ============================
       Instrument type                         Instrument supported
     ======================================  ============================
-       :ref:`acs<qs-setup-acs>`              WET Labs AC-S
+       :ref:`acs<qs-setup-acs>`              Sea-Bird Scientific AC-S
+       apogee                                Apogee Instruments PAR Sensor (SQ-522-SS)
        :ref:`dataq<qs-setup-dataq>`          | DATAQ DI-1100
                                              | (Data Acquisition Interface for analog sensors)
        hyperbb                               Sequoia HyperBB
+       hypernav                              Sea-Bird Scientfic HyperNav
        :ref:`lisst<qs-setup-lisst>`          Sequoia LISST
        nmea                                  Read & Parse NMEA over Serial or UDP
-       ontrak                               | Ontrak Control Systems ADU100
+       ontrak                                | Ontrak Control Systems ADU100, ADU200, and ADU208
                                              | (supports Flow control, Flowmeter, & DAQ for Analog sensors)
-       satlantic                             Satlantic Instruments (requires Instrument's Telemetry Definition or Calibration Files)
+       satlantic                             | Satlantic Instruments (e.g. HyperOCR, HyperPro, HyperSAS, Suna)
+                                             | Requires Instrument's Telemetry Definition or Calibration Files
        suna                                  Satlantic Suna V1 and V2
-       :ref:`generic<qs-setup-generic>`      | Any sensor outputting simple ascii frame
-                                             | (e.g. :ref:`WET Labs ECO-Triplets<qs-figure-setup-generic-bb3>`, BioSpherical PAR, SeaBird TSG)
+       :ref:`generic<qs-setup-generic>`      | Any sensor outputting text over serial
+                                             | (e.g. :ref:`Sea-Bird Scientific ECO-Triplets<qs-figure-setup-generic-bb3>`, BioSpherical PAR, SeaBird TSG)
     ======================================  ============================
 
 .. _qs-figure-startup:
@@ -81,7 +81,7 @@ To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Wind
 
 Setup a generic instrument
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Instruments are considered as generic if they send data as structured ascii frame. The frame is considered structured when each variable is separated by a separator (e.g. comma, tabulation) and the frame terminate with a terminator (e.g. carriage return). An example on how to fill the form for a WET Labs ECO-BB3 is given in the :ref:`Screenshot 2<qs-figure-setup-generic-bb3>`.
+Instruments are considered as generic if they send data as structured ascii frame. The frame is considered structured when each variable is separated by a separator (e.g. comma, tabulation) and the frame terminate with a terminator (e.g. carriage return). An example on how to fill the form for a Sea-Bird Scientific ECO-BB3 is given in the :ref:`Screenshot 2<qs-figure-setup-generic-bb3>`.
 
 ``General section <top left>``
   The manufacturer, model, and serial number of the instruments must be entered at the top left of the window.
@@ -109,7 +109,7 @@ Instruments are considered as generic if they send data as structured ascii fram
     .. note::
       Note that the software record the date and time at which it received each data frame, hence no need to record the instrument timestamp which often drifts significantly during month long campaigns and is rarely set properly.
 
-Below is an example of two data frames received from a WET Labs ECO-BB3 to illustrate this settings. Each variable is separated by a tabulation (`\t`). The column 2, 4, and 6 correspond to the wavelengths of the sensor (note that the indexing start at 0 not 1). The column of interest with values corresponding to each one of the wavelength are 3, 5, and 7 (e.g. 255, 244, and 232 for the first frame). An example of variable names could be: beta470, beta532, and beta650. The variable units are: counts, counts, and counts in this case. Frames are separated by a new line character (`\r\n`). The date, time, and checksum (last number) would be ignored in these case. The  :ref:`Screenshot 2<qs-figure-setup-generic-bb3>` shows how to fill the form for this instrument and the data frames in question.::
+Below is an example of two data frames received from a Sea-Bird Scientific ECO-BB3 to illustrate this settings. Each variable is separated by a tabulation (`\t`). The column 2, 4, and 6 correspond to the wavelengths of the sensor (note that the indexing start at 0 not 1). The column of interest with values corresponding to each one of the wavelength are 3, 5, and 7 (e.g. 255, 244, and 232 for the first frame). An example of variable names could be: beta470, beta532, and beta650. The variable units are: counts, counts, and counts in this case. Frames are separated by a new line character (`\r\n`). The date, time, and checksum (last number) would be ignored in these case. The  :ref:`Screenshot 2<qs-figure-setup-generic-bb3>` shows how to fill the form for this instrument and the data frames in question.::
 
     11/08/16	20:33:49	470	255	532	244	650	232	524
     11/08/16	20:33:50	470	263	532	251	650	237	588
@@ -122,14 +122,16 @@ Below is an example of two data frames received from a WET Labs ECO-BB3 to illus
   :scale: 50 %
   :align: center
 
-  Screenshot 2. Inlinino generic instrument setup window prefilled for a WET Labs ECO-BB3
+  Screenshot 2. Inlinino generic instrument setup window prefilled for a Sea-Bird Scientific ECO-BB3
 
 
 .. _qs-setup-analog:
 
 Setup an analog instrument
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Inlinino supports analog instruments by using a data acquisition (DAQ) module connected to a virtual serial port. The DAQ supported with the current version of Inlinino is the :ref:`DataQ DI-1100<qs-setup-dataq>` which is commercially available. Previous version of inlinino supporting a custom made DAQ :ref:`PASC<qs-setup-pasc>`, which is not supported anymore.
+Data acquisition system (DAQ) are required to read and log data from analog instruments. Supported DAQ include:
+    + :ref:`DataQ DI-1100<qs-setup-dataq>` and DI-2108
+    + Ontrak ADU100
 
 .. _qs-setup-dataq:
 
@@ -157,13 +159,6 @@ DataQ DI-1100
   Screenshot 3. Inlinino DataQ DI-1100 setup window for analog instruments
 
 
-.. _qs-setup-pasc:
-
-PASC
-""""
-The precision analog to serial converted (PASC) DAQ developed with the first version of Inlinino was not ported to the current version of Inlinino. For now, we recommend using the commercially available :ref:`DataQ DI-1100<qs-setup-dataq>` DAQ supported by Inlinino.
-
-
 .. _qs-setup-lisst:
 
 Setup a Sequoia LISST
@@ -185,9 +180,9 @@ The folder in which the data is logged is specified in the field `Log Directory`
 
 .. _qs-setup-acs:
 
-Setup a WET Labs AC-S
-^^^^^^^^^^^^^^^^^^^^^
-Setting up a WET Labs AC-S or AC-9 is simple as all settings needed are provided by the manufacturer in the device file (.dev). This file can be located on the computer with the `browse` button on the side of the Device File field.
+Setup a Sea-Bird Scientific AC-S
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting up a Sea-Bird Scientific AC-S or AC-9 is simple as all settings needed are provided by the manufacturer in the device file (.dev). This file can be located on the computer with the `browse` button on the side of the Device File field.
 
 The folder in which the data is logged is specified in the field `Log Directory`. The button `Browse` can be used to easily browse the computer file system and choose the adequate directory.
 
@@ -199,7 +194,7 @@ The folder in which the data is logged is specified in the field `Log Directory`
   :scale: 50 %
   :align: center
 
-  Screenshot 5. Inlinino setup window for a WET Labs AC-S
+  Screenshot 5. Inlinino setup window for a Sea-Bird Scientific AC-S
 
 
 Main Window
@@ -214,11 +209,11 @@ To log data follow the steps describe in the following section (:ref:`Log Data<q
 
 To log data from multiple instruments simultaneously, start multiple instances of Inlinino. To do so, simply click on the Inlinino executable icon (.app on macOS or .exe on Windows) as many times as instruments to log. On the startup  window select the appropriate instrument each time.
 
-The last 120 values of selected channels are displayed in the plotting section of the main window (:ref:`Figure 7<qs-figure-main-window>`) once the instrument is connected. On generic and analog instruments all channels are selected. On the WET Labs ACS and Sequoia LISST the user can select the channels of interest from the ``Select Channel(s)`` Group-Box menu at the bottom of the sidebar. By default, the latest channels selected by the users are plotted.
+The last 120 values of selected channels are displayed in the plotting section of the main window (:ref:`Figure 7<qs-figure-main-window>`) once the instrument is connected. On generic and analog instruments all channels are selected. On the Sea-Bird Scientific ACS and Sequoia LISST the user can select the channels of interest from the ``Select Channel(s)`` Group-Box menu at the bottom of the sidebar. By default, the latest channels selected by the users are plotted.
 
 The ``Packets`` Group-Box of the sidebar displays in real-time the number of packets received, logged, and corrupted. When an instrument is turned on a few corrupted packets could be received, they are generally due to the instruments initialization message. If the number of corrupted packets keep increasing, a problem with the data format, the instrument settings, or the connections is occurring. Note that if the raw data is logged, the corrupted packets are logged but not timestamped. The raw data logging option is available in the setup menu of generic instruments. For other instrument types it's activated by defaults.
 
-Instruments with many channels like the WET Labs AC-S and Sequoia LISST have an auxiliary window (:ref:`Figure 8<qs-figure-aux-window>`) which shows the latest value received of each channel. Instruments communicating auxiliary data (e.g. instrument temperature) have it displayed in the ``Auxiliary Data`` Group-Box of the sidebar.
+Instruments with many channels like the Sea-Bird Scientific AC-S and Sequoia LISST have an auxiliary window (:ref:`Figure 8<qs-figure-aux-window>`) which shows the latest value received of each channel. Instruments communicating auxiliary data (e.g. instrument temperature) have it displayed in the ``Auxiliary Data`` Group-Box of the sidebar.
 
 .. _qs-figure-main-window:
 .. figure:: screenshots/main_window_acs.png
@@ -264,7 +259,7 @@ Before logging data, it's important to check the configuration of the instrument
 To edit the configuration of an instrument, Inlinino must be started with the instrument loaded. Click the ``Setup`` button under the ``Controls`` Group-Box at the top of the sidebar. The setup window will pop-up. To update settings follow instructions specific to each instrument's type (c.f. :ref:`Table 1<qs-table-instr-supported>`).
 
 ``Append prefix to log file Group-Box``
-    Data filenames follow the syntax ``<instrument_model><instrument_serial_number>_YYYYMMDD_HHMMSS.csv``. For example a file for a WET Labs ACS serial number 301 created July 9, 2016 at 16:01:00 UTC would be named: ``ACS301_20160709_160100.csv``.
+    Data filenames follow the syntax ``<instrument_model><instrument_serial_number>_YYYYMMDD_HHMMSS.csv``. For example a file for a Sea-Bird Scientific ACS serial number 301 created July 9, 2016 at 16:01:00 UTC would be named: ``ACS301_20160709_160100.csv``.
 
     One might want to append a prefix to a data file name logged with Inlinino, in the event of instrument calibration or some experiments. To consistently append a prefix to the name of a file logged with Inlinino, select the prefix desired at the bottom of the setup window (:ref:`Screenshot 8<qs-figure-log-prefix>`).
 
@@ -277,8 +272,3 @@ To edit the configuration of an instrument, Inlinino must be started with the in
 
     .. warning::
       The ``Append prefix to log file`` settings are only applied to the current Inlinino session and are reset when Inlinino is restarted.
-
-
-Next step
-^^^^^^^^^
-Additional settings are explained in the :ref:`Configuration<cfg-application>` section.
