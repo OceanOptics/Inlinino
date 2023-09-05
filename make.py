@@ -12,7 +12,7 @@ if platform.system() == 'Windows':
     OS_SPECIAL = tuple()
     # PATH_TO_SITE_PACKAGES = r'C:\Program Files\Python38\Lib\site-packages'  # Windows 7
     # OS_SPECIAL = ('--add-data=%s%s%s' % (os.path.join(PATH_TO_SITE_PACKAGES, 'kaleido', 'executable', '*'), OS_OPERATOR, os.path.join('kaleido', 'executable')),)
-    # PATH_TO_HYPERNAV_PACKAGE = r'Y:\PycharmProjects\hypernav'
+    PATH_TO_HYPERNAV_PACKAGE = r'Y:\PycharmProjects\hypernav'
 elif platform.system() == 'Darwin':
     # macOS
     OS_OPERATOR = ':'

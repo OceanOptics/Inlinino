@@ -64,7 +64,7 @@ author = u'Nils Haentjens'
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'inlinino', '__init__.py'), 'r') as f:
     for l in f:
         if l.startswith('__version__'):
-            release = l.split('=')[1].strip(" '")
+            release = l.split('=')[1].strip(" \n'")
             version = release.rsplit('.',1)[0]
             break
 
