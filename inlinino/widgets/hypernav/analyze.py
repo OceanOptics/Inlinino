@@ -9,7 +9,7 @@ from inlinino.instruments.hypernav import HyperNav
 from inlinino.widgets import GenericWidget, classproperty
 from inlinino.widgets.hypernav.calibrate_dialog import HyperNavCalibrateDialogWidget
 try:
-    from hypernav.calibrate.reports import spec_board_report, write_report_to_pdf
+    from hypernav.calibrate.reports import spec_board_report, write_report_to_pdf, calibration_history_report
     from hypernav.calibrate import register_wavelengths
     from hypernav.io import HyperNav as HyperNavIO
     from hypernav.viz import GRAPH_CFG
@@ -65,6 +65,10 @@ class HyperNavAnalyzeWidget(GenericWidget):
             self.enable_button()
         elif self.rb_calibration.isChecked():
             dialog = HyperNavCalibrateDialogWidget(self, self.instrument, filename)
+            dialog.exec()
+            self.enable_button()
+        elif self.rb_compare_cals.isChecked():
+            dialog = HyperNavCalibrationHistoryDialogWidget(self, self.instrument)
             dialog.exec()
             self.enable_button()
 
@@ -185,6 +189,56 @@ class HyperNavWavelengthRegistrationDialogWidget(QtWidgets.QDialog, Worker):
             self.sb_wl_shift.value(),
             'show+pdf',
         )
+
+    def join(self):
+        super().join()
+        self.run_button.setEnabled(True)
+        self.run_button.setText('Run')
+
+
+class HyperNavCalibrationHistoryDialogWidget(QtWidgets.QDialog, Worker):
+    def __init__(self, parent, instrument: HyperNav):
+        self.instrument = instrument
+        ## Initialize QDialog(parent) and Worker(fun, signal)
+        super().__init__(parent=parent, fun=self.run, signal=instrument.signal.warning)
+        if parent.isActiveWindow():
+            self.setWindowModality(QtCore.Qt.WindowModal)
+        uic.loadUi(os.path.join(PATH_TO_RESOURCES, "widget_hypernav_cal_history_dialog.ui"), self)
+
+        self.run_button = self.button_box.addButton("Run", QtGui.QDialogButtonBox.ActionRole)
+        self.run_button.clicked.connect(self.start)
+        self.button_box.button(QtGui.QDialogButtonBox.Close).clicked.connect(self.accept)
+
+        self.browse_history_button.clicked.connect(self.browse_history_path)
+
+    @QtCore.pyqtSlot()
+    def browse_history_path(self):
+        path = QtGui.QFileDialog.getExistingDirectory(self, caption='Choose history directory')
+        self.le_history_path.setText(path)
+
+    def start(self):
+        for f in [f for f in self.__dict__.keys() if f.startswith('le_')]:
+            if not getattr(self, f).text():
+                self.instrument.signal.warning.emit('All fields must be field.')
+                return
+        # Disable button
+        self.run_button.setText('Processing ...')
+        self.run_button.setEnabled(False)
+        # Start worker
+        super().start(
+            f'folder {os.path.basename(self.le_history_path.text())}',
+            self.le_history_path.text(), int(self.le_head_sn.text())
+        )
+
+    @staticmethod
+    def run(path, head_sn):
+        report = calibration_history_report(path, head_sn)
+        report.show(config=GRAPH_CFG)
+        # target_filename = os.path.join(path, f"{ref}_SBSSN{sn:04}.pdf")
+        # write_report_to_pdf(target_filename, report)
+
+        # reports_generated.append(target_filename)
+        # return report_generated
 
     def join(self):
         super().join()

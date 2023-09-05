@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>225</width>
-    <height>369</height>
+    <width>239</width>
+    <height>375</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -139,6 +139,13 @@
            </property>
            <property name="checked">
             <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="rb_compare_cals">
+           <property name="text">
+            <string>Compare Calibrations</string>
            </property>
           </widget>
          </item>
