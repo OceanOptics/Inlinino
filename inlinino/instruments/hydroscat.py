@@ -101,13 +101,14 @@ class HydroScat(Instrument):
         betawavs = [int(betalab[2:]) for betalab in cfg['variable_names'][2:]]
         self.spectrum_plot_x_values = [np.array(betawavs)]
 
-        # Set standard configuration and check cfg input
-        super().setup(cfg)
-        self.logger.info("setup")
-
+        # If we're not in the idle state (i.e. RUNNING or STOPPED)
         if self.previous_state != "IDLE":
             self.close()
             self.change_state("IDLE")
+
+        # Set standard configuration and check cfg input
+        super().setup(cfg)
+        self.logger.info("setup")
 
 
     def change_state(self, state):
