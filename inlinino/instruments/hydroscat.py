@@ -24,6 +24,10 @@ class HydroScat(Instrument):
                            'variable_names', 'variable_units', 'variable_precision']
 
     def __init__(self, uuid, signal, *args, **kwargs):
+        # Instrument state machine
+        self.state = "IDLE"
+        self.previous_state = None
+
         super().__init__(uuid, signal, *args, **kwargs)
 
         self.all_data = []
@@ -52,8 +56,6 @@ class HydroScat(Instrument):
         #self.spectrum_plot_x_values = [np.array([420,442,488,550,550,676,676,852])]
         self.spectrum_plot_x_values = [np.array([420,442,488,550,676,852])]
 
-        # Device command state machine
-        self.state = "IDLE"
 
 
     def setup(self, cfg):
@@ -79,7 +81,10 @@ class HydroScat(Instrument):
         # Overload cfg with HydroScat specific parameters
         cfg['variable_names'] = ["Depth", "Voltage"] + self.hydroscat.channel_names()
         cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(3, len(cfg['variable_names'])+1)]
+        # cfg['variable_names'] = self.hydroscat.channel_names()
+        # cfg['variable_units'] = ['beta' for n in range(3, len(cfg['variable_names'])+1)]
         cfg['variable_precision'] = ['%.3f', '%.3f'] + ['%.9f' for n in range(3, len(cfg['variable_names'])+1)]
+        # cfg['variable_precision'] = ['%.9f' for n in range(3, len(cfg['variable_names'])+1)]
         cfg['terminator'] = b'\r\n'
 
         # Active Timeseries Variables
@@ -100,8 +105,19 @@ class HydroScat(Instrument):
         super().setup(cfg)
         self.logger.info("setup")
 
+        if self.previous_state != "IDLE":
+            self.close()
+            self.change_state("IDLE")
+
+
+    def change_state(self, state):
+        self.previous_state = self.state
+        self.state = state
+        self.logger.info("{} -> {}".format(self.previous_state, state))
+
 
     def init_interface(self):
+        # invoked after channel open request (via Open button)
         self.init()
 
 
@@ -112,7 +128,7 @@ class HydroScat(Instrument):
         self.logger.info("Fluorescence command")
         self.hydroscat.burst_command()
         self.logger.info("BURST command")
-        self.state = "READY"
+        self.change_state("READY")
 
     # State machine: start_state =>
     #                IDLE =open button=> READY =start button=> START =/start command=>
@@ -120,25 +136,26 @@ class HydroScat(Instrument):
     #                IDLE => ...
 
     def write_to_interface(self):
+        # TODO: may need to make this a monitor
         if self.state == "START":
             self.hydroscat.start_command()
             self.logger.info("START command")
-            self.state = "RUNNING"
+            self.change_state("RUNNING")
         elif self.state == "STOP":
             self.hydroscat.stop_command()
             self.logger.info("STOP command")
-            self.state = "READY"
+            self.change_state("READY")
 
 
     def log_start(self):
         if self.state == "READY":
-            self.state = "START"
+            self.change_state("START")
         super().log_start()
 
 
     def log_stop(self):
         if self.state == "RUNNING":
-            self.state = "STOP"
+            self.change_state("STOP")
         super().log_stop()
 
 
@@ -153,7 +170,7 @@ class HydroScat(Instrument):
     #     if self.alive:
     #         self.hydroscat.stop_command()
     #         self.logger.info("STOP command")
-    #         self.state = "IDLE"
+    #         self.change_state("IDLE")
     #     super().close(wait_thread_join)
 
 
