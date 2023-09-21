@@ -103,13 +103,15 @@ class HydroScat(Instrument):
 
         # If we're not in the idle state (i.e. RUNNING or STOPPED)
         if self.previous_state != "IDLE":
-            self.close()
-            self.change_state("IDLE")
+            try:
+                self.close()
+                self.change_state("IDLE")
+            except:
+                pass
 
         # Set standard configuration and check cfg input
         super().setup(cfg)
         self.logger.info("setup")
-
 
     def change_state(self, state):
         self.previous_state = self.state
