@@ -18,12 +18,11 @@ Quick Start
 
 .. |end-link-mac| raw:: html
 
-    -darwin.zip">macOS</a>
+    -darwin.zip">macOS (Intel)</a>
 
 Inlinino is available for Windows and macOS, the packaged executable can be downloaded with the links below.
 
     + |link-to-ftp|\ |release|\ |end-link-win|
-    + |link-to-ftp|\ |release|\ |end-link-win7|
     + |link-to-ftp|\ |release|\ |end-link-mac|
 
 Advance users or developers can setup the software directly from source (`GitHub Repository <https://github.com/OceanOptics/Inlinino/>`__).
