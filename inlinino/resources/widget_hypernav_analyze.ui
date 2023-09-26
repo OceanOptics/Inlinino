@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>239</width>
-    <height>375</height>
+    <width>238</width>
+    <height>351</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,45 +50,12 @@
          </sizepolicy>
         </property>
         <property name="text">
-         <string>First, record data to analyze (e.g. for spec. and board evaluation, in calibration room, or with HgAr fixture). Then, select the data file recorded and the analysis to perform.
+         <string>First, record data to analyze (e.g. for spec. and board evaluation, in calibration room, or with HgAr fixture). Then, select the analysis to perform, a modal will appear asking you for the data file to analyze and associated metadata.
 </string>
         </property>
         <property name="wordWrap">
          <bool>true</bool>
         </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QGroupBox" name="gp_file">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="title">
-         <string>Select file to analyze</string>
-        </property>
-        <property name="flat">
-         <bool>true</bool>
-        </property>
-        <layout class="QVBoxLayout" name="verticalLayout">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>6</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>6</number>
-         </property>
-         <item>
-          <widget class="QComboBox" name="filename_combobox"/>
-         </item>
-        </layout>
        </widget>
       </item>
       <item>
@@ -179,7 +146,7 @@
         <item>
          <widget class="QPushButton" name="run_button">
           <property name="text">
-           <string>Run</string>
+           <string>Open</string>
           </property>
          </widget>
         </item>

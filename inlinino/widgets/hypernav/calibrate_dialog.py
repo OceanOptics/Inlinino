@@ -5,7 +5,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 from inlinino import PATH_TO_RESOURCES
 from inlinino.shared.worker import Worker
 from inlinino.instruments.hypernav import HyperNav
-
+from inlinino.widgets import GenericDialog, classproperty
 
 try:
     from hypernav.io import HyperNav as HyperNavIO
@@ -14,20 +14,16 @@ except ModuleNotFoundError:
     HyperNavIO = None
 
 
-class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
-    def __init__(self, parent, instrument: HyperNav, log_file_name: str):
+class HyperNavCalibrateDialog(GenericDialog, Worker):
+    @classproperty
+    def __snake_name__(cls) -> str:
+        return 'hypernav_calibrate_dialog'
+
+    def __init__(self, parent, instrument: HyperNav):
         self.instrument = instrument
         super().__init__(parent=parent, fun=calibrate, signal=instrument.signal.warning)
-        if parent.isActiveWindow():
-            self.setWindowModality(QtCore.Qt.WindowModal)
-        uic.loadUi(os.path.join(PATH_TO_RESOURCES, "widget_hypernav_calibrate_dialog.ui"), self)
 
-        self.le_log_file.setText(log_file_name)
-
-        self.run_button = self.button_box.addButton("Run", QtGui.QDialogButtonBox.ActionRole)
-        self.run_button.clicked.connect(self.start)
-        self.button_box.button(QtGui.QDialogButtonBox.Close).clicked.connect(self.accept)
-
+        self.browse_datafile_button.clicked.connect(self.browse_datafile)
         self.browse_lamp_button.clicked.connect(self.browse_lamp_file)
         self.browse_plaque_button.clicked.connect(self.browse_plaque_file)
         self.browse_wavelength_button.clicked.connect(self.browse_wavelength_file)
@@ -37,6 +33,13 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
         self.set_head(self.cb_head_side.currentText())
 
         self.le_hypernav_sn.setText(self.instrument.serial_number)
+
+    @QtCore.pyqtSlot()
+    def browse_datafile(self):
+        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+                                                         caption='Choose HyperNav data file',
+                                                         filter='Device File (*.raw *.txt)')
+        self.le_log_file.setText(file_name)
 
     @QtCore.pyqtSlot()
     def browse_lamp_file(self):
@@ -76,15 +79,9 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
 
     @QtCore.pyqtSlot()
     def start(self):
-        for f in [f for f in self.__dict__.keys() if f.startswith('le_')]:
-            if f in ['le_history_cal_path']:
-                continue
-            if not getattr(self, f).text():
-                self.instrument.signal.warning.emit('All fields must be field.')
-                return
-        # Disable button
-        self.run_button.setText('Processing ...')
-        self.run_button.setEnabled(False)
+        if not self.check_fields_passed(ignore=['le_history_cal_path']):
+            return
+        self.disable_run_button()
 
         if self.cb_software.currentText() == 'legacy':
             # Execute legacy function
@@ -92,7 +89,7 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
                 # Calls external executable so no need for Thread
                 calibrate_legacy(
                     self.instrument.log_path,
-                    os.path.join(self.instrument.log_path, self.le_log_file.text()),
+                    self.le_log_file.text(),
                     self.le_lamp_path.text(),
                     self.le_plaque_path.text(),
                     self.le_wavelength_path.text(),
@@ -109,17 +106,15 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
                 self.instrument.signal.warning[str, str, str].emit(f"Error running 'legacy' calibration.",
                                                                    str(e), 'error')
             except Exception as e:
-                self.instrument.signal.warning[str, str, str].emit(f"Error while analyzing '{self.le_log_file.text()}'."
+                self.instrument.signal.warning[str, str, str].emit(f"Error while analyzing '{os.path.basename(self.le_log_file.text())}'."
                                                                    , str(e), 'error')
-            # Reset buttons
-            self.run_button.setEnabled(True)
-            self.run_button.setText('Run')
+            self.enable_run_button()
         elif self.cb_software.currentText() == 'python':
             # Execute Python Code
             super().start(
-                self.le_log_file.text(),
+                os.path.basename(self.le_log_file.text()),
                 self.instrument.log_path,
-                os.path.join(self.instrument.log_path, self.le_log_file.text()),
+                self.le_log_file.text(),
                 self.le_lamp_path.text(),
                 self.le_plaque_path.text(),
                 self.le_wavelength_path.text(),
@@ -135,11 +130,8 @@ class HyperNavCalibrateDialogWidget(QtWidgets.QDialog, Worker):
             )
         else:
             self.instrument.signal.warning.emit(f'Calibration software `{self.cb_software}` not available.')
-            # Reset buttons
-            self.run_button.setEnabled(True)
-            self.run_button.setText('Run')
+            self.enable_run_button()
 
     def join(self):
         super().join()
-        self.run_button.setEnabled(True)
-        self.run_button.setText('Run')
+        self.enable_run_button()

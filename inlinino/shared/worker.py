@@ -1,6 +1,10 @@
-import os
+import logging
+import warnings
 from threading import Thread
 from multiprocessing import Process, Queue
+
+
+logger = logging.getLogger(__name__)
 
 
 class Worker:
@@ -23,9 +27,17 @@ class Worker:
     @staticmethod
     def _run(*args, fun, queue):
         try:
-            res = fun(*args)
-            if res is not None:
-                queue.put(('success', f"File(s) generated:\n" + '\n'.join(res)))
+            with warnings.catch_warnings(record=True) as ws:
+                res = fun(*args)
+                if len(ws) > 0:
+                    for w in ws:
+                        logger.warning(w.message)
+                    msg = "Warning(s):\n" + "\n".join([f"  - {w.message}" for w in ws])
+                    if res is not None:
+                        msg += f"\n\nFile(s) generated:\n" + '\n'.join(res)
+                    queue.put(('warning', msg))
+                elif res is not None:
+                    queue.put(('success', f"File(s) generated:\n" + '\n'.join(res)))
         except Exception as e:
             if queue is not None:
                 queue.put(('error', str(e)))
