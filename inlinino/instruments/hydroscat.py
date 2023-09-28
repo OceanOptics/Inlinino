@@ -48,12 +48,7 @@ class HydroScat(Instrument):
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = dict(y_label_name='Backscattering',
                                               y_label_units='beta')
-        # self.spectrum_plot_trace_names = [["bb420", "bb550", "bb442", "bb676", "bb488",
-        #                                   "bb852", "fl550", "fl676"]]
         self.spectrum_plot_trace_names = ["backscattering"]
-        #self.spectrum_plot_x_values = [[0 for name in self.spectrum_plot_trace_names][2:]]
-        #self.spectrum_plot_x_values = [np.array([420,550,442,676,488,852,550,676])]
-        #self.spectrum_plot_x_values = [np.array([420,442,488,550,550,676,676,852])]
         self.spectrum_plot_x_values = [np.array([420,442,488,550,676,852])]
 
 
@@ -81,11 +76,8 @@ class HydroScat(Instrument):
         # Overload cfg with HydroScat specific parameters
         cfg['variable_names'] = ["Depth", "Voltage"] + self.hydroscat.channel_names()
         cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(2, len(cfg['variable_names']))]
-        # cfg['variable_names'] = self.hydroscat.channel_names()
-        # cfg['variable_units'] = ['beta' for n in range(3, len(cfg['variable_names'])+1)]
         cfg['variable_precision'] = ['%0.3f']*2 + \
             ['%.9f' for n in range(2, len(cfg['variable_names']))]
-        # cfg['variable_precision'] = ['%.9f' for n in range(3, len(cfg['variable_names'])+1)]
         cfg['terminator'] = b'\r\n'
 
         # Active Timeseries Variables
@@ -193,13 +185,17 @@ class HydroScat(Instrument):
                         try:
                             data = []
                             for var_name in self.widget_active_timeseries_variables_selected:
-                                data.append(data_dict[var_name])
+                                if var_name == "Voltage":
+                                    # needed in handle_data for new_ts_data.emit()
+                                    data.append(self.hydroscat.aux_data["Voltage"])
+                                else:
+                                    data.append(data_dict[var_name])
                         finally:
                             self.active_timeseries_variables_lock.release()
                     else:
                         self.logger.error('Unable to acquire lock to update active timeseries variables')
 
-                    # also, get return all values
+                    # also, capture all values as a dictionary
                     self.all_data = data_dict
 
         return data
@@ -233,10 +229,9 @@ class HydroScat(Instrument):
             # Log parsed data
             if self.log_prod_enabled and self._log_active:
                 beta_vals = [self.all_data[key] for key in self.all_data
-                         if key.startswith("bb") or key.startswith("fl")]
+                                if key.startswith("bb") or key.startswith("fl")]
                 fields = [self.hydroscat.aux_data["Depth"],
                           self.hydroscat.aux_data["Voltage"]] + beta_vals
-                #self._log_prod.write(self.hydroscat.sep.join([str(field) for field in fields]), timestamp)
                 self._log_prod.write(fields, timestamp)
 
                 if not self.log_raw_enabled:
