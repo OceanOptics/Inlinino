@@ -94,13 +94,13 @@ class HydroScat(Instrument):
         betawavs = [int(betalab[2:]) for betalab in cfg['variable_names'][2:]]
         self.spectrum_plot_x_values = [np.array(betawavs)]
 
-        # If we're not in the idle state (i.e. RUNNING or STOPPED)
+        # If we were not previously in the idle state (i.e. we were
+        # RUNNING or STOPPED), transition to that state now
         if self.previous_state != "IDLE":
             try:
                 self.close()
-                self.change_state("IDLE")
             except:
-                pass
+                self.logger.warn("not previously idle")
 
         # Set standard configuration and check cfg input
         super().setup(cfg)
@@ -162,12 +162,20 @@ class HydroScat(Instrument):
                 sleep(0.1)
 
 
-    # def close(self, wait_thread_join=True):
-    #     if self.alive:
-    #         self.hydroscat.stop_command()
-    #         self.logger.info("STOP command")
-    #         self.change_state("IDLE")
-    #     super().close(wait_thread_join)
+    def close(self, wait_thread_join=True):
+        try:
+            super().close(wait_thread_join)
+        except:
+            self.logger.warn("close")
+        finally:
+            self.change_state("IDLE")
+
+
+    def read(self, size=None):
+        try:
+            super().read(size)
+        except:
+            self.logger.warn("read")
 
 
     def parse(self, packet):
