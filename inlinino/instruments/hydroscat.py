@@ -50,7 +50,7 @@ class HydroScat(Instrument):
                                               y_label_units='beta')
         # self.spectrum_plot_trace_names = [["bb420", "bb550", "bb442", "bb676", "bb488",
         #                                   "bb852", "fl550", "fl676"]]
-        self.spectrum_plot_trace_names = ["beta"]
+        self.spectrum_plot_trace_names = ["backscattering"]
         #self.spectrum_plot_x_values = [[0 for name in self.spectrum_plot_trace_names][2:]]
         #self.spectrum_plot_x_values = [np.array([420,550,442,676,488,852,550,676])]
         #self.spectrum_plot_x_values = [np.array([420,442,488,550,550,676,676,852])]
@@ -80,10 +80,11 @@ class HydroScat(Instrument):
 
         # Overload cfg with HydroScat specific parameters
         cfg['variable_names'] = ["Depth", "Voltage"] + self.hydroscat.channel_names()
-        cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(3, len(cfg['variable_names'])+1)]
+        cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(2, len(cfg['variable_names']))]
         # cfg['variable_names'] = self.hydroscat.channel_names()
         # cfg['variable_units'] = ['beta' for n in range(3, len(cfg['variable_names'])+1)]
-        cfg['variable_precision'] = ['%.3f', '%.3f'] + ['%.9f' for n in range(3, len(cfg['variable_names'])+1)]
+        cfg['variable_precision'] = ['%0.3f']*2 + \
+            ['%.9f' for n in range(2, len(cfg['variable_names']))]
         # cfg['variable_precision'] = ['%.9f' for n in range(3, len(cfg['variable_names'])+1)]
         cfg['terminator'] = b'\r\n'
 
@@ -192,17 +193,14 @@ class HydroScat(Instrument):
                         try:
                             data = []
                             for var_name in self.widget_active_timeseries_variables_selected:
-                                if var_name == "Voltage":
-                                    data.append(self.hydroscat.aux_data[var_name])
-                                else:
-                                    data.append(data_dict[var_name])
+                                data.append(data_dict[var_name])
                         finally:
                             self.active_timeseries_variables_lock.release()
                     else:
                         self.logger.error('Unable to acquire lock to update active timeseries variables')
 
-                    # also, get all values
-                    self.all_data = [data_dict[key] for key in data_dict]
+                    # also, get return all values
+                    self.all_data = data_dict
 
         return data
 
@@ -217,9 +215,10 @@ class HydroScat(Instrument):
                     self.active_timeseries_variables_lock.release()
             else:
                 self.logger.error('Unable to acquire lock to update timeseries plot')
-
+            
             # Update spectrum plot
-            self.signal.new_spectrum_data.emit([np.array(self.all_data[2:8])])
+            bb_vals = [self.all_data[key] for key in self.all_data if key.startswith("bb")]
+            self.signal.new_spectrum_data.emit([np.array(bb_vals)])
 
             # Format and signal aux data
             if self.hydroscat.aux_data["Time"] is not None:
@@ -233,13 +232,16 @@ class HydroScat(Instrument):
 
             # Log parsed data
             if self.log_prod_enabled and self._log_active:
+                beta_vals = [self.all_data[key] for key in self.all_data
+                         if key.startswith("bb") or key.startswith("fl")]
                 fields = [self.hydroscat.aux_data["Depth"],
-                          self.hydroscat.aux_data["Voltage"]] + self.all_data
+                          self.hydroscat.aux_data["Voltage"]] + beta_vals
                 #self._log_prod.write(self.hydroscat.sep.join([str(field) for field in fields]), timestamp)
                 self._log_prod.write(fields, timestamp)
 
                 if not self.log_raw_enabled:
                     self.signal.packet_logged.emit()
+
 
     # TODO: wrong spelling of update
     def udpate_active_timeseries_variables(self, name, active):
