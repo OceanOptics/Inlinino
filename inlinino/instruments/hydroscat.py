@@ -54,14 +54,12 @@ class HydroScat(Instrument):
 
 
     def setup(self, cfg):
-        source = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
+        in_out = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
                                                     self._interface._serial))
-        # TODO: fix out, serial_mode ?
-        # TODO: num_channels (setup UI widget or needed? => can't we just get this from .cal file?)
-        # TODO: instead of verbose, could pass a logger object
+
         self.hydroscat = aquasense.hydroscat.HydroScat(
-                            cal_path=cfg["calibration_file"], source=source,
-                            out=None, sep=",", num_channels=8, serial_mode=False,
+                            cal_path=cfg["calibration_file"], in_out=in_out,
+                            out=None, sep=",", serial_mode=False,
                             burst_mode=cfg["burst_mode"],
                             sleep_on_memory_full=cfg["sleep_on_memory_full"],
                             fluorescence_control=cfg["fluorescence"],
@@ -71,6 +69,7 @@ class HydroScat(Instrument):
                             burst_cycle=cfg["burst_cycle"],
                             total_duration=cfg["total_duration"],
                             log_period=cfg["log_period"],
+                            logger=self.logger,
                             verbose=True)
 
         # Overload cfg with HydroScat specific parameters
@@ -226,7 +225,6 @@ class HydroScat(Instrument):
 
             # Format and signal aux data
             if self.hydroscat.aux_data["Time"] is not None:
-                # TODO: fix old formats!
                 date_time = datetime.strftime(datetime.fromtimestamp(int(self.hydroscat.aux_data["Time"])), format="%m/%d/%Y %H:%M:%S")
                 self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
                                                '%.4f' % self.hydroscat.aux_data["Depth"],
@@ -246,7 +244,6 @@ class HydroScat(Instrument):
                     self.signal.packet_logged.emit()
 
 
-    # TODO: wrong spelling of update
     def udpate_active_timeseries_variables(self, name, active):
         # ensure only one thread updates active timeseries variables
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
