@@ -25,9 +25,10 @@ To install Inlinino (tested with python 3.8 only, should work with newer python 
 
     pip install -r requirements.txt
 
-On Ubuntu, PyQt5 should also be installed with apt:
+On Ubuntu, PyQt5 and PyQt5.QtMultimedia should also be installed with apt:
 
     sudo apt install python3-pyqt5
+    sudo apt install python3-pyqt5.qtmultimedia
 
 To use Ontrak ADU on Windows additional dll and python modules are needed. Note that in resources/ontrack the path to the dll need to be edited with `os.path.join(PATH_TO_RESOURCES, 'ontrak', 'AduHid')`.
     
@@ -61,4 +62,8 @@ The code is organized in:
 When Inlinino is started an engineering log file is created in `logs/inlinino_<YYYYMMDD>_<hhmmss>.log` and keep track of most tasks executed (e.g. user interaction, creation of data log files, warnings, and potential errors).
 
 ### Questions and issues
+On Ubuntu, one my night need to update the rights to the serial port to let Inlinino read and write from/to them. For example to give right to the serial port `/dev/ttyACM0`:
+
+    sudo chmod 666 /dev/ttyACM0
+
 For any questions or issues regarding Inlinino please contact [me](mailto:nils.haentjens+inlinino@maine.edu).
