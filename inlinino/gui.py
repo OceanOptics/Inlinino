@@ -224,6 +224,9 @@ class MainWindow(QtGui.QMainWindow):
         if hasattr(self.instrument, 'spectrum_plot_x_label'):
             x_label_name, x_label_units = self.instrument.spectrum_plot_x_label
             self.spectrum_plot_widget.plotItem.setLabel('bottom', x_label_name, units=x_label_units)
+        if hasattr(self.instrument, 'spectrum_plot_y_label'):
+            y_label_name, y_label_units = self.instrument.spectrum_plot_y_label
+            self.spectrum_plot_widget.plotItem.setLabel('left', y_label_name, units=y_label_units)
         self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
 
     def set_clock(self):

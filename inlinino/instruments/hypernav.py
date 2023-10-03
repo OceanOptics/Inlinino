@@ -48,6 +48,7 @@ class HyperNav(Satlantic):
         self.widget_hypernav_cal_enabled = True
         self.widget_metadata_enabled = False  # Already included in hypernav_cal widget
         self.spectrum_plot_x_label = ('', '')  # Name, Units
+        self.spectrum_plot_y_label = ('signal', '')  # Name, Units
         # Special variables
         self._frame_finder = None
         self._unknown_frame_last_warn = 0
@@ -161,7 +162,7 @@ class HyperNav(Satlantic):
             self.px_reg_path = {'PRT': cfg['px_reg_path_prt'], 'SBD': cfg['px_reg_path_sbd']}
         # Get HyperNav  specific parser with appropriate pixel registration
         self._parser = pySat.Instrument()
-        pixel_reg_type = []
+        pixel_reg_type, cal_signal = [], []
         for head, path, sn in zip(['prt', 'sbd'],
                                   ['px_reg_path_prt', 'px_reg_path_sbd'],
                                   [self.prt_sbs_sn, self.sbd_sbs_sn]):
@@ -170,14 +171,17 @@ class HyperNav(Satlantic):
             if not cfg[path]:
                 td = hypernav_telemetry_definition()
                 pixel_reg_type.append('channel')
+                cal_signal.append(False)
             elif os.path.splitext(cfg[path])[1] == '.cgs':
                 px_reg = [f'{wl:.2f}' for wl in read_manufacturer_pixel_registration(cfg[path])]
                 td = hypernav_telemetry_definition(px_reg)
                 pixel_reg_type.append('wavelength')
+                cal_signal.append(False)
             elif os.path.splitext(cfg[path])[1] in self._parser.VALID_CAL_EXTENSIONS:
                 td = pySat.Parser(cfg[path])
                 td.frame_nfields = len(td.type) - (1 if td.type[-1] == 'TERMINATOR' else 0)
                 pixel_reg_type.append('wavelength')
+                cal_signal.append(True)
             else:
                 raise pySat.CalibrationFileExtensionError(f'File extension incorrect: {cfg[path]}')
             td.frame_header = f'SATYLZ{sn:04d}'
@@ -195,6 +199,13 @@ class HyperNav(Satlantic):
             self.spectrum_plot_x_label = ('Wavelength', 'nm')
         else:
             self.spectrum_plot_x_label = ('Channel', '#')
+        # Spectral Plot Y Label
+        if True in cal_signal and False in cal_signal:
+            self.spectrum_plot_y_label = ('Lu', 'counts | uW/cm2/nm/sr')
+        elif True in cal_signal:
+            self.spectrum_plot_y_label = ('Lu', 'uW/cm2/nm/sr')
+        else:
+            self.spectrum_plot_y_label = ('Lu', 'counts')
         # Map keys
         for k, p in self._parser.cal.items():
             self._parser_key_map[k] = self.map_key_to_idx(p.key)
@@ -443,8 +454,7 @@ class HyperNav(Satlantic):
                         for v, t in zip(data, parser.data_type)]
         except ValueError:
             raise pySat.ParserError(f"Unexpected data type in {packet.frame_header}.")
-        frame_header = packet.frame[:10].decode(self._parser.ENCODING)
-        return SatPacket(data, frame_header)
+        return SatPacket(data, packet.frame_header)
 
     def handle_data(self, data: SatPacket, timestamp: float):
         # Needed to overwrite handle_data has data format changed from calibrated dict to raw list.
@@ -456,13 +466,20 @@ class HyperNav(Satlantic):
         values = [data.frame[i] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
         metadata[idx] = (self.widget_metadata_frame_counters[idx], values)
         self.signal.new_meta_data.emit(metadata)
+        # Get Integration Time
+        if cal.cal_coefs:
+            i = cal.type.index('INTTIME')
+            aint = self._parser._fit_data(data.frame[i], cal.fit_type[i], cal.cal_coefs[i])
         # Update Timeseries
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
                 ts_data = [float('nan')] * len(self.active_timeseries_variables)
                 for i, (frame_header, key, idx) in enumerate(self.active_timeseries_variables):
                     if frame_header == data.frame_header:
-                        ts_data[i] = data.frame[idx]
+                        if cal.cal_coefs:
+                            ts_data[i] = self._parser._fit_data(data.frame[idx], cal.fit_type[idx], cal.cal_coefs[idx], aint)
+                        else:
+                            ts_data[i] = data.frame[idx]
                 self.signal.new_ts_data.emit(ts_data, timestamp)
             finally:
                 self.active_timeseries_variables_lock.release()
@@ -472,7 +489,11 @@ class HyperNav(Satlantic):
         spectrum_data = [None] * len(self.frame_headers_idx)
         idx_start, idx_end = self._parser_core_idx_limits[data.frame_header]
         spectra = np.array(data.frame[idx_start:idx_end])
-        spectrum_data[self.frame_headers_idx[data.frame_header]] = spectra
+        if cal.core_cal_coefs is not None and len(cal.core_cal_coefs[0]) == len(spectra):  # OPTIC3 calibration (not immersed)
+            spectrum_data[self.frame_headers_idx[data.frame_header]] = (
+                    cal.core_cal_coefs[1, :] * (spectra - cal.core_cal_coefs[0, :]) * aint / cal.core_cal_coefs[3, :])
+        else:
+            spectrum_data[self.frame_headers_idx[data.frame_header]] = spectra
         self.signal.new_spectrum_data.emit(spectrum_data)
         # Update Calibration Widget
         self.signal.new_frame.emit(data)
