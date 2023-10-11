@@ -67,42 +67,42 @@
     <item row="3" column="0">
      <widget class="QLabel" name="label_6">
       <property name="text">
-       <string>Burst Duration</string>
+       <string>Burst Duration (seconds)</string>
       </property>
      </widget>
     </item>
     <item row="5" column="0">
      <widget class="QLabel" name="label_8">
       <property name="text">
-       <string>Total Duration</string>
+       <string>Total Duration (hours)</string>
       </property>
      </widget>
     </item>
     <item row="2" column="0">
      <widget class="QLabel" name="label_5">
       <property name="text">
-       <string>Warm up Time</string>
+       <string>Warm up Time (seconds)</string>
       </property>
      </widget>
     </item>
     <item row="4" column="0">
      <widget class="QLabel" name="label_7">
       <property name="text">
-       <string>Burst Cycle</string>
+       <string>Burst Cycle (minutes)</string>
       </property>
      </widget>
     </item>
     <item row="6" column="0">
      <widget class="QLabel" name="label_9">
       <property name="text">
-       <string>Log Period</string>
+       <string>Log Period (seconds)</string>
       </property>
      </widget>
     </item>
     <item row="1" column="0">
      <widget class="QLabel" name="label_4">
       <property name="text">
-       <string>Start Delay</string>
+       <string>Start Delay (seconds)</string>
       </property>
      </widget>
     </item>
