@@ -52,15 +52,13 @@ class HydroScat(Instrument):
         self.spectrum_plot_x_values = [np.array([420,442,488,550,676,852])]
 
 
-
     def setup(self, cfg):
-        exit_early = False
-
         # sanity check numeric values
+
+        errmsg = None
 
         if int(cfg["fluorescence"]) not in [0, 1, 2]:
             errmsg = "fluorescence must be 0, 1, or 2"
-            exit_early = True
 
         for varname in ["start_delay", "warmup_time",
                         "burst_duration", "burst_cycle",
@@ -68,67 +66,66 @@ class HydroScat(Instrument):
             try:
                 if float(cfg[varname]) < 0:
                     errmsg = "{} must be 0 or more".format(varname)
-                    exit_early = True
             except:
                 errmsg = "{} must be 0 or more".format(varname)
-                exit_early = True
 
-        if exit_early:
+        if errmsg is not None:
             self.logger.error(errmsg)
-        else:
-            in_out = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
-                                                        self._interface._serial))
-
-            self.hydroscat = aquasense.hydroscat.HydroScat(
-                                cal_path=cfg["calibration_file"], in_out=in_out,
-                                out=None, sep=",", serial_mode=False,
-                                burst_mode=cfg["burst_mode"],
-                                sleep_on_memory_full=cfg["sleep_on_memory_full"],
-                                fluorescence_control=int(cfg["fluorescence"]),
-                                start_delay=float(cfg["start_delay"]),
-                                warmup_time=float(cfg["warmup_time"]),
-                                burst_duration=float(cfg["burst_duration"]),
-                                burst_cycle=float(cfg["burst_cycle"]),
-                                total_duration=float(cfg["total_duration"]),
-                                log_period=float(cfg["log_period"]),
-                                logger=self.logger,
-                                verbose=True)
-
-            # Overload cfg with HydroScat specific parameters
-            cfg['variable_names'] = ["Depth", "Voltage"] + self.hydroscat.channel_names()
-            cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(2, len(cfg['variable_names']))]
-            cfg['variable_precision'] = ['%0.3f']*2 + \
-                ['%.9f' for n in range(2, len(cfg['variable_names']))]
-            cfg['terminator'] = b'\r\n'
-
-            super().setup(cfg)
-
-            # Active Timeseries Variables
-            self.active_variables = {var_name:True for var_name in cfg['variable_names']}
-            self.active_variables["Depth"] = False
-            self.active_variables["Voltage"] = False
-            self.widget_active_timeseries_variables_names = cfg['variable_names']
-            self.widget_active_timeseries_variables_selected = \
-                        [name for name in self.active_variables if self.active_variables[name]]
             
-            # Update wavelengths for Spectrum Plot
-            # (plot is updated after the initial instrument setup or button click)
-            self.spectrum_plot_trace_names = cfg['variable_names'][2:]
-            betawavs = [int(betalab[2:]) for betalab in cfg['variable_names'][2:]]
-            self.spectrum_plot_x_values = [np.array(betawavs)]
+        in_out = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
+                                                    self._interface._serial))
 
-            # If we were not previously in the idle state (i.e. we were
-            # RUNNING or STOPPED), transition to that state now
-            if self.previous_state != "IDLE":
-                try:
-                    self.close()
-                except:
-                    self.logger.warn("not previously idle")
+        self.hydroscat = aquasense.hydroscat.HydroScat(
+                            cal_path=cfg["calibration_file"], in_out=in_out,
+                            out=None, sep=",", serial_mode=False,
+                            burst_mode=cfg["burst_mode"],
+                            sleep_on_memory_full=cfg["sleep_on_memory_full"],
+                            fluorescence_control=int(cfg["fluorescence"]),
+                            start_delay=float(cfg["start_delay"]),
+                            warmup_time=float(cfg["warmup_time"]),
+                            burst_duration=float(cfg["burst_duration"]),
+                            burst_cycle=float(cfg["burst_cycle"]),
+                            total_duration=float(cfg["total_duration"]),
+                            log_period=float(cfg["log_period"]),
+                            logger=self.logger,
+                            verbose=True)
 
-            # Set standard configuration and check cfg input
-            # TODO: move to start of this function?
-            # super().setup(cfg)
-            self.logger.info("setup")
+        # Overload cfg with HydroScat specific parameters
+        cfg['variable_names'] = ["Depth", "Voltage"] + self.hydroscat.channel_names()
+        cfg['variable_units'] = ["m", "V"] + ['beta' for n in range(2, len(cfg['variable_names']))]
+        cfg['variable_precision'] = ['%0.3f']*2 + \
+            ['%.9f' for n in range(2, len(cfg['variable_names']))]
+        cfg['terminator'] = b'\r\n'
+
+        # Active Timeseries Variables
+        self.active_variables = {var_name:True for var_name in cfg['variable_names']}
+        self.active_variables["Depth"] = False
+        self.active_variables["Voltage"] = False
+        self.widget_active_timeseries_variables_names = cfg['variable_names']
+        self.widget_active_timeseries_variables_selected = \
+                    [name for name in self.active_variables if self.active_variables[name]]
+        
+        # Update wavelengths for Spectrum Plot
+        # (plot is updated after the initial instrument setup or button click)
+        self.spectrum_plot_trace_names = cfg['variable_names'][2:]
+        betawavs = [int(betalab[2:]) for betalab in cfg['variable_names'][2:]]
+        self.spectrum_plot_x_values = [np.array(betawavs)]
+
+        super().setup(cfg)
+
+        # If we were not previously in the idle state (i.e. we were
+        # RUNNING or STOPPED), transition to that state now
+        if self.previous_state != "IDLE":
+            try:
+                self.close()
+            except:
+                self.logger.warn("not previously idle")
+
+        # Set standard configuration and check cfg input
+        # TODO: move to start of this function?
+        # super().setup(cfg)
+        self.logger.info("setup")
+
 
     def change_state(self, state):
         self.previous_state = self.state
