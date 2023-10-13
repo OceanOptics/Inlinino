@@ -50,6 +50,7 @@ class HydroScat(Instrument):
                                               y_label_units='beta')
         self.spectrum_plot_trace_names = ["backscattering"]
         self.spectrum_plot_x_values = [np.array([420,442,488,550,676,852])]
+        # TODO: call setup here as well?
 
 
     def setup(self, cfg):
@@ -104,9 +105,10 @@ class HydroScat(Instrument):
         self.widget_active_timeseries_variables_names = cfg['variable_names']
         self.widget_active_timeseries_variables_selected = \
                     [name for name in self.active_variables if self.active_variables[name]]
-        
+                
         # Update wavelengths for Spectrum Plot
         # (plot is updated after the initial instrument setup or button click)
+        # TODO: always emit all data for all betas!!
         self.spectrum_plot_trace_names = cfg['variable_names'][2:]
         betawavs = [int(betalab[2:]) for betalab in cfg['variable_names'][2:]]
         self.spectrum_plot_x_values = [np.array(betawavs)]
@@ -242,8 +244,10 @@ class HydroScat(Instrument):
                 self.logger.error('Unable to acquire lock to update timeseries plot')
             
             # Update spectrum plot
-            bb_vals = [self.all_data[key] for key in self.all_data if key.startswith("bb")]
-            self.signal.new_spectrum_data.emit([np.array(bb_vals)])
+            #bb_vals = [self.all_data[key] for key in self.all_data if key.startswith("bb")]
+            beta_vals = [self.all_data[name] for name in self.all_data #self.spectrum_plot_trace_names]
+                         if name.startswith("bb")]
+            self.signal.new_spectrum_data.emit([np.array(beta_vals)])
 
             # Format and signal aux data
             if self.hydroscat.aux_data["Time"] is not None:
