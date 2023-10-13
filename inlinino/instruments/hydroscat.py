@@ -46,9 +46,8 @@ class HydroScat(Instrument):
 
         # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
-        self.spectrum_plot_axis_labels = dict(y_label_name='Backscattering',
-                                              y_label_units='beta')
-        self.spectrum_plot_trace_names = ["backscattering"]
+        self.spectrum_plot_axis_labels = dict(y_label_name='Signal')
+        self.spectrum_plot_trace_names = ["beta"]
         self.spectrum_plot_x_values = [np.array([420,442,488,550,676,852])]
         # TODO: call setup here as well?
 
@@ -56,22 +55,23 @@ class HydroScat(Instrument):
     def setup(self, cfg):
         # sanity check numeric values
 
-        errmsg = None
+        errmsgs = []
 
         if int(cfg["fluorescence"]) not in [0, 1, 2]:
-            errmsg = "fluorescence must be 0, 1, or 2"
+            errmsgs.append("fluorescence must be 0, 1, or 2")
 
         for varname in ["start_delay", "warmup_time",
                         "burst_duration", "burst_cycle",
                         "total_duration", "log_period"]:
             try:
                 if float(cfg[varname]) < 0:
-                    errmsg = "{} must be 0 or more".format(varname)
+                    errmsgs.append("{} must be 0 or more".format(varname))
             except:
-                errmsg = "{} must be 0 or more".format(varname)
+                errmsgs.append("{} must be 0 or more".format(varname))
 
-        if errmsg is not None:
-            self.logger.error(errmsg)
+        if errmsgs is not None:
+            for errmsg in errmsgs:
+                self.logger.error(errmsg)
             
         in_out = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
                                                     self._interface._serial))
