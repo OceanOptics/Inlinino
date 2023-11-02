@@ -187,7 +187,7 @@ class HyperNavCalWidget(GenericWidget):
         self.instrument.send_cmd('stop')
 
     def cal(self):
-        self.instrument.send_cmd(f'cal {self.ctrl_int_time.currentText()},{self.ctrl_light_dark_ratio.value()}')
+        self.instrument.send_cmd(f'cal {self.ctrl_int_time.currentText()} {self.ctrl_light_dark_ratio.value()}')
 
 
     """
