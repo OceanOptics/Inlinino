@@ -29,13 +29,8 @@ jobs:
           echo "Release: ${{ steps.system-info.outputs.release }}"
           echo "Total memory bytes: ${{ steps.system-info.outputs.totalmem }}"
 
-      - name: Extract Branch Name
-        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
-        id: extract_branch
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.extract_branch.outputs.branch }}
 
       - name: Setup python
         uses: actions/setup-python@v4
