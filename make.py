@@ -58,7 +58,7 @@ if hypernav is not None:
          os.path.join('hypernav', 'calibrate', 'templates'))
     ])
 for item, dest in ls:
-    add_data.append(f'--add-data={item}{data_sep}{dest}')
+    add_data.append(f'--add-data={os.path.relpath(item, root)}{data_sep}{dest}')
 
 # Include hidden imports
 hidden_imports = []

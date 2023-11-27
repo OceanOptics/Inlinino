@@ -46,7 +46,7 @@ jobs:
       - name: Download external resources
         run: |
           cd inlinino/resources
-          wget -r -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
+          wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
           cd ../../
 
       - name: Make Bundle
