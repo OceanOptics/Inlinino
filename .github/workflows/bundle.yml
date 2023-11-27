@@ -47,12 +47,13 @@ jobs:
 
       - name: Get Bundle Name (Ubuntu & Windows)
         if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')
-        run:
-          echo "BUNDLE_NAME=$(ls bundle/dist | xargs)" >> $GITHUB_ENV
+        run: |
+          ls
+          echo "BUNDLE_NAME=$(ls bundle/dist | head -1 | xargs)" >> $GITHUB_ENV
 
       - name: Get Bundle Name (macOS)
         if: matrix.os == 'macos-latest'
-        run:
+        run: |
           echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
 
       - name: Zip Bundle
