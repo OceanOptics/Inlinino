@@ -58,7 +58,7 @@ if hypernav is not None:
          os.path.join('hypernav', 'calibrate', 'templates'))
     ])
 for item, dest in ls:
-    add_data.append(f'--add-data={os.path.abspath(item, root)}{data_sep}{dest}')
+    add_data.append(f'--add-data={os.path.abspath(item)}{data_sep}{dest}')
     # Require absolute path for GitHub workflow as data can be on different drive and relpath won't work.
 
 # Include hidden imports

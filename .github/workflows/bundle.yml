@@ -44,7 +44,7 @@ jobs:
       - name: Make Bundle
         run: |
           python make.py
-          echo "BUNDLE_NAME=$(ls bundle/dist | head -1 | xargs)" >> $GITHUB_ENV
+          echo "BUNDLE_NAME=$(if [ -e bundle/dist/*.app ]; then echo $(basename bundle/dist/*.app); else echo $(ls bundle/dist); fi | xargs)" >> $GITHUB_ENV
 
       - name: Zip Bundle
         uses: thedoctor0/zip-release@0.7.1
