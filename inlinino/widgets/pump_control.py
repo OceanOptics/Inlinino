@@ -11,13 +11,13 @@ class PumpControlWidget(GenericWidget):
     def setup(self):
         self.instrument.relay_status = RELAY_HOURLY
         self.set_timing()
+        if self.instrument.widget_pump_control_enabled:
+            self.show()
+        else:
+            self.hide()
 
     def reset(self):
-        if self.instrument.widget_pump_control_enabled:
-            self.setup()
-            self.group_box_pump_control.show()
-        else:
-            self.group_box_pump_control.hide()
+        self.setup()
 
     def toggle_pump(self):
         if self.pb_toggle_pump.isChecked():

@@ -139,6 +139,8 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.new_ts_data.connect(self.on_new_ts_data)
         if self.instrument.signal.alarm is not None:
             self.instrument.signal.alarm.connect(self.on_data_timeout)
+        if self.instrument.signal.alarm_custom is not None:
+            self.instrument.signal.alarm_custom.connect(self.on_custom_alarm)
         # Set Widgets
         available_widgets = ((AuxDataWidget, False),
                              (FlowControlWidget, True),
@@ -469,9 +471,20 @@ class MainWindow(QtGui.QMainWindow):
     @QtCore.pyqtSlot(bool)
     def on_data_timeout(self, active):
         if active and not self.alarm_message_box.active:
-            self.alarm_message_box.show(self.instrument.name, self.instrument.interface_name)
+            txt = ""
+            if self.instrument.name is not None:
+                txt += f"Instument: {self.instrument.name}\n"
+            if self.instrument.interface_name is not None:
+                txt += f"Port: {self.instrument.interface_name}\n\n"
+            txt += self.alarm_message_box.TEXT
+            self.alarm_message_box.show(txt)
         elif not active and self.alarm_message_box.active:
             self.alarm_message_box.hide()
+
+    @QtCore.pyqtSlot(str)
+    def on_custom_alarm(self, text):
+        if not self.alarm_message_box.active:
+            self.alarm_message_box.show(text, sound=False)
 
     def closeEvent(self, event):
         icon, txt = QtGui.QMessageBox.Question, "Are you sure you want to exit?"
@@ -513,17 +526,16 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
         self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
         self.alarm_sound.setPlaylist(self.alarm_playlist)
 
-    def show(self, instrument_name=None, interface_name=None):
+    def show(self, txt: str = None, sound: bool = True):
         if not self.active:
-            txt = ""
-            if instrument_name is not None:
-                txt += f"Instument: {instrument_name}\n"
-            if interface_name is not None:
-                txt += f"Port: {interface_name}\n\n"
-            self.setText(txt + self.TEXT)
+            if txt is None:
+                self.setText(self.TEXT)
+            else:
+                self.setText(txt)
             super().show()
-            self.alarm_playlist.setCurrentIndex(0)
-            self.alarm_sound.play()
+            if sound:
+                self.alarm_playlist.setCurrentIndex(0)
+                self.alarm_sound.play()
             self.active = True
 
     def hide(self):
@@ -857,6 +869,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg['event_counter_channels_enabled'].append(c)
                     k = getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).value()
                     self.cfg['event_counter_k_factors'].append(k)
+            self.cfg['low_flow_alarm_enabled'] = self.checkbox_low_flow_alarm_enabled.isChecked()
             self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains'] = [], []
             for c in range(3):
                 if getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).isChecked():
@@ -1044,6 +1057,8 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
             for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
                 getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
                 getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)
+            if 'low_flow_alarm_enabled' in self.cfg.keys():
+                self.checkbox_low_flow_alarm_enabled.setChecked(self.cfg['low_flow_alarm_enabled'])
             for c, g in zip(self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains']):
                 getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).setChecked(True)
                 getattr(self, 'spinbox_analog_channel%d_gain' % (c)).setValue(g)

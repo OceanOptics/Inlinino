@@ -11,6 +11,7 @@ class InstrumentSignals(QtCore.QObject):
     new_aux_data = QtCore.pyqtSignal(list)
     new_meta_data = QtCore.pyqtSignal(list)
     alarm = QtCore.pyqtSignal(bool)
+    alarm_custom = QtCore.pyqtSignal(str)
 
 
 class HyperNavSignals(InstrumentSignals):

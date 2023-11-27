@@ -94,6 +94,12 @@ class Ontrak(Instrument):
         self.event_counter_channels = [0]
         self.event_counter_k_factors = [1381]
         self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
+        # Low Flow Alarm
+        self.low_flow_alarm_enabled = True
+        self._low_flow_alarm_started = False
+        self._low_flow_alarm_on = False
+        self._low_flow_alarm_on_counter = 0
+        self._low_flow_alarm_off_counter = 0
         # Analog Channel(s)
         self.analog_channels = [2]
         self.analog_gains = [2]  # 5V Gain on channel 2 for ADU100
@@ -145,6 +151,8 @@ class Ontrak(Instrument):
             raise ValueError('Missing field event counter k factors')
         self.event_counter_k_factors = cfg['event_counter_k_factors']
         self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
+        if 'low_flow_alarm_enabled' in cfg.keys():
+            self.low_flow_alarm_enabled = cfg['low_flow_alarm_enabled']
 
         if self.model == 'ADU100':
             if 'analog_channels_enabled' not in cfg.keys():
@@ -270,6 +278,8 @@ class Ontrak(Instrument):
         else:
             self._relay_hourly_skip_before = 0
         self._relay_interval_start = time()
+        # Reset low flow alarm
+        self._low_flow_alarm_started = False
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
@@ -301,6 +311,37 @@ class Ontrak(Instrument):
             aux[i] = f'{data[i]:.4f}'
             i += 1
         self.signal.new_aux_data.emit(aux)
+        # Set low flow alarm
+        #   flow must be detected to enable alarm (prevent alarm to rig when connect ADU)
+        #   alarm is triggered after three consecutive flow below the threshold
+        #   alarm is disabled after 30 consecutive flow above threshold
+        if self.low_flow_alarm_enabled:
+            i = 1 if self.relay_enabled else 0
+            low_flow_detected = False
+            for _ in self.event_counter_channels:
+                if self._low_flow_alarm_started:
+                    if data[i] < 2.0:
+                        low_flow_detected = True
+                        break
+                elif data[i] > 0.1:
+                    self._low_flow_alarm_started = True
+                    break
+                i += 1
+            if not self._low_flow_alarm_started:
+                return
+            if low_flow_detected:
+                self._low_flow_alarm_on_counter += 1
+                self._low_flow_alarm_off_counter = 0
+            else:
+                self._low_flow_alarm_on_counter = 0
+                self._low_flow_alarm_off_counter += 1
+            if not self._low_flow_alarm_on and self._low_flow_alarm_on_counter > 120:
+                self._low_flow_alarm_on = True
+                self.signal.alarm_custom.emit('Low flow (<2 L/min). Possible issues:\n'
+                                              '    - filter is full, replace filter\n'
+                                              '    - pump is too slow, adjust back pressure\n')
+            elif self._low_flow_alarm_on and self._low_flow_alarm_off_counter > 20:
+                self._low_flow_alarm_on = False
 
     def set_relay(self):
         """

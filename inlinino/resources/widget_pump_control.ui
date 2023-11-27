@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Form</class>
- <widget class="QWidget" name="Form">
+ <class>widget_pump_control</class>
+ <widget class="QWidget" name="widget_pump_control">
   <property name="geometry">
    <rect>
     <x>0</x>

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>742</width>
-    <height>412</height>
+    <height>435</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -520,6 +520,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="checkbox_low_flow_alarm_enabled">
+         <property name="text">
+          <string>Enable Flow Alarm (&lt;2 L/min)</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="verticalSpacer_3">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -699,12 +709,21 @@
  </widget>
  <tabstops>
   <tabstop>le_manufacturer</tabstop>
+  <tabstop>combobox_model</tabstop>
   <tabstop>le_serial_number</tabstop>
+  <tabstop>combobox_interface</tabstop>
   <tabstop>combobox_log_raw</tabstop>
   <tabstop>combobox_log_products</tabstop>
-  <tabstop>le_log_path</tabstop>
   <tabstop>button_browse_log_directory</tabstop>
+  <tabstop>le_log_path</tabstop>
   <tabstop>checkbox_relay0_enabled</tabstop>
+  <tabstop>combobox_relay0_mode</tabstop>
+  <tabstop>checkbox_relay1_enabled</tabstop>
+  <tabstop>combobox_relay1_mode</tabstop>
+  <tabstop>checkbox_relay2_enabled</tabstop>
+  <tabstop>combobox_relay2_mode</tabstop>
+  <tabstop>checkbox_relay3_enabled</tabstop>
+  <tabstop>combobox_relay3_mode</tabstop>
   <tabstop>checkbox_event_counter_channel0_enabled</tabstop>
   <tabstop>spinbox_event_counter_channel0_k_factor</tabstop>
   <tabstop>checkbox_event_counter_channel1_enabled</tabstop>
@@ -713,6 +732,7 @@
   <tabstop>spinbox_event_counter_channel2_k_factor</tabstop>
   <tabstop>checkbox_event_counter_channel3_enabled</tabstop>
   <tabstop>spinbox_event_counter_channel3_k_factor</tabstop>
+  <tabstop>checkbox_low_flow_alarm_enabled</tabstop>
   <tabstop>checkbox_analog_channel0_enabled</tabstop>
   <tabstop>spinbox_analog_channel0_gain</tabstop>
   <tabstop>checkbox_analog_channel1_enabled</tabstop>

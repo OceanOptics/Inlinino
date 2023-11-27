@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>flow_control</class>
- <widget class="QWidget" name="flow_control">
+ <class>widget_flow_control</class>
+ <widget class="QWidget" name="widget_flow_control">
   <property name="geometry">
    <rect>
     <x>0</x>
