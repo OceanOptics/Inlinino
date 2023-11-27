@@ -72,7 +72,7 @@ for i in [
 # Bundle application
 PyInstaller.__main__.run([
     f'--name=Inlinino-v{version}-{platform.system()}',
-    '--icon=%s' % os.path.join('inlinino', 'resources', f'inlinino.{icon_ext}'),
+    f"--icon={os.path.relpath(os.path.join('inlinino', 'resources', f'inlinino.{icon_ext}'), root)}",
     f'--distpath={os.path.join(root, "dist")}',
     f'--workpath={os.path.join(root, "build")}',
     f'--specpath={root}',
