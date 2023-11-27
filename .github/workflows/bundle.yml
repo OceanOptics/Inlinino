@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    defaults: # Required for conda environment activation
+      run:
+        shell: bash -el {0}
     strategy:
       fail-fast: false
       matrix:
@@ -48,8 +51,7 @@ jobs:
       - name: Get Bundle Name (Ubuntu & Windows)
         if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')
         run: |
-          ls
-          echo "BUNDLE_NAME=$(ls bundle/dist | head -1 | xargs)" >> $GITHUB_ENV
+          echo "BUNDLE_NAME=$(ls bundle/dist | xargs)" >> $GITHUB_ENV
 
       - name: Get Bundle Name (macOS)
         if: matrix.os == 'macos-latest'
