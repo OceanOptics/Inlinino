@@ -87,6 +87,7 @@ class HydroScat(Instrument):
                             burst_cycle=float(cfg["burst_cycle"]),
                             total_duration=float(cfg["total_duration"]),
                             log_period=float(cfg["log_period"]),
+                            output_cal_header=cfg["output_cal_header"],
                             logger=self.logger,
                             verbose=True)
 
@@ -96,6 +97,8 @@ class HydroScat(Instrument):
         cfg['variable_precision'] = ['%0.3f']*2 + \
             ['%.9f' for n in range(2, len(cfg['variable_names']))]
         cfg['terminator'] = b'\r\n'
+
+        self.output_cal_header = cfg["output_cal_header"]
 
         # Active Timeseries Variables
         self.active_variables = {var_name:True for var_name in cfg['variable_names']}
@@ -157,6 +160,10 @@ class HydroScat(Instrument):
         # TODO: may need to make this a monitor
         if self.state == "START":
             self.hydroscat.start_command()
+            if self.output_cal_header:
+                lines = self.hydroscat.header_lines()
+                for line in lines:
+                    self.logger.info(line)
             self.logger.info("START command")
             self.change_state("RUNNING")
         elif self.state == "STOP":
