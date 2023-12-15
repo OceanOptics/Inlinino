@@ -114,7 +114,7 @@ class HydroScat(Instrument):
         self.spectrum_plot_trace_names = ["beta"]
         betawavs = [int(betalab[2:])
                     for betalab in cfg['variable_names'] if betalab.startswith("bb")]
-        self.spectrum_plot_x_values = [np.array(betawavs)]
+        self.spectrum_plot_x_values = [np.array(sorted(betawavs))]
 
         super().setup(cfg)
 
@@ -250,7 +250,7 @@ class HydroScat(Instrument):
                 self.logger.error('Unable to acquire lock to update timeseries plot')
             
             # Update spectrum plot
-            beta_vals = [self.all_data[name] for name in self.all_data
+            beta_vals = [self.all_data[name] for name in sorted(self.all_data)
                          if name.startswith("bb")]
             self.signal.new_spectrum_data.emit([np.array(beta_vals)])
 

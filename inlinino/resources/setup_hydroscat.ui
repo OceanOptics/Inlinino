@@ -361,6 +361,19 @@
     <string>Sleep on Memory Full</string>
    </property>
   </widget>
+  <widget class="QCheckBox" name="cb_output_cal_header">
+   <property name="geometry">
+    <rect>
+     <x>280</x>
+     <y>180</y>
+     <width>200</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Output Caibration Header</string>
+   </property>
+  </widget>
  </widget>
  <tabstops>
   <tabstop>combobox_log_raw</tabstop>
