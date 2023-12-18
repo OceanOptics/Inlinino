@@ -38,7 +38,7 @@ To use Ontrak ADU on Windows additional dll and python modules are needed. Note 
     unzip adu_python_libusb.zip
     cp adu_python_libusb/libusb/* inlinino/ressources/libusb
 
-To use HydroScat, the Python `aquasense` package is needed. See `README.md` in the [aquasense repository](https://bitbucket.csiro.au/projects/AQRS/repos/aquasense/browse) for installation after cloning https://bitbucket.csiro.au/scm/aqrs/aquasense.git.
+To use HydroScat, the Python `aquasense` package is needed. See `README.md` in the [aquasense repository](https://bitbucket.csiro.au/projects/AQRS/repos/aquasense/browse) for installation after cloning https://bitbucket.csiro.au/scm/aqrs/aquasense.git. See also the [CSIRO aquasense record](http://hdl.handle.net/102.100.100/602807?index=1).
 
 Inlinino can then be started from the folder containing inlinino's source code with.
 

@@ -21,6 +21,7 @@ class HydroScat(Instrument):
                            'start_delay', 'warmup_time',
                            'burst_duration', 'burst_cycle',
                            'total_duration', 'log_period',
+                           'output_cal_header',
                            'variable_names', 'variable_units', 'variable_precision']
 
     def __init__(self, uuid, signal, *args, **kwargs):
@@ -47,8 +48,6 @@ class HydroScat(Instrument):
         # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = dict(y_label_name='Signal')
-        self.spectrum_plot_trace_names = ["beta"]
-        self.spectrum_plot_x_values = [np.array([420,442,488,550,676,852])]
 
 
     def setup(self, cfg):
