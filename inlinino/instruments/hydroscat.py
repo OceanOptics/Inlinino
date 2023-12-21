@@ -131,9 +131,8 @@ class HydroScat(Instrument):
 
     # State machine
     #  start_state =>
-    #  IDLE =open button=> READY =start button=> START =/start command=>
-    #  RUNNING =stop button=> STOP =/stop command=> READY =close button=>
-    #  IDLE => ...
+    #  IDLE =open button/start command=> START =>
+    #  RUNNING =close button=> STOP =/stop command=> IDLE
 
     def change_state(self, state):
         self.previous_state = self.state
@@ -153,7 +152,7 @@ class HydroScat(Instrument):
         self.logger.info("Fluorescence command")
         self.hydroscat.burst_command()
         self.logger.info("BURST command")
-        self.change_state("READY")
+        self.change_state("START")
 
 
     def write_to_interface(self):
@@ -168,35 +167,17 @@ class HydroScat(Instrument):
         elif self.state == "STOP":
             self.hydroscat.stop_command()
             self.logger.info("STOP command")
-            self.change_state("READY")
-
-
-    def log_start(self):
-        if self.state == "READY":
-            self.change_state("START")
-        super().log_start()
-
-
-    def log_stop(self):
-        if self.state == "RUNNING":
-            self.change_state("STOP")
-        super().log_stop()
-
-
-    def open(self, **kwargs):
-        super().open(**kwargs)
-        if self.alive:
-            while self.state != "READY":
-                sleep(0.1)
+            self.change_state("IDLE")
 
 
     def close(self, wait_thread_join=True):
+        if self.state == "RUNNING":
+            self.change_state("STOP")
+
         try:
             super().close(wait_thread_join)
         except:
             self.logger.warn("close")
-        finally:
-            self.change_state("IDLE")
 
 
     def parse(self, packet):
