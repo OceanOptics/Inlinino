@@ -432,6 +432,8 @@ class USBADUHIDInterface(Interface):
         # vendor_id is ignored and set to ontrak
         if platform.system() != 'Windows':
             raise InterfaceException('USB-ADUHID interface is compatible with Windows only.')
+        if aduhid is None:
+            raise InterfaceException('USB-ADUHID driver not found.')
         if product_id is not None:
             self._device = aduhid.open_device_by_product_id(product_id, self._timeout)
         elif serial_number is not None:
