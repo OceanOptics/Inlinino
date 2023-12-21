@@ -28,10 +28,7 @@ from inlinino.instruments.hydroscat import HydroScat
 from inlinino.instruments.hypernav import HyperNav
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
-try:
-    from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface
-except ImportError:
-    pass
+from inlinino.instruments.ontrak import Ontrak, USBADUHIDInterface
 from inlinino.instruments.satlantic import Satlantic
 from inlinino.instruments.suna import SunaV1, SunaV2
 from inlinino.instruments.taratsg import TaraTSG

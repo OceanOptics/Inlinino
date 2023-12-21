@@ -11,7 +11,7 @@ if platform.system() == 'Windows':
     try:
         from inlinino.resources.ontrak import aduhid
     except ImportError:
-        pass
+        aduhid = None
 else:
     aduhid = None
 
