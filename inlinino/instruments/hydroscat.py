@@ -129,6 +129,11 @@ class HydroScat(Instrument):
         # super().setup(cfg)
         self.logger.info("setup")
 
+    # State machine
+    #  start_state =>
+    #  IDLE =open button=> READY =start button=> START =/start command=>
+    #  RUNNING =stop button=> STOP =/stop command=> READY =close button=>
+    #  IDLE => ...
 
     def change_state(self, state):
         self.previous_state = self.state
@@ -150,13 +155,8 @@ class HydroScat(Instrument):
         self.logger.info("BURST command")
         self.change_state("READY")
 
-    # State machine: start_state =>
-    #                IDLE =open button=> READY =start button=> START =/start command=>
-    #                RUNNING =stop button=> STOP =/stop command=> READY =close button=>
-    #                IDLE => ...
 
     def write_to_interface(self):
-        # TODO: may need to make this a monitor
         if self.state == "START":
             self.hydroscat.start_command()
             if self.output_cal_header:
@@ -197,13 +197,6 @@ class HydroScat(Instrument):
             self.logger.warn("close")
         finally:
             self.change_state("IDLE")
-
-
-    def read(self, size=None):
-        try:
-            super().read(size)
-        except:
-            self.logger.warn("read")
 
 
     def parse(self, packet):
