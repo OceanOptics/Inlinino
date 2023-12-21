@@ -856,7 +856,6 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'ontrak':
-            next
             self.cfg['model'] = self.combobox_model.currentText()
             self.cfg['relay0_enabled'] = self.checkbox_relay0_enabled.isChecked()
             self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors'] = [], []
