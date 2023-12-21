@@ -217,18 +217,15 @@ class Instrument:
                         self.logger.warning(e)
                         # raise e
                 else:
-                    try:
-                        # we may want to write to the interface even when no data has been read!
-                        self.write_to_interface()
-                    except Exception as e:
-                        self.logger.warning(e)
-                        # raise e
                     if data_received is not None and \
                             timestamp - data_received > self.DATA_TIMEOUT and data_timeout_flag is False:
                         self.logger.error(f'No data received during the past {timestamp - data_received:.2f} seconds')
                         data_timeout_flag = True
                         if self.signal.alarm is not None:
                             self.signal.alarm.emit(True)
+
+                # give instrument opportunity to write (e.g. commands) to interface
+                self.write_to_interface()
             except InterfaceException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
@@ -262,7 +259,6 @@ class Instrument:
 
     def handle_packet(self, packet, timestamp):
         self.signal.packet_received.emit()
-        self.write_to_interface()
         if self.log_raw_enabled and self._log_active:
             self._log_raw.write(packet, timestamp)
             self.signal.packet_logged.emit()
