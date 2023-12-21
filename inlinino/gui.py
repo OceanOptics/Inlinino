@@ -742,7 +742,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_save(self):
         # Read form
-        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or 'le_' in a or 'sb_' in a]
+        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or \
+                  'le_' in a or 'sb_' in a or 'cb_' in a]
         empty_fields = list()
         for f in fields:
             field_prefix, field_name = f.split('_', 1)
@@ -795,6 +796,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg[field_name] = True
                 else:
                     self.cfg[field_name] = False
+            elif field_prefix == 'cb':
+                self.cfg[field_name] = getattr(self, f).isChecked()
         if self.cfg['module'] == 'dataq':
             # Remove optional fields specific to dataq
             f2rm = [f for f in empty_fields if f.startswith('Variable')]
