@@ -1307,7 +1307,7 @@ class App(QtGui.QApplication):
                 instrument_class = {'generic': Instrument, 'acs': ACS, 'apogee': ApogeeQuantumSensor,
                                     'dataq': DATAQ, 'hyperbb': HyperBB, 'hypernav': HyperNav,
                                     'lisst': LISST, 'nmea': NMEA,
-                                    #'ontrak': Ontrak,
+                                    'ontrak': Ontrak,
                                     'satlantic': Satlantic,
                                     'sunav1': SunaV1, 'sunav2': SunaV2, 'taratsg': TaraTSG,
                                     "hydroscat": HydroScat}
