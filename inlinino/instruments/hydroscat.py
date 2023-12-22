@@ -1,4 +1,5 @@
 from inlinino.instruments import Instrument
+from inlinino.log import Log
 
 import aquasense.hydroscat
 
@@ -117,6 +118,19 @@ class HydroScat(Instrument):
 
         super().setup(cfg)
 
+        # Set prod logger
+        log_cfg = {'path': cfg['log_path'], 'filename_prefix': self.bare_log_prefix}
+        for k in ['length', 'variable_names', 'variable_units', 'variable_precision']:
+            if k in cfg.keys():
+                log_cfg[k] = cfg[k]
+
+        if self.output_cal_header:
+            header_lines = self.hydroscat.header_lines()
+        else:
+            header_lines = []
+
+        self._log_prod = ProdLogger(header_lines, log_cfg, self.signal.status_update)
+
         # If we were not previously in the idle state (i.e. we were
         # RUNNING or STOPPED), transition to that state now
         if self.previous_state != "IDLE":
@@ -158,10 +172,6 @@ class HydroScat(Instrument):
     def write_to_interface(self):
         if self.state == "START":
             self.hydroscat.start_command()
-            if self.output_cal_header:
-                lines = self.hydroscat.header_lines()
-                for line in lines:
-                    self.logger.info(line)
             self.logger.info("START command")
             self.change_state("RUNNING")
         elif self.state == "STOP":
@@ -257,3 +267,17 @@ class HydroScat(Instrument):
                     [name for name in self.active_variables if self.active_variables[name]]
             finally:
                 self.active_timeseries_variables_lock.release()
+
+
+class ProdLogger(Log):
+    def __init__(self, header_lines, cfg, signal_new_file=None):
+        super().__init__(cfg, signal_new_file)
+        self.header_lines = header_lines
+
+
+    def write_header(self):
+        """Override to write calibration header lines before other header lines."""
+        for line in self.header_lines:
+            self._file.write("{}\n".format(line))
+
+        super().write_header()
