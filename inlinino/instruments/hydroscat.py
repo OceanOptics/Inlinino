@@ -1,7 +1,10 @@
 from inlinino.instruments import Instrument
 from inlinino.log import Log
 
-import aquasense.hydroscat
+try:
+    import aquasense.hydroscat
+except ImportError:
+    pass
 
 from datetime import datetime
 
@@ -132,7 +135,7 @@ class HydroScat(Instrument):
         self._log_prod = ProdLogger(header_lines, log_cfg, self.signal.status_update)
 
         # If we were not previously in the idle state (i.e. we were
-        # RUNNING or STOPPED), transition to that state now
+        # RUNNING or STOPPED), close now
         if self.previous_state != "IDLE":
             try:
                 self.close()
