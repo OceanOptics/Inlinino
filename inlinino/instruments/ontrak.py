@@ -239,9 +239,7 @@ class Ontrak(Instrument):
                 toc = 1/self.refresh_rate - (time() - tic)
                 if toc > 0:
                     sleep(toc)
-            except InterfaceException as e:
-                # probably some I/O problem such as disconnected USB serial
-                # adapters -> exit
+            except IOError as e:
                 self.logger.error(e)
                 self.signal.alarm.emit(True)
                 # raise e
@@ -378,18 +376,12 @@ def get_adu_interface(interface):
             #   bytes 1 to 7 are ASCII character values representing the command
             #   remainder of message is padded to character code 0 (null)
             byte_str = chr(0x01) + msg_str + chr(0) * max(7 - len(msg_str), 0)
-            try:
-                num_bytes_written = super().write(byte_str.encode())
-            except IOError as e:
-                raise InterfaceException(e)
+            num_bytes_written = super().write(byte_str.encode())
             return num_bytes_written
 
         def read(self):
-            try:
-                # read 8-bytes from the device
-                data = super().read(8)
-            except IOError as e:
-                raise InterfaceException(e)
+            # read 8-bytes from the device
+            data = super().read(8)
             # construct a string out of the read values, starting from the 2nd byte
             byte_str = ''.join(chr(n) for n in data[1:])
             result_str = byte_str.split('\x00', 1)[0]  # remove the trailing null '\x00' characters

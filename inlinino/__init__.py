@@ -29,10 +29,10 @@ sys.excepthook = except_hook
 if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
     root_logger.debug('Running in bundled mode')
     package_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
-    os.chdir(package_dir)
 else:
     root_logger.debug('Running from source')
     package_dir = os.path.dirname(__file__)
+os.chdir(package_dir)
 PATH_TO_RESOURCES = os.path.join(package_dir, 'resources')
 
 

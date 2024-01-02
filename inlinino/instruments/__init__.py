@@ -181,7 +181,7 @@ class Instrument:
             self._interface.stop()
             if wait_thread_join:
                 timeout = self._interface.timeout if self._interface.timeout is not None else 1
-                self._thread.join(timeout)
+                self._thread.join(2*timeout)  # Need time to read and write
                 if self._thread.is_alive():
                     self.logger.warning('Thread did not join.')
             self.log_stop()
@@ -190,10 +190,17 @@ class Instrument:
 
     def run(self):
         if self._interface.is_open:
-            # Initialize interface (typically empty buffers)
-            self._interface.init()
-            # Send init frame to instrument
-            self.init_interface()
+            try:
+                # Initialize interface (typically empty buffers)
+                self._interface.init()
+                # Send init frame to instrument
+                self.init_interface()
+            except IOError as e:
+                self.logger.error(e)
+                if self.signal.alarm is not None:
+                    self.signal.alarm.emit(True)
+                self.close(wait_thread_join=False)
+                return
             # Set data timeout flag
             data_timeout_flag = False
             data_received = None
@@ -223,17 +230,19 @@ class Instrument:
                         data_timeout_flag = True
                         if self.signal.alarm is not None:
                             self.signal.alarm.emit(True)
-
                 # give instrument opportunity to write (e.g. commands) to interface
                 self.write_to_interface()
-            except InterfaceException as e:
-                # probably some I/O problem such as disconnected USB serial
-                # adapters -> exit
+            except IOError as e:
                 self.logger.error(e)
                 if self.signal.alarm is not None:
                     self.signal.alarm.emit(True)
                 break
-        self.close(wait_thread_join=False)
+        try:
+            self.close(wait_thread_join=False)
+        except IOError as e:
+            self.logger.error(e)
+            if self.signal.alarm is not None:
+                self.signal.alarm.emit(True)
 
     def data_received(self, data, timestamp):
         self._buffer.extend(data)
@@ -427,6 +436,8 @@ class SerialInterface(Interface):
     def stop(self):
         if hasattr(self._serial, 'cancel_read'):
             self._serial.cancel_read()
+        if hasattr(self._serial, 'cancel_write'):
+            self._serial.cancel_write()
 
     def close(self):
         self._serial.close()

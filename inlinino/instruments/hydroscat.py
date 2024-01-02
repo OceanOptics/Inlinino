@@ -1,3 +1,5 @@
+import os
+
 from inlinino.instruments import Instrument
 from inlinino.log import Log
 
@@ -12,7 +14,6 @@ import io
 import numpy as np
 
 from threading import Lock
-from time import sleep
 
 
 class HydroScat(Instrument):
@@ -28,14 +29,13 @@ class HydroScat(Instrument):
                            'output_cal_header',
                            'variable_names', 'variable_units', 'variable_precision']
 
-    def __init__(self, uuid, signal, *args, **kwargs):
+    def __init__(self, uuid, cfg, *args, **kwargs):
+        super().__init__(uuid, cfg, *args, setup=False, **kwargs)
         # Instrument state machine
+        self.hydroscat: aquasense.hydroscat.HydroScat = None
+        self.output_cal_header = None
         self.state = "IDLE"
         self.previous_state = None
-
-        super().__init__(uuid, signal, *args, **kwargs)
-
-        self.all_data = []
 
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
@@ -47,33 +47,40 @@ class HydroScat(Instrument):
 
         # Init Channels to Plot widget
         self.widget_select_channel_enabled = True
+        self.widget_active_timeseries_variables_names = []
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
+        self.active_variables = None
 
         # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
         self.spectrum_plot_axis_labels = dict(y_label_name='Signal')
+        self.spectrum_plot_trace_names = ["beta"]
+        self.spectrum_plot_x_values = []
 
+        # Setup
+        self.setup(cfg)
 
     def setup(self, cfg):
-        # sanity check numeric values
-
+        # sanity check
         errmsgs = []
-
-        if int(cfg["fluorescence"]) not in [0, 1, 2]:
+        try:
+            if int(cfg["fluorescence"]) not in [0, 1, 2]:
+                errmsgs.append("fluorescence must be 0, 1, or 2")
+        except ValueError:
             errmsgs.append("fluorescence must be 0, 1, or 2")
-
         for varname in ["start_delay", "warmup_time",
                         "burst_duration", "burst_cycle",
                         "total_duration", "log_period"]:
             try:
                 if float(cfg[varname]) < 0:
                     errmsgs.append("{} must be 0 or more".format(varname))
-            except:
+            except ValueError:
                 errmsgs.append("{} must be 0 or more".format(varname))
-
-        if errmsgs is not None:
-            for errmsg in errmsgs:
-                self.logger.error(errmsg)
+        if not os.path.isfile(cfg["calibration_file"]):
+            errmsgs.append(f"Calibration file not found: {cfg['calibration_file']}")
+        if errmsgs:
+            raise ValueError('\n'.join(errmsgs))
             
         in_out = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
                                                     self._interface._serial))
@@ -114,7 +121,6 @@ class HydroScat(Instrument):
         # Update wavelengths for Spectrum Plot
         # Plot is updated after the initial instrument setup or button click
         # We only show values for bb channels since bb and fl channel numbers overlap
-        self.spectrum_plot_trace_names = ["beta"]
         betawavs = [int(betalab[2:])
                     for betalab in cfg['variable_names'] if betalab.startswith("bb")]
         self.spectrum_plot_x_values = [np.array(sorted(betawavs))]
@@ -134,18 +140,6 @@ class HydroScat(Instrument):
 
         self._log_prod = ProdLogger(header_lines, log_cfg, self.signal.status_update)
 
-        # If we were not previously in the idle state (i.e. we were
-        # RUNNING or STOPPED), close now
-        if self.previous_state != "IDLE":
-            try:
-                self.close()
-            except:
-                self.logger.warn("not previously idle")
-
-        # Set standard configuration and check cfg input
-        # super().setup(cfg)
-        self.logger.info("setup")
-
     # State machine
     #  start_state =>
     #  IDLE =open button/start command=> START =>
@@ -159,10 +153,6 @@ class HydroScat(Instrument):
 
     def init_interface(self):
         # invoked after channel open request (via Open button)
-        self.init()
-
-
-    def init(self):
         self.hydroscat.date_command()
         self.logger.info("DATE command")
         self.hydroscat.flourescence_command()
@@ -186,79 +176,52 @@ class HydroScat(Instrument):
     def close(self, wait_thread_join=True):
         if self.state == "RUNNING":
             self.change_state("STOP")
-
-        try:
-            super().close(wait_thread_join)
-        except:
-            self.logger.warn("close")
+        super().close(wait_thread_join)
 
 
     def parse(self, packet):
-        data = [None] * len(self.widget_active_timeseries_variables_selected)
         if self.state == "RUNNING":
             raw_packet = packet.decode()
-            self.logger.info("{}".format(raw_packet))
             if raw_packet[0:2] in ["*T", "*D", "*H"]:
-                self.logger.info("data packet")
                 data_dict = self.hydroscat.rawline2datadict(raw_packet)
                 if raw_packet[0:2] != "*H":
-                    # get all selected values
-                    # ensure only one thread updates active timeseries variables
-                    if self.active_timeseries_variables_lock.acquire(timeout=0.25):
-                        try:
-                            data = []
-                            for var_name in self.widget_active_timeseries_variables_selected:
-                                if var_name == "Voltage":
-                                    # needed in handle_data for new_ts_data.emit()
-                                    data.append(self.hydroscat.aux_data["Voltage"])
-                                else:
-                                    data.append(data_dict[var_name])
-                        finally:
-                            self.active_timeseries_variables_lock.release()
-                    else:
-                        self.logger.error('Unable to acquire lock to update active timeseries variables')
-
-                    # also, capture all values as a dictionary
-                    self.all_data = data_dict
-
-        return data
+                    return data_dict
 
 
     def handle_data(self, data, timestamp):
-        if all([datum is not None for datum in data]):
-            # Update timeseries plot
-            if self.active_timeseries_variables_lock.acquire(timeout=0.125):
-                try:
-                    self.signal.new_ts_data.emit(data, timestamp)
-                finally:
-                    self.active_timeseries_variables_lock.release()
-            else:
-                self.logger.error('Unable to acquire lock to update timeseries plot')
-            
-            # Update spectrum plot
-            beta_vals = [self.all_data[name] for name in sorted(self.all_data)
-                         if name.startswith("bb")]
-            self.signal.new_spectrum_data.emit([np.array(beta_vals)])
+        # Update timeseries plot
+        ts_data = [self.hydroscat.aux_data["Voltage"] if var_name == "Voltage" else data[var_name]
+                   for var_name in self.widget_active_timeseries_variables_selected]
+        if self.active_timeseries_variables_lock.acquire(timeout=0.125):
+            try:
+                self.signal.new_ts_data.emit(ts_data, timestamp)
+            finally:
+                self.active_timeseries_variables_lock.release()
+        else:
+            self.logger.error('Unable to acquire lock to update timeseries plot')
 
-            # Format and signal aux data
-            if self.hydroscat.aux_data["Time"] is not None:
-                date_time = datetime.strftime(datetime.fromtimestamp(int(self.hydroscat.aux_data["Time"])), format="%m/%d/%Y %H:%M:%S")
-                self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
-                                               '%.4f' % self.hydroscat.aux_data["Depth"],
-                                               '%.4f' % self.hydroscat.aux_data["Voltage"],
-                                               '%s' % date_time])
-                self.logger.info("aux data")
+        # Update spectrum plot
+        beta_vals = [data[name] for name in sorted(data) if name.startswith("bb")]
+        self.signal.new_spectrum_data.emit([np.array(beta_vals)])
 
-            # Log parsed data
-            if self.log_prod_enabled and self._log_active:
-                beta_vals = [self.all_data[key] for key in self.all_data
-                                if key.startswith("bb") or key.startswith("fl")]
-                fields = [self.hydroscat.aux_data["Depth"],
-                          self.hydroscat.aux_data["Voltage"]] + beta_vals
-                self._log_prod.write(fields, timestamp)
+        # Format and signal aux data
+        if self.hydroscat.aux_data["Time"] is not None:
+            date_time = datetime.strftime(datetime.fromtimestamp(int(self.hydroscat.aux_data["Time"])),
+                                          format="%Y-%m-%d %H:%M:%S")
+            self.signal.new_aux_data.emit(['%.4f' % self.hydroscat.aux_data["Temperature"],
+                                           '%.4f' % self.hydroscat.aux_data["Depth"],
+                                           '%.4f' % self.hydroscat.aux_data["Voltage"],
+                                           '%s' % date_time])
 
-                if not self.log_raw_enabled:
-                    self.signal.packet_logged.emit()
+        # Log parsed data
+        if self.log_prod_enabled and self._log_active:
+            beta_vals = [value for key, value in data.items() if key.startswith("bb") or key.startswith("fl")]
+            fields = [self.hydroscat.aux_data["Depth"],
+                      self.hydroscat.aux_data["Voltage"]] + beta_vals
+            self._log_prod.write(fields, timestamp)
+
+            if not self.log_raw_enabled:
+                self.signal.packet_logged.emit()
 
 
     def udpate_active_timeseries_variables(self, name, active):
