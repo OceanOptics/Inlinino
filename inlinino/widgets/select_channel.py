@@ -41,7 +41,7 @@ class SelectChannelWidget(GenericWidget):
     @QtCore.pyqtSlot(QtCore.QModelIndex)
     def update(self, proxy_index):
         source_index = self.variables_filter_proxy_model.mapToSource(proxy_index).row()
-        self.instrument.udpate_active_timeseries_variables(
+        self.instrument.update_active_timeseries_variables(
             self.variables_model.item(source_index).text(),
             bool(self.variables_model.item(source_index).checkState())
         )

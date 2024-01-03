@@ -18,13 +18,13 @@ class FlowControlWidget(GenericWidget):
     def setup(self):
         self.set_switch_mode()
         self.set_switch_timing()
+        if self.instrument.widget_flow_control_enabled:
+            self.show()
+        else:
+            self.hide()
 
     def reset(self):
-        if self.instrument.widget_flow_control_enabled:
-            self.setup()
-            self.group_box_instrument_control.show()
-        else:
-            self.group_box_instrument_control.hide()
+        self.setup()
 
     def set_switch_mode(self):
         if self.radio_instrument_control_filter.isChecked():

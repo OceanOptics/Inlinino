@@ -68,10 +68,10 @@ class ACS(Instrument):
         self.active_timeseries_a_wavelengths = np.zeros(len(self._parser.lambda_a), dtype=bool)
         for wl in [532]:
             channel_name = 'c(%s)' % self._parser.lambda_c[np.argmin(np.abs(self._parser.lambda_c - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+            self.update_active_timeseries_variables(channel_name, True)
         for wl in [532, 676]:
             channel_name = 'a(%s)' % self._parser.lambda_a[np.argmin(np.abs(self._parser.lambda_a - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+            self.update_active_timeseries_variables(channel_name, True)
 
     def data_received(self, data, timestamp):
         self._buffer.extend(data)
@@ -134,7 +134,7 @@ class ACS(Instrument):
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def udpate_active_timeseries_variables(self, name, state):
+    def update_active_timeseries_variables(self, name, state):
         if not ((state and name not in self.widget_active_timeseries_variables_selected) or
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return

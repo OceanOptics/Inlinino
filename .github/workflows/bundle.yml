@@ -1,0 +1,73 @@
+on:
+  push:
+    branches:
+      - master
+      - dev
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+          cache: 'pip'
+      - name: Install python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller==6.0
+          pip list
+
+      - name: Download external resources (Ubuntu & macOS)
+        if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'macos-latest')
+        run: |
+          cd inlinino/resources
+          wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
+          cd ../../
+
+      - name: Download external resources (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd inlinino/resources
+          C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
+          cd ../../    
+
+      - name: Make Bundle
+        run: |
+          python make.py
+
+      - name: Get Bundle Name (Ubuntu & Windows)
+        if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')
+        run: |
+          echo "BUNDLE_NAME=$(ls bundle/dist | xargs)" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Get Bundle Name (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
+
+      - name: Zip Bundle
+        uses: thedoctor0/zip-release@0.7.1
+        with:
+          type: 'zip'
+          directory: 'bundle/dist/'
+          path: '${{ env.BUNDLE_NAME }}'
+          filename: '${{ env.BUNDLE_NAME }}.zip'
+
+      - name: Upload Bundle
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.BUNDLE_NAME }}
+          path: bundle/dist/${{ env.BUNDLE_NAME }}.zip
+        # Known issue of double zip: https://github.com/actions/upload-artifact/issues/39
+        # However, need to zip before upload as too many files to send otherwise (very slow)

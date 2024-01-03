@@ -97,6 +97,12 @@ class Ontrak(Instrument):
         self.event_counter_channels = [0]
         self.event_counter_k_factors = [1381]
         self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
+        # Low Flow Alarm
+        self.low_flow_alarm_enabled = True
+        self._low_flow_alarm_started = False
+        self._low_flow_alarm_on = False
+        self._low_flow_alarm_on_counter = 0
+        self._low_flow_alarm_off_counter = 0
         # Analog Channel(s)
         self.analog_channels = [2]
         self.analog_gains = [2]  # 5V Gain on channel 2 for ADU100
@@ -118,8 +124,8 @@ class Ontrak(Instrument):
         # Set specific attributes
         if 'model' not in cfg.keys():
             raise ValueError('Missing field model')
-        if self.model and self.model not in ['ADU100', 'ADU200']:
-            raise ValueError('Model not supported. Supported models are: ADU100 and ADU200')
+        if self.model and self.model not in ['ADU100', 'ADU200', 'ADU208']:
+            raise ValueError('Model not supported. Supported models are: ADU100, ADU200, and ADU208')
         if 'relay0_enabled' not in cfg.keys():
             raise ValueError('Missing field relay0 enabled')
         self.relay_enabled = cfg['relay0_enabled']
@@ -148,12 +154,21 @@ class Ontrak(Instrument):
             raise ValueError('Missing field event counter k factors')
         self.event_counter_k_factors = cfg['event_counter_k_factors']
         self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
-        if 'analog_channels_enabled' not in cfg.keys():
-            raise ValueError('Missing field analog channels enabled')
-        self.analog_channels = cfg['analog_channels_enabled']
-        if 'analog_channels_gains' not in cfg.keys():
-            raise ValueError('Missing field analog channels gains')
-        self.analog_gains = cfg['analog_channels_gains']
+        if 'low_flow_alarm_enabled' in cfg.keys():
+            self.low_flow_alarm_enabled = cfg['low_flow_alarm_enabled']
+
+        if self.model == 'ADU100':
+            if 'analog_channels_enabled' not in cfg.keys():
+                raise ValueError('Missing field analog channels enabled')
+                self.analog_channels = cfg['analog_channels_enabled']
+            if 'analog_channels_gains' not in cfg.keys():
+                raise ValueError('Missing field analog channels gains')
+            self.analog_gains = cfg['analog_channels_gains']
+        else:
+            # Prevent loading analog channels for models that don't support it
+            #   => read_analog check if there is channel to reads otherwise
+            self.analog_channels = []
+            self.analog_gains = []
         self._analog_calibration_timestamp = None
         # Overload cfg with DATAQ specific parameters
         if self.relay_mode == 'Switch':
@@ -205,6 +220,8 @@ class Ontrak(Instrument):
                 product_id = 100
             elif self.model == 'ADU200':
                 product_id = 200
+            elif self.model == 'ADU208':
+                product_id = 208
             else:
                 raise ValueError('Model not supported.')
             super().open(vendor_id=self.VENDOR_ID, product_id=product_id, **kwargs)
@@ -262,6 +279,8 @@ class Ontrak(Instrument):
         else:
             self._relay_hourly_skip_before = 0
         self._relay_interval_start = time()
+        # Reset low flow alarm
+        self._low_flow_alarm_started = False
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
@@ -293,11 +312,42 @@ class Ontrak(Instrument):
             aux[i] = f'{data[i]:.4f}'
             i += 1
         self.signal.new_aux_data.emit(aux)
+        # Set low flow alarm
+        #   flow must be detected to enable alarm (prevent alarm to rig when connect ADU)
+        #   alarm is triggered after three consecutive flow below the threshold
+        #   alarm is disabled after 30 consecutive flow above threshold
+        if self.low_flow_alarm_enabled:
+            i = 1 if self.relay_enabled else 0
+            low_flow_detected = False
+            for _ in self.event_counter_channels:
+                if self._low_flow_alarm_started:
+                    if data[i] < 2.0:
+                        low_flow_detected = True
+                        break
+                elif data[i] > 0.1:
+                    self._low_flow_alarm_started = True
+                    break
+                i += 1
+            if not self._low_flow_alarm_started:
+                return
+            if low_flow_detected:
+                self._low_flow_alarm_on_counter += 1
+                self._low_flow_alarm_off_counter = 0
+            else:
+                self._low_flow_alarm_on_counter = 0
+                self._low_flow_alarm_off_counter += 1
+            if not self._low_flow_alarm_on and self._low_flow_alarm_on_counter > 120:
+                self._low_flow_alarm_on = True
+                self.signal.alarm_custom.emit('Low flow (<2 L/min). Possible issues:\n'
+                                              '    - filter is full, replace filter\n'
+                                              '    - pump is too slow, adjust back pressure\n')
+            elif self._low_flow_alarm_on and self._low_flow_alarm_off_counter > 20:
+                self._low_flow_alarm_on = False
 
     def set_relay(self):
         """
         Set relay(s)
-        TODO work on interfacing relay 1, 2, and 3 on ADU200 (only relay 0) for now
+        TODO work on interfacing relay 1, 2, and 3 on ADU20X (only relay 0) for now
         :return:
         """
         if not self.relay_enabled:
@@ -335,7 +385,7 @@ class Ontrak(Instrument):
         timestamps, values = [], []
         for channel in self.event_counter_channels:
             self._interface.write(f'RC{channel}')  # Read and Clean Counter
-            timestamps.append(time())  # Get exact timestamp, needed to calculate flowrate
+            timestamps.append(time())  # Get exact timestamp, needed to calculate flow rate
             value = self._interface.read()
             values.append(float('nan') if value is None else value)
         return timestamps, values

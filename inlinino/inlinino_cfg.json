@@ -657,14 +657,19 @@
       ]
     },
     "8e73f966-0de7-11ed-b02c-acde48001122": {
-      "module": "ontrack",
-      "manufacturer": "Ontrack",
+      "module": "ontrak",
+      "manufacturer": "Ontrak",
       "model": "ADU100",
       "serial_number": "B02694",
-      "log_raw": true,
+      "interface": "usb-hid",
+      "log_raw": false,
       "log_products": true,
       "log_path": "data",
-      "relay_enabled": true,
+      "relay0_mode": "Switch",
+      "relay1_mode": "Switch",
+      "relay2_mode": "Switch",
+      "relay3_mode": "Switch",
+      "relay0_enabled": true,
       "event_counter_channels_enabled": [
         0
       ],
@@ -677,6 +682,75 @@
       "analog_channels_gains": [
         2
       ]
+    },
+    "2f5ebee2-7fa8-11ed-b069-acde48001122": {
+      "module": "ontrak",
+      "manufacturer": "Ontrak",
+      "serial_number": "B02782",
+      "model": "ADU100",
+      "interface": "usb-hid",
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "relay0_mode": "Pump",
+      "relay1_mode": "Switch",
+      "relay2_mode": "Switch",
+      "relay3_mode": "Switch",
+      "relay0_enabled": true,
+      "event_counter_channels_enabled": [
+        0
+      ],
+      "event_counter_k_factors": [
+        1
+      ],
+      "analog_channels_enabled": [],
+      "analog_channels_gains": []
+    },
+    "bbed44a6-780e-11ed-8ac9-acde48001122": {
+      "module": "ontrak",
+      "manufacturer": "Ontrak",
+      "serial_number": "A51730",
+      "model": "ADU200",
+      "interface": "usb-hid",
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "relay0_mode": "Pump",
+      "relay1_mode": "Switch",
+      "relay2_mode": "Switch",
+      "relay3_mode": "Switch",
+      "relay0_enabled": true,
+      "event_counter_channels_enabled": [
+        0
+      ],
+      "event_counter_k_factors": [
+        664
+      ],
+      "analog_channels_enabled": [],
+      "analog_channels_gains": []
+    },
+    "6a338538-4a88-11ee-a2f0-acde48001122": {
+      "module": "ontrak",
+      "manufacturer": "Ontrak",
+      "serial_number": "A05001",
+      "model": "ADU208",
+      "interface": "usb-hid",
+      "log_raw": false,
+      "log_products": true,
+      "log_path": "data",
+      "relay0_mode": "Switch",
+      "relay1_mode": "Switch",
+      "relay2_mode": "Switch",
+      "relay3_mode": "Switch",
+      "relay0_enabled": true,
+      "event_counter_channels_enabled": [
+        0
+      ],
+      "event_counter_k_factors": [
+        1200
+      ],
+      "analog_channels_enabled": [],
+      "analog_channels_gains": []
     },
     "8953510c-0de7-11ed-b02c-acde48001122": {
       "manufacturer": "WetLabs",
@@ -765,6 +839,5 @@
       "log_products": true
     }
   },
-  "interfaces": {
-  }
+  "interfaces": {}
 }

@@ -225,7 +225,7 @@ class Satlantic(Instrument):
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def udpate_active_timeseries_variables(self, name: str, state: bool):
+    def update_active_timeseries_variables(self, name: str, state: bool):
         if not ((state and name not in self.widget_active_timeseries_variables_selected) or
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return

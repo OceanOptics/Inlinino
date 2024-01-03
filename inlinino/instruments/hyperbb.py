@@ -1,8 +1,13 @@
-from inlinino.instruments import Instrument
-import numpy as np
+import os.path
+
+from typing import Optional
 from threading import Lock
+
+import numpy as np
 from scipy.io import loadmat
 from scipy.interpolate import interp2d, splrep, splev  # , pchip_interpolate
+
+from inlinino.instruments import Instrument
 
 
 class HyperBB(Instrument):
@@ -14,7 +19,7 @@ class HyperBB(Instrument):
     def __init__(self, uuid, cfg, signal, *args, **kwargs):
         super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
-        self._parser = None
+        self._parser: Optional[HyperBBParser] = None
         self.signal_reconstructed = None
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
@@ -45,10 +50,13 @@ class HyperBB(Instrument):
             raise ValueError('Missing calibration temperature file (*.mat)')
         self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'])
         self.signal_reconstructed = np.empty(len(self._parser.wavelength)) * np.nan
-        # Overload cfg
-        cfg['variable_names'] = self._parser.FRAME_VARIABLES
-        cfg['variable_units'] = [''] * len(self._parser.FRAME_VARIABLES)
-        cfg['variable_precision'] = self._parser.FRAME_PRECISIONS
+        # Overload cfg with received data
+        prod_var_names = ['beta_u', 'bb']
+        prod_var_units = ['m-1 sr-1', 'm-1']
+        prod_var_precision = ['%.5e', '%.5e']
+        cfg['variable_names'] = self._parser.FRAME_VARIABLES + prod_var_names
+        cfg['variable_units'] = [''] * len(self._parser.FRAME_VARIABLES) + prod_var_units
+        cfg['variable_precision'] = self._parser.FRAME_PRECISIONS + prod_var_precision
         cfg['terminator'] = b'\n'
         # Set standard configuration and check cfg input
         super().setup(cfg)
@@ -59,13 +67,13 @@ class HyperBB(Instrument):
         self.active_timeseries_wavelength = np.zeros(len(self._parser.wavelength), dtype=bool)
         for wl in np.arange(450, 700, 50):
             channel_name = 'beta(%d)' % self._parser.wavelength[np.argmin(np.abs(self._parser.wavelength - wl))]
-            self.udpate_active_timeseries_variables(channel_name, True)
+            self.update_active_timeseries_variables(channel_name, True)
 
     def parse(self, packet):
         return self._parser.parse(packet)
 
     def handle_data(self, raw, timestamp):
-        bb, wl, gain, net_ref_zero_flag = self._parser.calibrate(np.array([raw], dtype=float))
+        beta_u, bb, wl, gain, net_ref_zero_flag = self._parser.calibrate(np.array([raw], dtype=float))
         signal = np.empty(len(self._parser.wavelength)) * np.nan
         try:
             sel = self._parser.wavelength == int(wl)
@@ -89,11 +97,11 @@ class HyperBB(Instrument):
         self.signal.new_spectrum_data.emit([self.signal_reconstructed])
         # Log data as received
         if self.log_prod_enabled and self._log_active:
-            self._log_prod.write(raw, timestamp)
+            self._log_prod.write(np.concatenate((raw, beta_u, bb)), timestamp)
             if not self.log_raw_enabled:
                 self.signal.packet_logged.emit()
 
-    def udpate_active_timeseries_variables(self, name, state):
+    def update_active_timeseries_variables(self, name, state):
         if not ((state and name not in self.widget_active_timeseries_variables_selected) or
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return
@@ -203,10 +211,10 @@ class HyperBBParser(metaclass=MetaHyperBBParser):
         """
         Calibrate an array of frames from HyperBB
 
-        :param raw: <nx30 np.array> frames decoded from HyperBB
-        :return: beta: <nx28 np.array> m being the number of wavelength
-                 wl: <nx1 np.array> wavelength (nm)
-                 gain: <nx1 np.array> gain used (1: none, 2: low, and 3: high)
+        :param raw: <nx30 np.ndarray> frames decoded from HyperBB
+        :return: beta: <nx28 np.ndarray> m being the number of wavelength
+                 wl: <nx1 np.ndarray> wavelength (nm)
+                 gain: <nx1 np.ndarray> gain used (1: none, 2: low, and 3: high)
         """
 
         # Remove scans with multiple gains
@@ -264,11 +272,12 @@ class HyperBBParser(metaclass=MetaHyperBBParser):
             beta_u[wl == kwl] = scatx_corrected[wl == kwl] * self.mu[self.wavelength == kwl]
         # Calculate backscattering
         bb = 2 * np.pi * self.Xp * beta_u
-        return bb, wl, gain, net_ref_zero_flag
+        return beta_u, bb, wl, gain, net_ref_zero_flag
 
 
 if __name__ == "__main__":
-    p_cal = '/Users/nils/Documents/Lab/Inlinino/development_ressources/HBB_SN8005_ShipDisk-2/MatlabProcessingSoftware/Hbb_Cal_Plaque_20210315_114120.mat'
-    t_cal = '/Users/nils/Documents/Lab/Inlinino/development_ressources/HBB_SN8005_ShipDisk-2/MatlabProcessingSoftware/HBB_Cal_Temp_20210315_205506.mat'
+    import os
+    p_cal = os.path.join('..', 'cfg', 'HBB8005_CalPlaque_20210315.mat')
+    t_cal = os.path.join('..', 'cfg', 'HBB8005_CalTemp_20210315.mat')
 
     hbb = HyperBBParser(p_cal, t_cal)

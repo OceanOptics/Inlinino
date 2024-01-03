@@ -4,7 +4,7 @@ Inlinino
 [![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)](https://www.python.org/downloads/)
 [![Documentation Status](https://readthedocs.org/projects/inlinino/badge/?version=latest)](https://inlinino.readthedocs.io/en/latest/?badge=latest)
 
-Inlinino is an open-source software data logger for oceanographers. It primarily logs measurements from optical instruments deployed on research vessels during month long campaigns. Secondarily, it provides real-time visualization, which helps users troubleshoot instruments in the field and ensure collection of quality data. Inlinino is designed to interface with either analog, serial, USB, UDP instruments. The data received is timestamped and logged as received (raw) and/or in a comma separated file (csv) for easy importation in data analysis software. Typically, a new log file is created every hour for simplicity of post-processing and backups. Instruments supported are: SeaBird TSG (SBE-45 + SBE-38), Biospherical Instruments Inc. PAR, WET Labs ECO instruments (e.g. ECO-BB3, ECO-FLBBCD), WET Labs ACS, Satlantic instruments (e.g. HyperOCR, HyperPro, HyperSAS, HyperNAV, Suna), Sequoia Scientific LISST, Sequoia Scientific HyperBB, NMEA, and analog sensors through a data acquisition system (DataQ DI-1100, Ontrak ADU100, and ADU200). Other instruments can be added via the user interface if they output simple ascii data frame, otherwise the code is intended to be modular to support new instruments. 
+Inlinino is an open-source software data logger for oceanographers. It primarily records measurements from optical instruments deployed on research vessels during month long campaigns. It provides real-time visualization, which helps users troubleshoot instruments in the field and ensure collection of quality data. Inlinino can interface with either analog, serial, USB, or UDP instruments. The data received is logged in a timestamped raw format (as communicated by the instrument) or in a comma separated file (csv) for easy importation in data analysis software. Typically, a new log file is created every hour for simplicity of post-processing and easy backups. Instruments supported are: Sea-Bird Scientific ACS, Sequoia HyperBB, Sequoia LISST100x, SeaBird TSG (SBE-45 + SBE-38), Biospherical Instruments Inc. PAR, Sea-Bird Scientific ECO sensors (e.g. ECO-BB3, ECO-FLBBCD, ECO-BB9), Satlantic (now SBS) instruments (e.g. HyperOCR, HyperPro, HyperSAS, HyperNAV, Suna), NMEA over serial or UDP, analog sensors via data acquisition systems (Ontrak ADU100, DataQ DI-1100, and DI-2108), and peripheral control (e.g. pump, 3-way valves) via relay interface (Ontrak ADU100, ADU200, and ADU208). Other serial instruments with ascii output can be configured with the user interface. Instruments with non-trivial output can be added by writing a dedicated python module.
      
 The documentation of the project is available at [http://inlinino.readthedocs.io](http://inlinino.readthedocs.io/en/latest/).
 
@@ -25,9 +25,10 @@ To install Inlinino (tested with python 3.8 only, should work with newer python 
 
     pip install -r requirements.txt
 
-On Ubuntu, PyQt5 should also be installed with apt:
+On Ubuntu, PyQt5 and PyQt5.QtMultimedia should also be installed with apt:
 
     sudo apt install python3-pyqt5
+    sudo apt install python3-pyqt5.qtmultimedia
 
 To use Ontrak ADU on Windows additional dll and python modules are needed. Note that in resources/ontrack the path to the dll need to be edited with `os.path.join(PATH_TO_RESOURCES, 'ontrak', 'AduHid')`.
     
@@ -63,4 +64,8 @@ The code is organized in:
 When Inlinino is started an engineering log file is created in `logs/inlinino_<YYYYMMDD>_<hhmmss>.log` and keep track of most tasks executed (e.g. user interaction, creation of data log files, warnings, and potential errors).
 
 ### Questions and issues
+On Ubuntu, one my night need to update the rights to the serial port to let Inlinino read and write from/to them. For example to give right to the serial port `/dev/ttyACM0`:
+
+    sudo chmod 666 /dev/ttyACM0
+
 For any questions or issues regarding Inlinino please contact [me](mailto:nils.haentjens+inlinino@maine.edu).

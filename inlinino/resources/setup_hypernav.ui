@@ -23,6 +23,9 @@
       <string>Starboard Radiometer</string>
      </property>
      <layout class="QFormLayout" name="formLayout">
+      <property name="fieldGrowthPolicy">
+       <enum>QFormLayout::ExpandingFieldsGrow</enum>
+      </property>
       <item row="0" column="0">
        <widget class="QLabel" name="label_6">
         <property name="text">
@@ -52,7 +55,7 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QPushButton" name="button_browse_px_reg_stb">
+       <widget class="QPushButton" name="button_browse_px_reg_sbd">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
@@ -202,6 +205,9 @@
       <string>Port Side Radiometer</string>
      </property>
      <layout class="QFormLayout" name="formLayout_2">
+      <property name="fieldGrowthPolicy">
+       <enum>QFormLayout::ExpandingFieldsGrow</enum>
+      </property>
       <item row="0" column="0">
        <widget class="QLabel" name="label_5">
         <property name="text">
@@ -341,7 +347,7 @@
   <tabstop>button_browse_px_reg_prt</tabstop>
   <tabstop>le_sbd_sbs_sn</tabstop>
   <tabstop>le_optional_px_reg_path_sbd</tabstop>
-  <tabstop>button_browse_px_reg_stb</tabstop>
+  <tabstop>button_browse_px_reg_sbd</tabstop>
  </tabstops>
  <resources/>
  <connections>
