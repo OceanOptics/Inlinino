@@ -16,6 +16,7 @@ class LISST(Instrument):
         super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Instrument Specific attributes
         self._parser = None
+        self._received_packet = False  # Used to query new measurement
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 10
@@ -78,6 +79,10 @@ class LISST(Instrument):
     def parse(self, packet):
         return (self._parser.unpack_packet(packet),)
 
+    def handle_packet(self, packet, timestamp):
+        self._received_packet = True
+        super().handle_packet(packet, timestamp)
+
     def handle_data(self, raw, timestamp):
         raw = raw[0]  # data is numpy array passed as tuple to go through handle_packet of generic module
         # Apply calibration
@@ -116,7 +121,9 @@ class LISST(Instrument):
         self._interface.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
 
     def write_to_interface(self):
-        self._interface.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
+        if self._received_packet:
+            self._received_packet = False
+            self._interface.write(b'GX' + bytes(self._parser.LINE_ENDING, self._parser.ENCODING))
 
     @staticmethod
     def format_aux_data(data):
