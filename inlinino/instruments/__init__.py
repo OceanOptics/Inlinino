@@ -152,13 +152,17 @@ class Instrument:
     def setup_interface(self, cfg):
         if 'interface' in cfg.keys():
             if cfg['interface'] == 'serial':
-                self._interface = SerialInterface()
+                if not isinstance(self._interface, SerialInterface):
+                    self._interface = SerialInterface()
             elif cfg['interface'] == 'socket':
-                self._interface = SocketInterface()
+                if not isinstance(self._interface, SocketInterface):
+                    self._interface = SocketInterface()
             elif cfg['interface'] == 'usb-hid':
-                self._interface = USBHIDInterface()
+                if not isinstance(self._interface, USBHIDInterface):
+                    self._interface = USBHIDInterface()
             elif cfg['interface'] == 'usb':
-                self._interface = USBInterface()
+                if not isinstance(self._interface, USBInterface):
+                    self._interface = USBInterface()
             else:
                 raise ValueError(f'Invalid communication interface {cfg["interface"]}')
 
@@ -181,7 +185,7 @@ class Instrument:
             self._interface.stop()
             if wait_thread_join:
                 timeout = self._interface.timeout if self._interface.timeout is not None else 1
-                self._thread.join(timeout)
+                self._thread.join(2*timeout)  # Need time to read and write
                 if self._thread.is_alive():
                     self.logger.warning('Thread did not join.')
             self.log_stop()
@@ -190,10 +194,17 @@ class Instrument:
 
     def run(self):
         if self._interface.is_open:
-            # Initialize interface (typically empty buffers)
-            self._interface.init()
-            # Send init frame to instrument
-            self.init_interface()
+            try:
+                # Initialize interface (typically empty buffers)
+                self._interface.init()
+                # Send init frame to instrument
+                self.init_interface()
+            except IOError as e:
+                self.logger.error(e)
+                if self.signal.alarm is not None:
+                    self.signal.alarm.emit(True)
+                self.close(wait_thread_join=False)
+                return
             # Set data timeout flag
             data_timeout_flag = False
             data_received = None
@@ -223,14 +234,19 @@ class Instrument:
                         data_timeout_flag = True
                         if self.signal.alarm is not None:
                             self.signal.alarm.emit(True)
-            except InterfaceException as e:
-                # probably some I/O problem such as disconnected USB serial
-                # adapters -> exit
+                # give instrument opportunity to write (e.g. commands) to interface
+                self.write_to_interface()
+            except IOError as e:
                 self.logger.error(e)
                 if self.signal.alarm is not None:
                     self.signal.alarm.emit(True)
                 break
-        self.close(wait_thread_join=False)
+        try:
+            self.close(wait_thread_join=False)
+        except IOError as e:
+            self.logger.error(e)
+            if self.signal.alarm is not None:
+                self.signal.alarm.emit(True)
 
     def data_received(self, data, timestamp):
         self._buffer.extend(data)
@@ -256,7 +272,6 @@ class Instrument:
 
     def handle_packet(self, packet, timestamp):
         self.signal.packet_received.emit()
-        self.write_to_interface()
         if self.log_raw_enabled and self._log_active:
             self._log_raw.write(packet, timestamp)
             self.signal.packet_logged.emit()
@@ -425,6 +440,8 @@ class SerialInterface(Interface):
     def stop(self):
         if hasattr(self._serial, 'cancel_read'):
             self._serial.cancel_read()
+        if hasattr(self._serial, 'cancel_write'):
+            self._serial.cancel_write()
 
     def close(self):
         self._serial.close()

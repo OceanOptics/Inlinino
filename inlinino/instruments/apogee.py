@@ -94,9 +94,7 @@ class ApogeeQuantumSensor(Instrument):
                 elif len(self._buffer) > self._max_buffer_length:
                     self.logger.warning('Buffer exceeded maximum length. Buffer emptied to prevent overflow')
                     self._buffer = bytearray()
-            except InterfaceException as e:
-                # probably some I/O problem such as disconnected USB serial
-                # adapters -> exit
+            except IOError as e:
                 self.logger.error(e)
                 if self.signal.alarm is not None:
                     self.signal.alarm.emit(True)

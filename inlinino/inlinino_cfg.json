@@ -377,7 +377,7 @@
       ],
       "log_raw": true,
       "log_products": true,
-      "log_path": "C:/data/TaraMicrobiome/5_Martinique-FrenchGuyana/GPS",
+      "log_path": "data",
       "manufacturer": "NMEA",
       "model": "SC701-Serial",
       "interface": "serial",
@@ -798,6 +798,45 @@
         "beta532",
         "beta660"
       ]
+    },
+    "28379668-fa05-11ed-8eb8-4c77cbaa9c6c": {
+      "module": "taratsg",
+      "manufacturer": "Sea-Bird",
+      "model": "SBE38+45",
+      "serial_number": "Tara42",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data"
+    },
+    "8953513e-0de7-11ed-b02c-acde48001122": {
+      "module": "hydroscat",
+      "log_raw": true,
+      "log_products": true,
+      "log_path": "data",
+      "calibration_file": "cfg/HS080339-2021-10-16.cal",
+      "burst_mode": true,
+      "sleep_on_memory_full": false,
+      "output_cal_header": true,
+      "fluorescence": 0,
+      "start_delay": 0.0,
+      "warmup_time": 0.0,
+      "burst_duration": 0.0,
+      "burst_cycle": 0.0,
+      "total_duration": 0.4,
+      "log_period": 0.5,
+      "manufacturer": "HobiLabs",
+      "model": "HydroScat",
+      "serial_number": "HS080339"
+    },
+    "1d3de7ba-fa9d-11ed-9dd0-4c77cbaa9c6c": {
+      "module": "acs",
+      "device_file": "cfg/acs382.dev",
+      "log_path": "data",
+      "manufacturer": "WetLabs",
+      "model": "ACS",
+      "serial_number": "382",
+      "log_raw": true,
+      "log_products": true
     }
   },
   "interfaces": {}

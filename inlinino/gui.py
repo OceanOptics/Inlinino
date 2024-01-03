@@ -4,6 +4,7 @@ import glob
 import logging
 import uuid
 import zipfile
+import configparser
 from math import floor
 from time import time, gmtime, strftime
 import serial
@@ -18,12 +19,12 @@ import pySatlantic.instrument as pySat
 from inlinino import RingBuffer, __version__, PATH_TO_RESOURCES, COLOR_SET
 from inlinino.app_signal import InstrumentSignals, HyperNavSignals
 from inlinino.cfg import CFG
-from inlinino.instruments import Instrument, SerialInterface, SocketInterface, USBInterface, USBHIDInterface, \
-    InterfaceException
+from inlinino.instruments import Instrument, SerialInterface, SocketInterface, USBInterface, USBHIDInterface
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.apogee import ApogeeQuantumSensor
 from inlinino.instruments.dataq import DATAQ
 from inlinino.instruments.hyperbb import HyperBB
+from inlinino.instruments.hydroscat import HydroScat
 from inlinino.instruments.hypernav import HyperNav, read_manufacturer_pixel_registration
 from inlinino.instruments.lisst import LISST
 from inlinino.instruments.nmea import NMEA
@@ -216,8 +217,8 @@ class MainWindow(QtGui.QMainWindow):
         min_x, max_x = None, None
         for i, (name, x) in enumerate(zip(self.instrument.spectrum_plot_trace_names,
                                           self.instrument.spectrum_plot_x_values)):
-                min_x = min(min_x, min(x)) if min_x is not None else min(x)
-                max_x = max(max_x, max(x)) if max_x is not None else max(x)
+                min_x = min(min_x, min(x)) if min_x is not None else (min(x) if len(x) > 0 else 0)
+                max_x = max(max_x, max(x)) if max_x is not None else (max(x) if len(x) > 0 else 10)
                 self.spectrum_plot_widget.addItem(pg.PlotCurveItem(
                     pen=pg.mkPen(color=COLOR_SET[i % len(COLOR_SET)], width=2), name=name))
         min_x = 0 if min_x is None else min_x
@@ -283,7 +284,7 @@ class MainWindow(QtGui.QMainWindow):
                         for k in ('port', 'baudrate', 'bytesize', 'parity', 'stopbits', 'timeout'):
                             CFG.interfaces[self.instrument.uuid][k] = getattr(dialog, k)
                         CFG.write()
-                    except InterfaceException as e:
+                    except IOError as e:
                         error_dialog()
             elif issubclass(type(self.instrument._interface), SocketInterface):
                 dialog = DialogSocketConnection(self)
@@ -297,7 +298,7 @@ class MainWindow(QtGui.QMainWindow):
                         for k in ('ip', 'port'):
                             CFG.interfaces[self.instrument.uuid]['socket_' + k] = getattr(dialog, k)
                         CFG.write()
-                    except InterfaceException as e:
+                    except IOError as e:
                         error_dialog()
             elif issubclass(type(self.instrument._interface), USBInterface) or \
                     issubclass(type(self.instrument._interface), USBHIDInterface) or \
@@ -305,7 +306,7 @@ class MainWindow(QtGui.QMainWindow):
                 # No need for dialog as automatic
                 try:
                     self.instrument.open()
-                except InterfaceException as e:
+                except IOError as e:
                     error_dialog()
             else:
                 logger.error('Interface not supported by GUI.')
@@ -503,15 +504,16 @@ class MainWindow(QtGui.QMainWindow):
 
 
 class MessageBoxAlarm(QtWidgets.QMessageBox):
-    TEXT = "An error occurred with the serial connection or " \
-           "no data was received in the past minute.\n" \
-           "  + Is the instrument powered?\n" \
-           "  + Is the communication cable (e.g. serial, usb, ethernet) connected?\n" \
-           "  + Is the instruments configured properly (e.g. automatically send data)?\n"
+    TEXT = "An error occurred with the connection or " \
+           "no data was received in the past minute.\n"
+    INFO_TEXT = "  + Is the instrument powered?\n" \
+                "  + Is the communication cable (e.g. serial, usb, ethernet) connected?\n" \
+                "  + Is the instruments configured properly (e.g. automatically send data)?\n"
 
     def __init__(self, parent):
         super().__init__(QtWidgets.QMessageBox.Warning, "Inlinino: Data Timeout Alarm",
                          self.TEXT, QtWidgets.QMessageBox.Ignore, parent)
+        self.setInformativeText(self.INFO_TEXT)
         self.setWindowModality(QtCore.Qt.WindowModal)
         self.active = False
         self.buttonClicked.connect(self.ignore)
@@ -529,9 +531,17 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
     def show(self, txt: str = None, sound: bool = True):
         if not self.active:
             if txt is None:
+                txt = ""
+                if instrument_name is not None:
+                    txt += f"Instument: {instrument_name}\n"
+                if interface_name is not None:
+                    opt = '' if ':' in interface_name else ' [disconnected]'
+                    txt += f"Port: {interface_name}{opt}\n\n"
+                self.setInformativeText(txt + self.INFO_TEXT)
                 self.setText(self.TEXT)
             else:
                 self.setText(txt)
+                self.setInformativeText('')
             super().show()
             if sound:
                 self.alarm_playlist.setCurrentIndex(0)
@@ -659,7 +669,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
             caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
 
-    def act_browse_calibration_file(self):  # Specific to Suna
+    def act_browse_calibration_file(self):  # Specific to Suna and HydroScat
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
             caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')
         self.le_calibration_file.setText(file_name)
@@ -756,7 +766,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_save(self):
         # Read form
-        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or 'le_' in a]
+        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or
+                  a.startswith('le_') or a.startswith('sb_') or a.startswith('dsb_') or a.startswith('cb_')]
         empty_fields = list()
         for f in fields:
             field_prefix, field_name = f.split('_', 1)
@@ -766,7 +777,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
             field_pretty_name = field_name.replace('_', ' ').title()
             if f in ['combobox_interface', 'combobox_model', *[f'combobox_relay{i}_mode' for i in range(4)]]:
                 self.cfg[field_name] = self.__dict__[f].currentText()
-            elif field_prefix == 'le':
+            elif field_prefix in ['le', 'sb', 'dsb']:
                 value = getattr(self, f).text().strip()
                 if not field_optional and not value:
                     empty_fields.append(field_pretty_name)
@@ -781,6 +792,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         # if len(value) > 3 and (value[:1] == "b'" and value[-1] == "'"):
                         #     value = bytes(value[2:-1], 'ascii')
                         value = value.strip().encode(self.ENCODING).decode('unicode_escape').encode(self.ENCODING)
+                    elif field_prefix == 'sb':  # SpinBox
+                        # a spinbox will contain either an int or float
+                        try:
+                            value = int(value)
+                        except ValueError:
+                            value = float(value)
+                    elif field_prefix == 'dsb':  # DoubleSpinBox
+                        value = float(value)
                     else:
                         value.strip()
                 except:
@@ -803,6 +822,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     self.cfg[field_name] = True
                 else:
                     self.cfg[field_name] = False
+            elif field_prefix == 'cb':
+                self.cfg[field_name] = getattr(self, f).isChecked()
         if self.cfg['module'] == 'dataq':
             # Remove optional fields specific to dataq
             f2rm = [f for f in empty_fields if f.startswith('Variable')]
@@ -930,6 +951,19 @@ class DialogInstrumentSetup(QtGui.QDialog):
             except Exception as e:
                 self.notification('Error in HyperNav configuration.', e)
                 return
+        elif self.cfg['module'] == 'hydroscat':
+            try:
+                f = configparser.ConfigParser()
+                f.read_file(open(self.cfg['calibration_file'], 'r'))
+                self.cfg['manufacturer'] = 'HobiLabs'
+                self.cfg['model'] = 'HydroScat'
+                self.cfg['serial_number'] = f.get('General', 'Serial')
+            except configparser.Error as e:
+                self.notification("Invalid HydroScat calibration file.", details=str(e))
+                return
+            except FileNotFoundError:
+                self.notification(f"No such calibration file: {self.cfg['calibration_file']}")
+                return
         # Update global instrument cfg
         CFG.read()  # Update local cfg if other instance updated cfg
         CFG.instruments[self.cfg_uuid] = self.cfg.copy()
@@ -1031,6 +1065,15 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                     getattr(self, 'combobox_' + k).setCurrentIndex(0)
                 else:
                     getattr(self, 'combobox_' + k).setCurrentIndex(1)
+            elif hasattr(self, 'dsb_' + k):
+                # double spin box
+                getattr(self, 'dsb_' + k).setValue(self.cfg[k])
+            elif hasattr(self, 'sb_' + k):
+                # spin box
+                getattr(self, 'sb_' + k).setValue(self.cfg[k])
+            elif hasattr(self, 'cb_' + k):
+                # check boxes
+                getattr(self, 'cb_' + k).setChecked(self.cfg[k])
         # Populate special fields specific to each module
         if self.cfg['module'] == 'dataq':
             for c in self.cfg['channels_enabled']:
@@ -1322,8 +1365,10 @@ class App(QtGui.QApplication):
         while not instrument_loaded:
             try:
                 instrument_class = {'generic': Instrument, 'acs': ACS, 'apogee': ApogeeQuantumSensor,
-                                    'dataq': DATAQ, 'hyperbb': HyperBB, 'hypernav': HyperNav,
-                                    'lisst': LISST, 'nmea': NMEA, 'ontrak': Ontrak, 'satlantic': Satlantic,
+                                    'dataq': DATAQ, 'hydroscat': HydroScat, 'hyperbb': HyperBB, 'hypernav': HyperNav,
+                                    'lisst': LISST, 'nmea': NMEA,
+                                    'ontrak': Ontrak,
+                                    'satlantic': Satlantic,
                                     'sunav1': SunaV1, 'sunav2': SunaV2, 'taratsg': TaraTSG}
                 instrument_signal = HyperNavSignals if instrument_module_name == 'hypernav' else InstrumentSignals
                 if instrument_module_name not in instrument_class.keys():

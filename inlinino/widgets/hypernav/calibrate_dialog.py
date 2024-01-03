@@ -10,7 +10,7 @@ from inlinino.widgets import GenericDialog, classproperty
 try:
     from hypernav.io import HyperNav as HyperNavIO
     from hypernav.calibrate import calibrate_legacy, calibrate
-except ModuleNotFoundError:
+except ImportError:
     HyperNavIO = None
 
 
