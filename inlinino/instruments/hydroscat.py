@@ -31,6 +31,9 @@ class HydroScat(Instrument):
 
     def __init__(self, uuid, cfg, *args, **kwargs):
         super().__init__(uuid, cfg, *args, setup=False, **kwargs)
+        # Interface (specific to aquasense package, setup_interface should not update interface)
+        self._io = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial, self._interface._serial))
+
         # Instrument state machine
         self.hydroscat: aquasense.hydroscat.HydroScat = None
         self.output_cal_header = None
@@ -81,12 +84,9 @@ class HydroScat(Instrument):
             errmsgs.append(f"Calibration file not found: {cfg['calibration_file']}")
         if errmsgs:
             raise ValueError('\n'.join(errmsgs))
-            
-        in_out = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial,
-                                                    self._interface._serial))
 
         self.hydroscat = aquasense.hydroscat.HydroScat(
-                            cal_path=cfg["calibration_file"], in_out=in_out,
+                            cal_path=cfg["calibration_file"], in_out=self._io,
                             out=None, sep=",", serial_mode=False,
                             burst_mode=cfg["burst_mode"],
                             sleep_on_memory_full=cfg["sleep_on_memory_full"],

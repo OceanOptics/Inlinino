@@ -152,13 +152,17 @@ class Instrument:
     def setup_interface(self, cfg):
         if 'interface' in cfg.keys():
             if cfg['interface'] == 'serial':
-                self._interface = SerialInterface()
+                if not isinstance(self._interface, SerialInterface):
+                    self._interface = SerialInterface()
             elif cfg['interface'] == 'socket':
-                self._interface = SocketInterface()
+                if not isinstance(self._interface, SocketInterface):
+                    self._interface = SocketInterface()
             elif cfg['interface'] == 'usb-hid':
-                self._interface = USBHIDInterface()
+                if not isinstance(self._interface, USBHIDInterface):
+                    self._interface = USBHIDInterface()
             elif cfg['interface'] == 'usb':
-                self._interface = USBInterface()
+                if not isinstance(self._interface, USBInterface):
+                    self._interface = USBInterface()
             else:
                 raise ValueError(f'Invalid communication interface {cfg["interface"]}')
 
