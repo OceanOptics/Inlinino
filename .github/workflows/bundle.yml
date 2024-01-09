@@ -42,7 +42,6 @@ jobs:
       - name: Checkout Aquasense Repository
         run: |
           git clone https://bitbucket.csiro.au/scm/aqrs/aquasense.git
-          ls -l
 
       - name: Setup python
         uses: actions/setup-python@v4
@@ -53,7 +52,7 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install -r requirements.txt
-          pip install -e hypernav
+          pip install -e hypernav/hypernav
           cd aquasense
           pip install .
           cd ..
