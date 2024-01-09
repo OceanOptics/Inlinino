@@ -11,6 +11,7 @@ on:
 jobs:
   Bundle:
     uses: ./.github/workflows/bundle.yml
+    secrets: inherit
 
   Release:
     uses: ./.github/workflows/release.yml

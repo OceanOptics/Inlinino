@@ -14,7 +14,6 @@ jobs:
 
   Bundle:
     name: Bundle
-    secrets: inherit
     strategy:
       fail-fast: false
       matrix:
