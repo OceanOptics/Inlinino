@@ -37,11 +37,11 @@ jobs:
         with:
           repository: OceanOptics/hypernav
           ssh-key: ${{ secrets.HYPERNAV_DEPLOY_KEY }}
-          path: hypernav
+          path: optional/hypernav
 
       - name: Checkout Aquasense Repository
         run: |
-          git clone https://bitbucket.csiro.au/scm/aqrs/aquasense.git
+          git clone https://bitbucket.csiro.au/scm/aqrs/aquasense.git optional/aquasense
 
       - name: Setup python
         uses: actions/setup-python@v4
@@ -52,10 +52,10 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install -r requirements.txt
-          pip install -e hypernav
-          cd aquasense
+          pip install -e optional/hypernav
+          cd optional/aquasense
           pip install .
-          cd ..
+          cd -
           pip install pyinstaller==6.0
           pip list
 
@@ -66,7 +66,7 @@ jobs:
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
           cd ../../hypernav/hypernav/
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
-          cd ../../
+          cd -
 
       - name: Download external resources (Windows)
         if: matrix.os == 'windows-latest'
@@ -75,7 +75,7 @@ jobs:
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
           cd ../../hypernav/hypernav/
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
-          cd ../
+          cd -
 
       - name: Make Bundle
         run: |

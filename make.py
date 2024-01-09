@@ -54,8 +54,8 @@ ls = [
 if hypernav is not None:
     print(hypernav.io.__version__)
     ls.extend([
-        (os.path.join(os.path.dirname(hypernav.__path__[0]), 'bin', '*.exe'), os.path.join('hypernav', 'bin')),
-        (os.path.join(os.path.dirname(hypernav.__path__[0]), 'calibrate', 'templates', '*.txt'),
+        (os.path.join(os.path.dirname(hypernav.__file__), 'bin', '*.exe'), os.path.join('hypernav', 'bin')),
+        (os.path.join(os.path.dirname(hypernav.__file__), 'calibrate', 'templates', '*.txt'),
          os.path.join('hypernav', 'calibrate', 'templates'))
     ])
 for item, dest in ls:
