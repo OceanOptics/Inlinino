@@ -64,7 +64,7 @@ jobs:
         run: |
           cd inlinino/resources
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd ../../hypernav/hypernav/
+          cd ../../optional/hypernav/hypernav/
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
           cd -
 
@@ -73,7 +73,7 @@ jobs:
         run: |
           cd inlinino/resources
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd ../../hypernav/hypernav/
+          cd ../../optional/hypernav/hypernav/
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
           cd -
 
