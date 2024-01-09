@@ -4,7 +4,7 @@ on:
   workflow_call:
     outputs:
       files:
-        description: 'List of artifact made by present workflow.'
+        description: 'List of artifact bundled.'
         value: |
           ${{ jobs.Bundle.outputs.ubuntu_artifact }}
           ${{ jobs.Bundle.outputs.macos_artifact }}
@@ -13,13 +13,14 @@ on:
 jobs:
 
   Bundle:
-    name: Bundle on Ubuntu, macOS, and Windows
-
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
+        os: [ 'ubuntu-latest', 'macos-latest', 'windows-latest' ]
+
+    name: Bundle on {{ matrix.os }}
+
+    runs-on: ${{ matrix.os }}
 
     outputs:
       ubuntu_artifact: ${{ steps.artifact_name.outputs.ubuntu-latest }}
@@ -29,12 +30,15 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          path: main
 
       - name: Checkout HyperNav Repository
         uses: actions/checkout@v4
         with:
           repository: OceanOptics/hypernav
           ssh-key: ${{ secrets.HYPERNAV_DEPLOY_KEY }}
+          path: hypernav
 
       - name: Checkout Aquasense Repository
         run: |
