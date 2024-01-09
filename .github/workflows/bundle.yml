@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: OceanOptics/hypernav
-          token: ${{ secrets.HYPERNAV_DEPLOY_KEY }}
+          ssh-key: ${{ secrets.HYPERNAV_DEPLOY_KEY }}
 
       - name: Checkout Aquasense Repository
         run: |
