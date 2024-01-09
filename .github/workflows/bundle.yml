@@ -52,7 +52,7 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install -r requirements.txt
-          pip install -e hypernav/hypernav
+          pip install -e hypernav
           cd aquasense
           pip install .
           cd ..
