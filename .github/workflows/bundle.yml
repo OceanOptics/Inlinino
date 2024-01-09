@@ -6,9 +6,10 @@ on:
       files:
         description: 'List of artifact bundled.'
         value: |
+          ${{ jobs.Bundle.outputs.windows_artifact }}
           ${{ jobs.Bundle.outputs.ubuntu_artifact }}
           ${{ jobs.Bundle.outputs.macos_artifact }}
-          ${{ jobs.Bundle.outputs.windows_artifact }}
+
 
 jobs:
 
@@ -29,8 +30,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-#        with:
-#          path: main
 
       - name: Checkout HyperNav Repository
         uses: actions/checkout@v4

@@ -5,7 +5,7 @@ on:
     inputs:
       files:
         description: 'Newline-delimited list of path globs for asset files to upload'
-        required: True
+        required: False
         type: string
 
 jobs:
@@ -20,18 +20,25 @@ jobs:
         run: |
           GIT_TAG=${GITHUB_REF#refs/*/}
           RELEASE_VERSION=${GIT_TAG#v}
-          RELEASE_DATETIME="$(date --utc '+%d.%m.%Y - %H:%M:%S')"
+          RELEASE_DATETIME="$(date --utc '+%Y-%m-%d %H:%M:%S')"
           # write to step outputs
           cat >> "$GITHUB_OUTPUT" << EOF
           gitTag=${GIT_TAG}
           version=${RELEASE_VERSION}
           datetime=${RELEASE_DATETIME}
           EOF
+          # Multi-line variables
+          echo "artifacts<<EOF" >> $GITHUB_OUTPUT
+          ls | xargs -n 1 >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
 
       - name: Create Release Page
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ inputs.files }}
+          files: ${{ steps.getVariables.outputs.artifacts }}
           body: |
             **Automated Release created on: ${{ steps.getVariables.outputs.datetime }}**
   
