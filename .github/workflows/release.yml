@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  workflow_call:
+    input:
+      files:
+        description: 'Newline-delimited list of path globs for asset files to upload'
+        required: True
+        type: string
+
+jobs:
+
+  Release:
+    name: Release with Artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract Git tag from GITHUB_REF
+        id: getVariables
+        run: |
+          GIT_TAG=${GITHUB_REF#refs/*/}
+          RELEASE_VERSION=${GIT_TAG#v}
+          RELEASE_DATETIME="$(date --utc '+%d.%m.%Y - %H:%M:%S')"
+          # write to step outputs
+          cat >> "$GITHUB_OUTPUT" << EOF
+          gitTag=${GIT_TAG}
+          version=${RELEASE_VERSION}
+          datetime=${RELEASE_DATETIME}
+          EOF
+
+      - name: Create Release Page
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ inputs.files }}
+          body: |
+            **Automated Release created on: ${{ steps.getVariables.outputs.datetime }}**
+  
+            # New Features
+            * tbd
+  
+            # Changes
+            * tbd
+  
+            # Bug Fixes
+            * tbd
+          draft: true
+          prerelease: false

@@ -1,29 +1,59 @@
+name: Bundle
+
 on:
-  push:
-    branches:
-      - master
-      - dev
+  workflow_call:
+    outputs:
+      files:
+        description: 'List of artifact made by present workflow.'
+        value: |
+          ${{ jobs.Bundle.outputs.ubuntu_artifact }}
+          ${{ jobs.Bundle.outputs.macos_artifact }}
+          ${{ jobs.Bundle.outputs.windows_artifact }}
 
 jobs:
-  build:
+
+  Bundle:
+    name: Bundle on Ubuntu, macOS, and Windows
+
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
 
+    outputs:
+      ubuntu_artifact: ${{ steps.artifact_name.outputs.ubuntu-latest }}
+      macos_artifact: ${{ steps.artifact_name.outputs.macos-latest }}
+      windows_artifact: ${{ steps.artifact_name.outputs.windows-latest }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Checkout HyperNav Repository
+        uses: actions/checkout@v4
+        with:
+          repository: OceanOptics/hypernav
+          token: ${{ secrets.HYPERNAV_DEPLOY_KEY }}
+
+      - name: Checkout Aquasense Repository
+        run: |
+          git clone https://bitbucket.csiro.au/scm/aqrs/aquasense.git
+          ls -l
 
       - name: Setup python
         uses: actions/setup-python@v4
         with:
           python-version: '3.8'
           cache: 'pip'
+
       - name: Install python dependencies
         run: |
           pip install -r requirements.txt
+          pip install -e hypernav
+          cd Aquasense
+          pip install .
+          cd ..
           pip install pyinstaller==6.0
           pip list
 
@@ -47,14 +77,12 @@ jobs:
 
       - name: Get Bundle Name (Ubuntu & Windows)
         if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')
-        run: |
-          echo "BUNDLE_NAME=$(ls bundle/dist | xargs)" >> $GITHUB_ENV
+        run: echo "BUNDLE_NAME=$(ls bundle/dist | xargs)" >> $GITHUB_ENV
         shell: bash
 
       - name: Get Bundle Name (macOS)
         if: matrix.os == 'macos-latest'
-        run: |
-          echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
+        run: echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
 
       - name: Zip Bundle
         uses: thedoctor0/zip-release@0.7.1
@@ -69,5 +97,10 @@ jobs:
         with:
           name: ${{ env.BUNDLE_NAME }}
           path: bundle/dist/${{ env.BUNDLE_NAME }}.zip
+          if-no-files-found: error
         # Known issue of double zip: https://github.com/actions/upload-artifact/issues/39
         # However, need to zip before upload as too many files to send otherwise (very slow)
+
+      - name: Output Artifact Name
+        id: artifact_name
+        run: echo "${{ matrix.os }}=${{ env.BUNDLE_NAME }}" >> $GITHUB_OUTPUT
