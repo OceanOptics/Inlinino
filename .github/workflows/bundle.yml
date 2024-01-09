@@ -29,11 +29,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          path: main
-
-      - name: Test
-        run: echo ${{ secrets.SECRET_TEST }}
+#        with:
+#          path: main
 
       - name: Checkout HyperNav Repository
         uses: actions/checkout@v4
@@ -57,7 +54,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -e hypernav
-          cd Aquasense
+          cd aquasense
           pip install .
           cd ..
           pip install pyinstaller==6.0

@@ -11,7 +11,7 @@ on:
 jobs:
   Bundle:
     uses: ./.github/workflows/bundle.yml
-    secrets: inherit
+    secrets: inherit  # Required to check out HyperNav repo
 
   Release:
     uses: ./.github/workflows/release.yml
