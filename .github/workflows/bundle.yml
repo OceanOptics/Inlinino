@@ -65,14 +65,20 @@ jobs:
         run: |
           cd inlinino/resources
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd ../../
+          cd ../../hypernav
+          ls
+          wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
+          cd ../
 
       - name: Download external resources (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           cd inlinino/resources
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd ../../    
+          cd ../../hypernav
+          ls
+          C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
+          cd ../
 
       - name: Make Bundle
         run: |
