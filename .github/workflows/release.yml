@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
+        with:
+          merge-multiple: True
 
       - name: Extract Git tag and Artifact names
         id: get_variables

@@ -104,7 +104,7 @@ jobs:
         # Known issue of double zip: https://github.com/actions/upload-artifact/issues/39
         # However, need to zip before upload as too many files to send otherwise (very slow)
 
-      - name: Output Artifact Name & Id
+      - name: Output Artifact Name
         id: artifact_id
         shell: bash
         run: echo "${{ matrix.os }}-name=${{ env.BUNDLE_NAME }}" >> $GITHUB_OUTPUT
