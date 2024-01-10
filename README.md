@@ -3,6 +3,7 @@ Inlinino
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)](https://www.python.org/downloads/)
 [![Documentation Status](https://readthedocs.org/projects/inlinino/badge/?version=latest)](https://inlinino.readthedocs.io/en/latest/?badge=latest)
+[![Build](https://github.com/OceanOptics/Inlinino/actions/workflows/pipeline.yml/badge.svg)](https://github.com/OceanOptics/Inlinino/actions/workflows/pipeline.yml)
 
 Inlinino is an open-source software data logger for oceanographers. It primarily records measurements from optical instruments deployed on research vessels during month long campaigns. It provides real-time visualization, which helps users troubleshoot instruments in the field and ensure collection of quality data. Inlinino can interface with either analog, serial, USB, or UDP instruments. The data received is logged in a timestamped raw format (as communicated by the instrument) or in a comma separated file (csv) for easy importation in data analysis software. Typically, a new log file is created every hour for simplicity of post-processing and easy backups. Instruments supported are: Sea-Bird Scientific ACS, Sequoia HyperBB, Sequoia LISST100x, SeaBird TSG (SBE-45 + SBE-38), Biospherical Instruments Inc. PAR, Sea-Bird Scientific ECO sensors (e.g. ECO-BB3, ECO-FLBBCD, ECO-BB9), Satlantic (now SBS) instruments (e.g. HyperOCR, HyperPro, HyperSAS, HyperNAV, Suna), NMEA over serial or UDP, analog sensors via data acquisition systems (Ontrak ADU100, DataQ DI-1100, and DI-2108), and peripheral control (e.g. pump, 3-way valves) via relay interface (Ontrak ADU100, ADU200, and ADU208). Other serial instruments with ascii output can be configured with the user interface. Instruments with non-trivial output can be added by writing a dedicated python module.
      
@@ -39,14 +40,14 @@ To use Ontrak ADU on Windows additional dll and python modules are needed. Note 
     unzip adu_python_libusb.zip
     cp adu_python_libusb/libusb/* inlinino/ressources/libusb
 
-To use HydroScat, the Python `aquasense` package is needed. See `README.md` in the [aquasense repository](https://bitbucket.csiro.au/projects/AQRS/repos/aquasense/browse) for installation after cloning https://bitbucket.csiro.au/scm/aqrs/aquasense.git. See also the [CSIRO aquasense record](http://hdl.handle.net/102.100.100/602807?index=1).
+To use HydroScat, the Python `aquasense` package is required. See `README.md` in the [aquasense repository](https://bitbucket.csiro.au/projects/AQRS/repos/aquasense/browse) for installation after cloning https://bitbucket.csiro.au/scm/aqrs/aquasense.git. See also the [CSIRO aquasense record](http://hdl.handle.net/102.100.100/602807?index=1).
 
 Inlinino can then be started from the folder containing inlinino's source code with.
 
     python -m inlinino
 
 ### Inlinino Software
-The application is written in Python 3, on top of pySerial, numpy, and PyQt5. The current version works with a "classic" Graphical User Interface. A web interface started to be implemented and can be found in the branch `tb-app` of this repository. A command line interface used to be available but was not ported to version >2.0.
+The application is written in Python 3, on top of pySerial, numpy, and PyQt5. The current version works with a "classic" Graphical User Interface. A web interface started to be implemented and can be found in the branch `tb-app` of this repository. A command line interface used to be available but is no longer supported (latest at v1.x).
 
 The code is organized in:
   + `docs`: User Documentation ([ReadTheDocs](https://inlinino.readthedocs.io/))
@@ -55,10 +56,7 @@ The code is organized in:
     - `ressources/`: User Interface Layout and Logo.
     - `*.py`: Core code of Inlinino.
     - `inlinino_cfg.json`: Applications parameters are saved in this file ([ReadTheDocs](https://inlinino.readthedocs.io/en/latest/cfg.html))
-  + `mcu_firmwares`: Firmwares to upload on a microcontroller for the previous DAQ module (deprecated)
-    - `PASC.cpp`: Precision analog to serial converter (PASC) firmware
-    - `Simulino.cpp `: Instrument simulator to test Inlinino with microcontrollers simulating the behavior of scientific instruments.
-  + `make.py`: Bundles Inlinino application into a .app or .exe depending on platform. pyInstaller must be installed.
+  + `make.py`: Bundles Inlinino application into a .app or .exe depending on platform, requires pyInstaller.
   + `setup.py`: Python environment setup file.
 
 When Inlinino is started an engineering log file is created in `logs/inlinino_<YYYYMMDD>_<hhmmss>.log` and keep track of most tasks executed (e.g. user interaction, creation of data log files, warnings, and potential errors).

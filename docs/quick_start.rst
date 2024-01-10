@@ -4,28 +4,7 @@
 Quick Start
 ===========
 
-.. |link-to-ftp| raw:: html
-
-    <a href="https://misclab.umeoce.maine.edu/software/Inlinino/Inlinino-v
-
-.. |end-link-win| raw:: html
-
-    -windows.zip">Windows</a>
-
-.. |end-link-win7| raw:: html
-
-    -windows7.zip">Windows 7</a>
-
-.. |end-link-mac| raw:: html
-
-    -darwin.zip">macOS (Intel)</a>
-
-Inlinino is available for Windows and macOS, the packaged executable can be downloaded with the links below.
-
-    + |link-to-ftp|\ |release|\ |end-link-win|
-    + |link-to-ftp|\ |release|\ |end-link-mac|
-
-Advance users or developers can setup the software directly from source (`GitHub Repository <https://github.com/OceanOptics/Inlinino/>`__).
+Inlinino's executable for Windows, macOS, and Ubuntu can be downloaded `here <https://github.com/OceanOptics/Inlinino/releases/>`__. Advance users or developers can run Inlinino directly from the source code available on the (`GitHub repository <https://github.com/OceanOptics/Inlinino/>`__).
 
 .. contents:: Table of Contents
 
