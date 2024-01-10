@@ -15,7 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Extract Git tag from GITHUB_REF
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Extract Git tag and Artifact names
         id: getVariables
         run: |
           GIT_TAG=${GITHUB_REF#refs/*/}
@@ -32,8 +35,7 @@ jobs:
           ls | xargs -n 1 >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+      - run: echo ${{ steps.getVariables.outputs.artifacts }}
 
       - name: Create Release Page
         uses: softprops/action-gh-release@v1
