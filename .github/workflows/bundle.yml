@@ -9,12 +9,6 @@ on:
           ${{ jobs.Bundle.outputs.ubuntu_artifact_filename }}
           ${{ jobs.Bundle.outputs.macos_artifact_filename }}
           ${{ jobs.Bundle.outputs.windows_artifact_filename }}
-      ids:
-        description: 'List of artifact ids.'
-        value: |
-          ${{ jobs.Bundle.outputs.ubuntu_artifact_id }}
-          ${{ jobs.Bundle.outputs.macos_artifact_id }}
-          ${{ jobs.Bundle.outputs.windows_artifact_id }}
 
 jobs:
   Bundle:
@@ -30,9 +24,6 @@ jobs:
       ubuntu_artifact_filename: ${{ steps.artifact_id.outputs.ubuntu-latest-name }}
       macos_artifact_filename: ${{ steps.artifact_id.outputs.macos-latest-name }}
       windows_artifact_filename: ${{ steps.artifact_id.outputs.windows-latest-name }}
-      ubuntu_artifact_id: ${{ steps.artifact_id.outputs.ubuntu-latest-id }}
-      macos_artifact_id: ${{ steps.artifact_id.outputs.macos-latest-id }}
-      windows_artifact_id: ${{ steps.artifact_id.outputs.windows-latest-id }}
 
     steps:
       - name: Checkout Repository
@@ -106,7 +97,6 @@ jobs:
 
       - name: Upload Bundle
         uses: actions/upload-artifact@v4
-        id: upload_artifact
         with:
           name: ${{ env.BUNDLE_NAME }}
           path: bundle/dist/${{ env.BUNDLE_NAME }}.zip
@@ -117,6 +107,4 @@ jobs:
       - name: Output Artifact Name & Id
         id: artifact_id
         shell: bash
-        run: |
-          echo "${{ matrix.os }}-name=${{ env.BUNDLE_NAME }}" >> $GITHUB_OUTPUT
-          echo "${{ matrix.os }}-id=${{ steps.upload_artifact.outputs.artifact_id }}" >> $GITHUB_OUTPUT
+        run: echo "${{ matrix.os }}-name=${{ env.BUNDLE_NAME }}" >> $GITHUB_OUTPUT
