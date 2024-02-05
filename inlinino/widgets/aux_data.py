@@ -31,3 +31,7 @@ class AuxDataWidget(GenericWidget):
     def on_new_aux_data(self, data):
         for i, v in enumerate(data):
             self.variable_values[i].setText(str(v))
+            if v in ('CRITICAL', 'ERROR', 'WARNING'):
+                self.variable_values[i].setStyleSheet('color: #e0463e;')
+            else:
+                self.variable_values[i].setStyleSheet('')

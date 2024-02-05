@@ -472,20 +472,19 @@ class MainWindow(QtGui.QMainWindow):
     @QtCore.pyqtSlot(bool)
     def on_data_timeout(self, active):
         if active and not self.alarm_message_box.active:
-            txt = ""
+            txt = self.alarm_message_box.TEXT
             if self.instrument.name is not None:
                 txt += f"Instument: {self.instrument.name}\n"
             if self.instrument.interface_name is not None:
                 txt += f"Port: {self.instrument.interface_name}\n\n"
-            txt += self.alarm_message_box.TEXT
             self.alarm_message_box.show(txt)
         elif not active and self.alarm_message_box.active:
             self.alarm_message_box.hide()
 
-    @QtCore.pyqtSlot(str)
-    def on_custom_alarm(self, text):
+    @QtCore.pyqtSlot(str, str)
+    def on_custom_alarm(self, text, info_text):
         if not self.alarm_message_box.active:
-            self.alarm_message_box.show(text, sound=False)
+            self.alarm_message_box.show(text, info_text, sound=False)
 
     def closeEvent(self, event):
         icon, txt = QtGui.QMessageBox.Question, "Are you sure you want to exit?"
@@ -528,20 +527,10 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
         self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
         self.alarm_sound.setPlaylist(self.alarm_playlist)
 
-    def show(self, txt: str = None, sound: bool = True):
+    def show(self, txt: str = None, info_txt: str = None, sound: bool = True):
         if not self.active:
-            if txt is None:
-                txt = ""
-                if instrument_name is not None:
-                    txt += f"Instument: {instrument_name}\n"
-                if interface_name is not None:
-                    opt = '' if ':' in interface_name else ' [disconnected]'
-                    txt += f"Port: {interface_name}{opt}\n\n"
-                self.setInformativeText(txt + self.INFO_TEXT)
-                self.setText(self.TEXT)
-            else:
-                self.setText(txt)
-                self.setInformativeText('')
+            self.setText(self.TEXT if txt is None else txt)
+            self.setInformativeText(self.INFO_TEXT if info_txt is None else info_txt)
             super().show()
             if sound:
                 self.alarm_playlist.setCurrentIndex(0)
@@ -861,7 +850,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 else:
                     self.cfg['model'] = 'UnknownMeterType'
                 self.cfg['serial_number'] = str(int(foo[-6:], 16))
-            except:
+            except Exception as e:
+                logger.error(e)
                 self.notification('Unable to parse acs device file.')
                 return
             if 'log_raw' not in self.cfg.keys():

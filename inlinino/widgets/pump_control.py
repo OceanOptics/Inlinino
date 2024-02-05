@@ -1,5 +1,5 @@
 from inlinino.widgets import GenericWidget
-from inlinino.instruments.ontrak import RELAY_ON, RELAY_HOURLY
+from inlinino.instruments.ontrak import Relay
 
 
 class PumpControlWidget(GenericWidget):
@@ -9,9 +9,9 @@ class PumpControlWidget(GenericWidget):
         self.spinbox_pump_on.valueChanged.connect(self.set_timing)
 
     def setup(self):
-        self.instrument.relay_status = RELAY_HOURLY
-        self.set_timing()
         if self.instrument.widget_pump_control_enabled:
+            self.instrument.relay.mode = Relay.HOURLY
+            self.set_timing()
             self.show()
         else:
             self.hide()
@@ -22,11 +22,11 @@ class PumpControlWidget(GenericWidget):
     def toggle_pump(self):
         if self.pb_toggle_pump.isChecked():
             self.pb_toggle_pump.setText('FORCE PUMP ON')
-            self.instrument.relay_status = RELAY_ON
+            self.instrument.relay.mode = Relay.ON
         else:
             self.pb_toggle_pump.setText('Force Pump On')
-            self.instrument.relay_status = RELAY_HOURLY
+            self.instrument.relay.mode = Relay.HOURLY
 
     def set_timing(self):
-        self.instrument.relay_hourly_start_at = 0
-        self.instrument.relay_on_duration = self.spinbox_pump_on.value()
+        self.instrument.relay.hourly_start_at = 0
+        self.instrument.relay.on_duration = self.spinbox_pump_on.value()

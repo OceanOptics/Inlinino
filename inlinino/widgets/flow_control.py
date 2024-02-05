@@ -1,6 +1,6 @@
 from time import time
 
-from inlinino.instruments.ontrak import RELAY_ON, RELAY_OFF, RELAY_HOURLY, RELAY_INTERVAL
+from inlinino.instruments.ontrak import Relay
 from inlinino.widgets import GenericWidget
 
 
@@ -16,9 +16,9 @@ class FlowControlWidget(GenericWidget):
         self.spinbox_instrument_control_filter_duration.valueChanged.connect(self.set_switch_timing)
 
     def setup(self):
-        self.set_switch_mode()
-        self.set_switch_timing()
         if self.instrument.widget_flow_control_enabled:
+            self.set_switch_mode()
+            self.set_switch_timing()
             self.show()
         else:
             self.hide()
@@ -28,26 +28,26 @@ class FlowControlWidget(GenericWidget):
 
     def set_switch_mode(self):
         if self.radio_instrument_control_filter.isChecked():
-            self.instrument.relay_status = RELAY_ON
+            self.instrument.relay.mode = Relay.ON
             self.group_box_instrument_control_filter_schedule.setEnabled(False)
         elif self.radio_instrument_control_total.isChecked():
-            self.instrument.relay_status = RELAY_OFF
+            self.instrument.relay.mode = Relay.OFF
             self.group_box_instrument_control_filter_schedule.setEnabled(False)
         elif self.radio_instrument_control_hourly.isChecked():
-            self.instrument.relay_status = RELAY_HOURLY
+            self.instrument.relay.mode = Relay.HOURLY
             self.group_box_instrument_control_filter_schedule.setEnabled(True)
             self.label_instrument_control_filter_start_every.setText('Start at minute')
-            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_hourly_start_at)
+            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay.hourly_start_at)
         elif self.radio_instrument_control_interval.isChecked():
-            self.instrument._relay_interval_start = time() - self.instrument.relay_on_duration * 60
-            self.instrument.relay_status = RELAY_INTERVAL
+            self.instrument.relay.interval_start = time() - self.instrument.relay.on_duration * 60
+            self.instrument.relay.mode = Relay.INTERVAL
             self.group_box_instrument_control_filter_schedule.setEnabled(True)
             self.label_instrument_control_filter_start_every.setText('Every (min)')
-            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay_off_duration)
+            self.spinbox_instrument_control_filter_start_every.setValue(self.instrument.relay.off_duration)
 
     def set_switch_timing(self):
         if self.radio_instrument_control_hourly.isChecked():
-            self.instrument.relay_hourly_start_at = self.spinbox_instrument_control_filter_start_every.value()
+            self.instrument.relay.hourly_start_at = self.spinbox_instrument_control_filter_start_every.value()
         elif self.radio_instrument_control_interval.isChecked():
-            self.instrument.relay_off_duration = self.spinbox_instrument_control_filter_start_every.value()
-        self.instrument.relay_on_duration = self.spinbox_instrument_control_filter_duration.value()
+            self.instrument.relay.off_duration = self.spinbox_instrument_control_filter_start_every.value()
+        self.instrument.relay.on_duration = self.spinbox_instrument_control_filter_duration.value()

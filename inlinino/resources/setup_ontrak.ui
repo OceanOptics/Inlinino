@@ -263,7 +263,12 @@
            <widget class="QComboBox" name="combobox_relay0_mode">
             <item>
              <property name="text">
-              <string>Switch</string>
+              <string>Switch (one-wire)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Switch (two-wire)</string>
              </property>
             </item>
             <item>

@@ -16,10 +16,6 @@ else:
     aduhid = None
 
 
-RELAY_OFF = 0
-RELAY_ON = 1
-RELAY_HOURLY = 2
-RELAY_INTERVAL = 3
 GALLONS_TO_LITERS = 3.78541
 
 
@@ -84,15 +80,8 @@ class Ontrak(Instrument):
         # Instrument Specific attributes
         # Relay
         self.relay_enabled = True
-        # TODO Store four parameters below in configuration file to replicate main interface
-        self.relay_mode = 'Switch'
-        self.relay_status = RELAY_HOURLY
-        self.relay_hourly_start_at = 0   # minutes
-        self.relay_on_duration = 10      # minutes
-        self.relay_off_duration = 30     # minutes
-        self._relay_interval_start = None
-        self._relay_hourly_skip_before = 0
-        self._relay_cached_position = None
+        self.relay_gui_mode = 'Switch'
+        self.relay = Relay(0)
         # Event Counter(s) / Flowmeter(s)
         self.event_counter_channels = [0]
         self.event_counter_k_factors = [1381]
@@ -131,22 +120,21 @@ class Ontrak(Instrument):
         self.relay_enabled = cfg['relay0_enabled']
         if 'relay0_mode' not in cfg.keys():
             raise ValueError('Missing field relay0 mode')
-        if cfg['relay0_mode'] not in ['Switch', 'Pump']:
+        if cfg['relay0_mode'] not in ['Switch', 'Switch (one-wire)', 'Switch (two-wire)', 'Pump']:
             raise ValueError('relay0_mode not supported. Supported models are: Switch and Pump')
-        self.relay_mode = cfg['relay0_mode']
+        self.relay_gui_mode = cfg['relay0_mode']
+        self.relay = CoupledExpiringRelay(0, 1) if 'two-wire' in self.relay_gui_mode else Relay(0)
         if not self.relay_enabled:
             self.widget_flow_control_enabled = False
             self.widget_pump_control_enabled = False
-        elif self.relay_mode == 'Switch':
+        elif self.relay_gui_mode.startswith('Switch'):
             self.widget_flow_control_enabled = True
             self.widget_pump_control_enabled = False
-            self.relay_status = RELAY_HOURLY
-        elif self.relay_mode == 'Pump':
+            self.relay.mode = Relay.HOURLY
+        elif self.relay_gui_mode == 'Pump':
             self.widget_flow_control_enabled = False
             self.widget_pump_control_enabled = True
-            self.relay_status = RELAY_HOURLY
-        self._relay_interval_start = None
-        self._relay_cached_position = None
+            self.relay.mode = Relay.HOURLY
         if 'event_counter_channels_enabled' not in cfg.keys():
             raise ValueError('Missing field event counter channels enabled')
         self.event_counter_channels = cfg['event_counter_channels_enabled']
@@ -171,9 +159,9 @@ class Ontrak(Instrument):
             self.analog_gains = []
         self._analog_calibration_timestamp = None
         # Overload cfg with DATAQ specific parameters
-        if self.relay_mode == 'Switch':
+        if self.relay_gui_mode.startswith('Switch'):
             relay_label, relay_units = 'Switch', '0=TOTAL|1=FILTERED'
-        elif self.relay_mode == 'Pump':
+        elif self.relay_gui_mode == 'Pump':
             relay_label, relay_units = 'Pump', '0=OFF|1=ON'
         else:
             relay_label, relay_units = 'Relay', '0=OFF|1=ON'
@@ -192,14 +180,15 @@ class Ontrak(Instrument):
         # Update Auxiliary Widget
         self.widget_aux_data_variable_names = []
         if self.relay_enabled:
-            if self.relay_mode == 'Switch':
+            if self.relay_gui_mode.startswith('Switch'):
                 self.widget_aux_data_variable_names.append('Switch')
-            elif self.relay_mode == 'Pump':
+            elif self.relay_gui_mode == 'Pump':
                 self.widget_aux_data_variable_names.append('Pump')
             else:
                 self.widget_aux_data_variable_names.append('Relay')
         for c in self.event_counter_channels:
             self.widget_aux_data_variable_names.append(f'Flow #{c} (L/min)')
+            self.widget_aux_data_variable_names.append(f'Flow Status #{c}')
         for c in self.analog_channels:
             self.widget_aux_data_variable_names.append(f'Analog C{c} (V)')
 
@@ -229,8 +218,10 @@ class Ontrak(Instrument):
             super().open(**kwargs)
 
     def close(self, wait_thread_join=True):
-        if self.relay_mode == 'Pump':
-            self.relay_status = RELAY_OFF
+        if self.relay_gui_mode == 'Pump':
+            self.relay.mode = Relay.OFF
+            if self.relay_enabled:
+                self.relay.set(self._interface)
             self.set_relay()
         super().close(wait_thread_join)
 
@@ -242,7 +233,7 @@ class Ontrak(Instrument):
             try:
                 tic = time()
                 # Set relay, read event counters, and analog
-                relay = self.set_relay()
+                relay = self.relay.set(self._interface) if self.relay_enabled else None
                 ec_timestamps, ec_values = self.read_event_counters()
                 analog_values = self.read_analog()
                 timestamp = time()
@@ -269,18 +260,17 @@ class Ontrak(Instrument):
         for channel in self.event_counter_channels:
             self._interface.write(f'RC{channel}')  # Set all event counters to 0
             self._interface.read()
-        self._interface.write('RPK0')
-        value = self._interface.read()
-        self._relay_cached_position = None if value is None else bool(value)
-        if self.relay_mode == 'Pump':
+        self.relay.read(self._interface)
+        if self.relay_gui_mode == 'Pump':
             # Skip first hour
-            self._relay_hourly_skip_before = time() + 3600
-            # self._relay_interval_start = time() - self.relay_on_duration * 60  # Default to off on start
+            self.relay.hourly_skip_before = time() + 3600
+            # self.relay.interval_start = time() - self.relay_on_duration * 60  # Default to off on start
         else:
-            self._relay_hourly_skip_before = 0
-        self._relay_interval_start = time()
+            self.relay.hourly_skip_before = 0
+        self.relay.interval_start = time()
         # Reset low flow alarm
         self._low_flow_alarm_started = False
+        self._low_flow_alarm_on = False
 
     def parse(self, packet: ADUPacket):
         data: List[bool, float] = [packet.relay] if self.relay_enabled else []
@@ -298,18 +288,23 @@ class Ontrak(Instrument):
     def handle_data(self, data, timestamp):
         super().handle_data(data, timestamp)
         # Format and signal aux data
-        aux, i = [None] * len(data), 0
+        aux, i = [None] * len(self.widget_aux_data_variable_names), 0
         if self.relay_enabled:
-            if self.relay_mode == 'Switch':
+            if self.relay_gui_mode.startswith('Switch'):
                 aux[i] = 'Filter' if data[i] else 'Total'
             else:
                 aux[i] = 'On' if data[i] else 'Off'
             i += 1
+        ii = i
         for _ in self.event_counter_channels:
-            aux[i] = f'{data[i]:.2f}'
+            aux[ii] = f'{data[i]:.2f}'
+            ii += 1
+            aux[ii] = 'CRITICAL' if 0.1 < data[i] < 1.0 else ('WARNING' if data[i] < 2.0 or self._low_flow_alarm_on else 'OK')
+            ii += 1
             i += 1
         for _ in self.analog_channels:
-            aux[i] = f'{data[i]:.4f}'
+            aux[ii] = f'{data[i]:.4f}'
+            ii += 1
             i += 1
         self.signal.new_aux_data.emit(aux)
         # Set low flow alarm
@@ -338,7 +333,7 @@ class Ontrak(Instrument):
                 self._low_flow_alarm_off_counter += 1
             if not self._low_flow_alarm_on and self._low_flow_alarm_on_counter > 120:
                 self._low_flow_alarm_on = True
-                self.signal.alarm_custom.emit('Low flow (<2 L/min). Possible issues:\n'
+                self.signal.alarm_custom.emit('Low flow (<2 L/min).', 'Possible issues:\n'
                                               '    - filter is full, replace filter\n'
                                               '    - pump is too slow, adjust back pressure\n')
             elif self._low_flow_alarm_on and self._low_flow_alarm_off_counter > 20:
@@ -351,35 +346,7 @@ class Ontrak(Instrument):
         :return:
         """
         if not self.relay_enabled:
-            return None
-        # Get relay position
-        if self.relay_status == RELAY_ON:
-            set_relay = True
-        elif self.relay_status == RELAY_OFF:
-            set_relay = False
-        elif self.relay_status == RELAY_HOURLY:
-            minute = int(strftime('%M'))
-            stop_at = self.relay_hourly_start_at + self.relay_on_duration
-            if ((self.relay_hourly_start_at <= minute < stop_at < 60) or \
-                    (60 <= stop_at and (self.relay_hourly_start_at <= minute or minute < stop_at % 60))) and \
-                    self._relay_hourly_skip_before < time():
-                set_relay = True
-            else:
-                set_relay = False
-        elif self.relay_status == RELAY_INTERVAL:
-            delta = ((time() - self._relay_interval_start) / 60) % (self.relay_on_duration + self.relay_off_duration)
-            set_relay = (delta < self.relay_on_duration)
-        else:
-            raise ValueError('Invalid operation mode for relay.')
-        # Set relay position
-        if set_relay != self._relay_cached_position:
-            if set_relay:
-                self._interface.write('SK0')  # ON
-                self._relay_cached_position = True
-            else:
-                self._interface.write('RK0')  # OFF
-                self._relay_cached_position = False
-        return self._relay_cached_position
+            self.relay.set(self._interface)
 
     def read_event_counters(self):
         timestamps, values = [], []
@@ -509,3 +476,118 @@ class USBADUHIDInterface(Interface):
         if self.is_open:
             return aduhid.write_device(self._device, data, self._timeout)
         raise InterfaceException(f'ADUHID module unable to write, open connection to device first.')
+
+
+class Relay:
+    OFF = 0
+    ON = 1
+    HOURLY = 2
+    INTERVAL = 3
+    
+    def __init__(self, id: int, mode=None):
+        self.id = id  # Must be between 0 and 7
+        self.mode = Relay.HOURLY if mode is None else mode
+
+        self.hourly_start_at = 0  # minutes
+        self.on_duration = 10  # minutes
+        self.off_duration = 30  # minutes
+        self.interval_start = None
+        self.hourly_skip_before = 0
+
+        self._cached_position = None
+
+    def reset(self):
+        self.interval_start = None
+        self._cached_position = None
+
+    def set(self, interface):
+        """
+        Set relay position
+
+        :return:
+        """
+        if self.mode == Relay.ON:
+            position = True
+        elif self.mode == Relay.OFF:
+            position = False
+        elif self.mode == Relay.HOURLY:
+            minute = int(strftime('%M'))
+            stop_at = self.hourly_start_at + self.on_duration
+            if (((self.hourly_start_at <= minute < stop_at < 60) or 
+                (60 <= stop_at and (self.hourly_start_at <= minute or minute < stop_at % 60))) and
+                self.hourly_skip_before < time()):
+                position = True
+            else:
+                position = False
+        elif self.mode == Relay.INTERVAL:
+            delta = ((time() - self.interval_start) / 60) % (self.on_duration + self.off_duration)
+            position = (delta < self.on_duration)
+        else:
+            raise ValueError('Invalid relay mode. Must be ON, OFF, HOURLY, or INTERVAL')
+        self._write(position, interface)
+        return position
+        
+    def _write(self, position, interface):
+        """
+        Write relay position to interface
+        
+        :param position: 
+        :return: 
+        """
+        if position != self._cached_position:
+            if position:
+                interface.write(f'SK{self.id}')  # ON
+                self._cached_position = True
+            else:
+                interface.write(f'RK{self.id}')  # OFF
+                self._cached_position = False
+
+    def read(self, interface):
+        interface.write(f'RPK{self.id}')
+        value = interface.read()
+        self._cached_position = None if value is None else bool(value)
+
+
+class CoupledExpiringRelay(Relay):
+    """
+    Coupled Relay, will have two relays in opposite position
+    Both relays go back to off after "hold_on" duration expires
+    
+    """
+    def __init__(self, id_a: int, id_b: int, mode=None):
+        super().__init__(id_a, mode)
+        self.id_b = id_b
+        self._cached_position_b = None
+        self.hold_on = 25 # seconds
+        self._hold_on_start_time = None
+        self._trigger_position = None
+
+    def reset(self):
+        super().reset()
+        self._cached_position_b = None
+        self._trigger_position = None
+
+    def _write(self, position, interface):
+        if position != self._trigger_position:
+            if position:
+                interface.write(f'RK{self.id_b}')  # OFF
+                self._cached_position_b = False
+                sleep(0.01)  # 10 ms
+                interface.write(f'SK{self.id}')  # ON
+                self._cached_position = True
+            else:
+                interface.write(f'RK{self.id}')  # OFF
+                self._cached_position = False
+                sleep(0.01)  # 10 ms
+                interface.write(f'SK{self.id_b}')  # ON
+                self._cached_position_b = True
+            self._trigger_position = position
+            self._hold_on_start_time = time()
+        if self._hold_on_start_time is not None and time() - self._hold_on_start_time > self.hold_on:
+            # Set back to off after hold_on period expires
+            if self._cached_position:
+                interface.write(f'RK{self.id}')  # OFF
+                self._cached_position = False
+            if self._cached_position_b:
+                interface.write(f'RK{self.id_b}')  # OFF
+                self._cached_position_b = False

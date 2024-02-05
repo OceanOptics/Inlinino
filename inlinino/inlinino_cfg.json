@@ -715,7 +715,7 @@
       "log_raw": false,
       "log_products": true,
       "log_path": "data",
-      "relay0_mode": "Pump",
+      "relay0_mode": "Switch (two-wire)",
       "relay1_mode": "Switch",
       "relay2_mode": "Switch",
       "relay3_mode": "Switch",
@@ -727,7 +727,8 @@
         664
       ],
       "analog_channels_enabled": [],
-      "analog_channels_gains": []
+      "analog_channels_gains": [],
+      "low_flow_alarm_enabled": true
     },
     "6a338538-4a88-11ee-a2f0-acde48001122": {
       "module": "ontrak",
