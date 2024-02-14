@@ -755,7 +755,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_save(self):
         # Read form
-        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or
+        fields = [a for a in self.__dict__.keys() if 'combobox_' in a or a.startswith('te_') or
                   a.startswith('le_') or a.startswith('sb_') or a.startswith('dsb_') or a.startswith('cb_')]
         empty_fields = list()
         for f in fields:
