@@ -44,7 +44,7 @@
         <string>IP of local computer (localhost doesn't work on Windows)</string>
        </property>
        <property name="text">
-        <string>192.168.101.42</string>
+        <string>192.168.150.42</string>
        </property>
       </widget>
      </item>

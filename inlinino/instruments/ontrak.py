@@ -299,7 +299,7 @@ class Ontrak(Instrument):
         for _ in self.event_counter_channels:
             aux[ii] = f'{data[i]:.2f}'
             ii += 1
-            aux[ii] = 'CRITICAL' if 0.1 < data[i] < 1.0 else ('WARNING' if data[i] < 2.0 or self._low_flow_alarm_on else 'OK')
+            aux[ii] = 'CRITICAL' if data[i] < 1.0 else ('WARNING' if data[i] < 2.0 or self._low_flow_alarm_on else 'OK')
             ii += 1
             i += 1
         for _ in self.analog_channels:
