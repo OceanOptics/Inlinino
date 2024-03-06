@@ -145,10 +145,10 @@ class Ontrak(Instrument):
         if 'low_flow_alarm_enabled' in cfg.keys():
             self.low_flow_alarm_enabled = cfg['low_flow_alarm_enabled']
 
-        if self.model == 'ADU100':
+        if cfg['model'] == 'ADU100':
             if 'analog_channels_enabled' not in cfg.keys():
                 raise ValueError('Missing field analog channels enabled')
-                self.analog_channels = cfg['analog_channels_enabled']
+            self.analog_channels = cfg['analog_channels_enabled']
             if 'analog_channels_gains' not in cfg.keys():
                 raise ValueError('Missing field analog channels gains')
             self.analog_gains = cfg['analog_channels_gains']
