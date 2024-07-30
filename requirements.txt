@@ -1,5 +1,5 @@
 pyserial==3.5
-pyqt5==5.15
+pyqt5==5.15.*
 pyqtgraph==0.12.1
 colorama==0.4.4
 numpy==1.22
