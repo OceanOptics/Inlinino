@@ -4,9 +4,9 @@ from inlinino.instruments import Instrument
 from inlinino.log import Log
 
 try:
-    import aquasense.hydroscat
+    from aquasense.hydroscat import HydroScat as ASHydroScat
 except ImportError:
-    pass
+    ASHydroScat = None
 
 from datetime import datetime
 
@@ -35,7 +35,7 @@ class HydroScat(Instrument):
         self._io = io.TextIOWrapper(io.BufferedRWPair(self._interface._serial, self._interface._serial))
 
         # Instrument state machine
-        self.hydroscat: aquasense.hydroscat.HydroScat = None
+        self.hydroscat: ASHydroScat = None
         self.output_cal_header = None
         self.state = "IDLE"
         self.previous_state = None
@@ -85,7 +85,10 @@ class HydroScat(Instrument):
         if errmsgs:
             raise ValueError('\n'.join(errmsgs))
 
-        self.hydroscat = aquasense.hydroscat.HydroScat(
+        if ASHydroScat is None:
+            raise ImportError("Package `aquasense` required.")
+
+        self.hydroscat = ASHydroScat(
                             cal_path=cfg["calibration_file"], in_out=self._io,
                             out=None, sep=",", serial_mode=False,
                             burst_mode=cfg["burst_mode"],

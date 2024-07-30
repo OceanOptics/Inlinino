@@ -3,6 +3,10 @@ import platform
 
 import PyInstaller.__main__
 import pyqtgraph
+try:
+    import hypernav
+except ImportError:
+    hypernav = None
 
 
 root = os.path.join('.', 'bundle')
@@ -47,6 +51,12 @@ ls = [
     (os.path.join(os.path.dirname(pyqtgraph.__file__), 'icons', '*.png'), os.path.join('pyqtgraph', 'icons')),
     (os.path.join(os.path.dirname(pyqtgraph.__file__), 'icons', '*.svg'), os.path.join('pyqtgraph', 'icons')),
 ]
+if hypernav is not None:
+    ls.extend([
+        (os.path.join(os.path.dirname(hypernav.__file__), 'bin', '*.exe'), os.path.join('hypernav', 'bin')),
+        (os.path.join(os.path.dirname(hypernav.__file__), 'calibrate', 'templates', '*.txt'),
+         os.path.join('hypernav', 'calibrate', 'templates'))
+    ])
 for item, dest in ls:
     add_data.append(f'--add-data={os.path.abspath(item)}{data_sep}{dest}')
     # Require absolute path for GitHub workflow as data can be on different drive and relpath won't work.
@@ -67,11 +77,11 @@ PyInstaller.__main__.run([
     f'--distpath={os.path.join(root, "dist")}',
     f'--workpath={os.path.join(root, "build")}',
     f'--specpath={root}',
-    # '--windowed',
+    '--windowed',
     '--noconfirm',
     # '--log-level=DEBUG',
     # '--clean',
-    '--debug=imports',
+    # '--debug=imports',
     *add_data,
     *hidden_imports,
     *os_specific_args,
