@@ -46,16 +46,6 @@ jobs:
           python-version: '3.8'
           cache: 'pip'
 
-      - name: Install python dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -e optional/hypernav
-          cd optional/aquasense
-          pip install .
-          cd -
-          pip install pyinstaller==6.*
-          pip list
-
       - name: Download external resources (Ubuntu & macOS)
         if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'macos-13')
         run: |
@@ -75,6 +65,17 @@ jobs:
           cd optional/hypernav/hypernav/
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
           cd -
+
+      - name: Install python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install optional/hypernav
+          pip show hypernav
+          pip install optional/aquasense
+          pip show aquasense
+          pip install pyinstaller==6.*
+          pip list
+          
 
       - name: Make Bundle
         run: |

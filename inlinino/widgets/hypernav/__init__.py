@@ -12,12 +12,12 @@ from inlinino.widgets.file_explorer import FileExplorerWidget
 from inlinino.widgets.monitor import MonitorWidget
 from inlinino.widgets.metadata import MetadataWidget
 
-# try:
-from hypernav.calibrate.graders import compute_stats, grade_dark_frames, grade_light_frames
-from hypernav.io import HyperNav as HyperNavIO
-# except ImportError:
-#     compute_stats, grade_dark_frames, grade_light_frames = None, None, None
-#     HyperNavIO = None
+try:
+    from hypernav.calibrate.graders import compute_stats, grade_dark_frames, grade_light_frames
+    from hypernav.io import HyperNav as HyperNavIO
+except ImportError:
+    compute_stats, grade_dark_frames, grade_light_frames = None, None, None
+    HyperNavIO = None
 
 UPASS = u'\u2705'
 UFAIL = u'\u274C'
