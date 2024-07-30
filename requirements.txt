@@ -2,13 +2,13 @@ pyserial==3.5
 pyqt5==5.15.*
 pyqtgraph==0.12.1
 colorama==0.4.4
-numpy==1.22
-scipy==1.6.*
+numpy==1.22.*
+scipy==1.9.*
 pyacs
 pysatlantic
-pynmea2==1.18.0
+pynmea2==1.18.*
 pyusb==1.2.1
 hidapi==0.11.2
-plotly==5.13.1
+plotly==5.13.*
 kaleido==0.2.1
 wakepy==0.7.1
