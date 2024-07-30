@@ -52,6 +52,7 @@ ls = [
     (os.path.join(os.path.dirname(pyqtgraph.__file__), 'icons', '*.svg'), os.path.join('pyqtgraph', 'icons')),
 ]
 if hypernav is not None:
+    print('Loaded HyperNav')
     ls.extend([
         (os.path.join(os.path.dirname(hypernav.__file__), 'bin', '*.exe'), os.path.join('hypernav', 'bin')),
         (os.path.join(os.path.dirname(hypernav.__file__), 'calibrate', 'templates', '*.txt'),

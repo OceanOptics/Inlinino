@@ -22,7 +22,7 @@ jobs:
 
     outputs:
       ubuntu_artifact_filename: ${{ steps.artifact_id.outputs.ubuntu-latest-name }}
-      macos_artifact_filename: ${{ steps.artifact_id.outputs.macos-latest-name }}
+      macos_artifact_filename: ${{ steps.artifact_id.outputs.macos-13-name }}
       windows_artifact_filename: ${{ steps.artifact_id.outputs.windows-latest-name }}
 
     steps:
@@ -53,15 +53,16 @@ jobs:
           cd optional/aquasense
           pip install .
           cd -
-          pip install pyinstaller==6.0
+          pip install pyinstaller==6.*
           pip list
 
       - name: Download external resources (Ubuntu & macOS)
-        if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'macos-latest')
+        if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'macos-13')
         run: |
           cd inlinino/resources
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd ../../optional/hypernav/hypernav/
+          cd -
+          cd optional/hypernav/hypernav/
           wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
           cd -
 
@@ -70,7 +71,8 @@ jobs:
         run: |
           cd inlinino/resources
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd ../../optional/hypernav/hypernav/
+          cd -
+          cd optional/hypernav/hypernav/
           C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
           cd -
 
@@ -84,7 +86,7 @@ jobs:
         shell: bash
 
       - name: Get Bundle Name (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-13'
         run: echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
 
       - name: Zip Bundle
