@@ -98,14 +98,19 @@ class DATAQ(Instrument):
         # Sample rate type (Hz) = (dividend) ÷ (srate × dec × deca)
         # For DI-1100
         #     dividend = 60000000    fixed
-        #     dec = 1                fixed
-        #     deca = [1, 40000]      defined through filter command
+        #     dec = [1, 512]         leverage internal CIC filter if available
+        #     deca = [1, 40000]      defined for filter command (prefer having a larger dec than deca)
         #     srate = [1500, 65535]  define through srate command
         # Example: srate = 60000 and deca = 1000 then sample rate = 1 Hz
         # In practice this is off. with 60000 and 10 sample at 0.5 Hz...
         # 6000 and 500 is exactly at 1 Hz with 500 points to average for each sample
-        self.send_cmd("srate 6000")
-        self.send_cmd("deca 500")
+        # Config for old firmware
+        # self.send_cmd("srate 6000")
+        # self.send_cmd("deca 500")
+        # Config for new firmware (might work on old firmware TBD)
+        self.send_cmd("srate 3000")
+        self.send_cmd("dec 512")
+        self.send_cmd("deca 10")
         # Start acquisition
         self.send_cmd("start")
 
