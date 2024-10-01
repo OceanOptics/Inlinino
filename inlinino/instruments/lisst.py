@@ -29,6 +29,7 @@ class LISST(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_variables_reset = False
         self.active_timeseries_angles = None
         # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
@@ -92,7 +93,9 @@ class LISST(Instrument):
         # Update plots
         if self.active_timeseries_variables_lock.acquire(timeout=0.5):
             try:
-                self.signal.new_ts_data.emit(beta[self.active_timeseries_angles], timestamp)
+                self.signal.new_ts_data[object, float, bool].emit(beta[self.active_timeseries_angles], timestamp,
+                                                                  self.active_timeseries_variables_reset)
+                self.active_timeseries_variables_reset = False  # Reset here as potentially set by update_active_timeseries_variables
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -134,6 +137,7 @@ class LISST(Instrument):
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+            self.active_timeseries_variables_reset = True
             try:
                 index = self.widget_active_timeseries_variables_names.index(name)
                 self.active_timeseries_angles[index] = state

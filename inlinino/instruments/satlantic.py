@@ -44,6 +44,7 @@ class Satlantic(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_variables_reset = False
         self.active_timeseries_variables = {}  # dict of each frame header
         # Init Spectrum Plot Widget
         self.spectrum_plot_enabled = True
@@ -209,7 +210,9 @@ class Satlantic(Instrument):
                 for i, (frame_header, key, idx) in enumerate(self.active_timeseries_variables):
                     if frame_header == data.frame_header:
                         ts_data[i] = data.frame[key][idx] if key == core_groupname else data.frame[key]
-                self.signal.new_ts_data.emit(ts_data, timestamp)
+                self.signal.new_ts_data[object, float, bool].emit(ts_data, timestamp,
+                                                                  self.active_timeseries_variables_reset)
+                self.active_timeseries_variables_reset = False  # Reset here as potentially set by update_active_timeseries_variables
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -232,6 +235,7 @@ class Satlantic(Instrument):
         frame_header, key, idx = self.active_timeseries_unpack_variable_name(name)
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
             try:
+                self.active_timeseries_variables_reset = True
                 if state:
                     self.active_timeseries_variables.append((frame_header, key, idx))
                     self.widget_active_timeseries_variables_selected.append(name)

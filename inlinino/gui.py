@@ -137,7 +137,8 @@ class MainWindow(QtGui.QMainWindow):
         self.instrument.signal.packet_received.connect(self.on_packet_received)
         self.instrument.signal.packet_corrupted.connect(self.on_packet_corrupted)
         self.instrument.signal.packet_logged.connect(self.on_packet_logged)
-        self.instrument.signal.new_ts_data.connect(self.on_new_ts_data)
+        self.instrument.signal.new_ts_data[object, float].connect(self.on_new_ts_data)
+        self.instrument.signal.new_ts_data[object, float, bool].connect(self.on_new_ts_data)
         if self.instrument.signal.alarm is not None:
             self.instrument.signal.alarm.connect(self.on_data_timeout)
         if self.instrument.signal.alarm_custom is not None:
@@ -409,38 +410,55 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot(list, float)
     @QtCore.pyqtSlot(np.ndarray, float)
-    def on_new_ts_data(self, data, timestamp):
-        if len(self._buffer_data) != len(data) or self.reset_ts_trace:
-            self.reset_ts_trace = False
-            # Init buffers
-            self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
-            self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
-            # Re-initialize Plot (need to do so when number of curve changes)
-            # TODO FIX HERE for multiple plots
-            self.timeseries_plot_widget.clear()
-            # new_plot_widget = self.create_timeseries_plot_widget()
-            # self.centralwidget.layout().replaceWidget(self.timeseries_plot_widget, new_plot_widget)
-            # self.timeseries_plot_widget = new_plot_widget
-            # Init curves
-            if hasattr(self.instrument, 'widget_active_timeseries_variables_selected'):
-                legend = self.instrument.widget_active_timeseries_variables_selected
-            else:
-                legend = [f"{name} ({units})" for name, units in
-                          zip(self.instrument.variable_names, self.instrument.variable_units)]
-            for i in range(len(data)):
-                self.timeseries_plot_widget.plotItem.addItem(
-                    pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
-                                     name=legend[i])
-                )
+    @QtCore.pyqtSlot(list, float, bool)
+    @QtCore.pyqtSlot(np.ndarray, float, bool)
+    def on_new_ts_data(self, data, timestamp, reset=False):
+        if self.instrument.active_timeseries_variables_lock.acquire(timeout=0.25):
+            try:
+                n = len(data)
+                if reset or len(self._buffer_data) != len(data) or self.reset_ts_trace:
+                    self.reset_ts_trace = False
+                    # Init legend
+                    if hasattr(self.instrument, 'widget_active_timeseries_variables_selected'):
+                        legend = self.instrument.widget_active_timeseries_variables_selected[
+                                 :]  # Shallow copy to prevent update
+                    else:
+                        legend = [f"{name} ({units})" for name, units in
+                                  zip(self.instrument.variable_names, self.instrument.variable_units)]
+                    # Check data is correct length
+                    if len(legend) != n:
+                        # Possible in rare instance widget_active_timeseries_variables_selected is updated by user after the data is received and updated
+                        logger.warning('Variables selected do not match data received. Skip timeseries update.')
+                        self.reset_ts_trace = True
+                        return
+                    # Init buffers
+                    self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
+                    self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
+                    # Re-initialize Plot (need to do so when number of curve changes)
+                    self.timeseries_plot_widget.clear()
+                    # Init curves
+                    for i in range(n):
+                        self.timeseries_plot_widget.plotItem.addItem(
+                            pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
+                                             name=legend[i])
+                        )
+            finally:
+                self.instrument.active_timeseries_variables_lock.release()
+        else:
+            if reset or len(self._buffer_data) != len(data) or self.reset_ts_trace:
+                logger.warning('Unable to acquire lock to update timeseries variables.')
+                self.reset_ts_trace = True
+                return
+            n = len(data)
         # Update buffers
         self._buffer_timestamp.extend(timestamp)
-        for i in range(len(data)):
+        for i in range(n):
             self._buffer_data[i].extend(data[i])
         # Update timeseries figure
         if time() - self.last_timeseries_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
             return
         timestamp = self._buffer_timestamp.get(self.BUFFER_LENGTH)  # Not used anymore
-        for i in range(len(data)):
+        for i in range(n):
             y = self._buffer_data[i].get(self.BUFFER_LENGTH)
             x = np.arange(len(y))
             y[np.isinf(y)] = 0

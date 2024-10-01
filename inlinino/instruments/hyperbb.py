@@ -33,6 +33,7 @@ class HyperBB(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_variables_reset = False
         self.active_timeseries_wavelength = None
         # Init Spectrum Plot widget
         self.spectrum_plot_enabled = True
@@ -85,7 +86,9 @@ class HyperBB(Instrument):
         # Update plots
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                self.signal.new_ts_data.emit(signal[self.active_timeseries_wavelength], timestamp)
+                self.signal.new_ts_data[object, float, bool].emit(signal[self.active_timeseries_wavelength], timestamp,
+                                                                  self.active_timeseries_variables_reset)
+                self.active_timeseries_variables_reset = False  # Reset here as potentially set by update_active_timeseries_variables
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -106,6 +109,7 @@ class HyperBB(Instrument):
                 (not state and name in self.widget_active_timeseries_variables_selected)):
             return
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
+            self.active_timeseries_variables_reset = True
             try:
                 index = self.widget_active_timeseries_variables_names.index(name)
                 self.active_timeseries_wavelength[index] = state

@@ -53,6 +53,7 @@ class HydroScat(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_variables_reset = False
         self.active_variables = None
 
         # Init Spectrum Plot widget
@@ -197,7 +198,9 @@ class HydroScat(Instrument):
                    for var_name in self.widget_active_timeseries_variables_selected]
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                self.signal.new_ts_data.emit(ts_data, timestamp)
+                self.signal.new_ts_data[object, float, bool].emit(ts_data, timestamp,
+                                                                  self.active_timeseries_variables_reset)
+                self.active_timeseries_variables_reset = False  # Reset here as potentially set by update_active_timeseries_variables
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -227,11 +230,12 @@ class HydroScat(Instrument):
                 self.signal.packet_logged.emit()
 
 
-    def udpate_active_timeseries_variables(self, name, active):
+    def update_active_timeseries_variables(self, name, state):
         # ensure only one thread updates active timeseries variables
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
+            self.active_timeseries_variables_reset = True
             try:
-                self.active_variables[name] = active
+                self.active_variables[name] = state
                 self.widget_active_timeseries_variables_selected = \
                     [name for name in self.active_variables if self.active_variables[name]]
             finally:

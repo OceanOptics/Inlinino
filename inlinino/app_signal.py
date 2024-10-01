@@ -6,7 +6,7 @@ class InstrumentSignals(QtCore.QObject):
     packet_received = QtCore.pyqtSignal()
     packet_corrupted = QtCore.pyqtSignal()
     packet_logged = QtCore.pyqtSignal()
-    new_ts_data = QtCore.pyqtSignal(object, float)
+    new_ts_data = QtCore.pyqtSignal([object, float], [object, float, bool])
     new_spectrum_data = QtCore.pyqtSignal(list)
     new_aux_data = QtCore.pyqtSignal(list)
     new_meta_data = QtCore.pyqtSignal(list)

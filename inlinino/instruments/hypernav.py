@@ -480,7 +480,8 @@ class HyperNav(Satlantic):
                             ts_data[i] = self._parser._fit_data(data.frame[idx], cal.fit_type[idx], cal.cal_coefs[idx], aint)
                         else:
                             ts_data[i] = data.frame[idx]
-                self.signal.new_ts_data.emit(ts_data, timestamp)
+                self.signal.new_ts_data[object, float, bool].emit(ts_data, timestamp, self.active_timeseries_variables_reset)
+                self.active_timeseries_variables_reset = False  # Reset here as potentially set by update_active_timeseries_variables
             finally:
                 self.active_timeseries_variables_lock.release()
         else:

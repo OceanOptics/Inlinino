@@ -31,6 +31,7 @@ class ACS(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables_lock = Lock()
+        self.active_timeseries_variables_reset = False
         self.active_timeseries_c_wavelengths = None
         self.active_timeseries_a_wavelengths = None
         # Init Spectrum Plot widget
@@ -107,9 +108,11 @@ class ACS(Instrument):
         # Update timeseries plot
         if self.active_timeseries_variables_lock.acquire(timeout=0.125):
             try:
-                self.signal.new_ts_data.emit(np.concatenate((data[1].c[self.active_timeseries_c_wavelengths],
-                                                             data[1].a[self.active_timeseries_a_wavelengths])),
-                                             timestamp)
+                self.signal.new_ts_data[object, float, bool].emit(
+                    np.concatenate((data[1].c[self.active_timeseries_c_wavelengths],
+                                    data[1].a[self.active_timeseries_a_wavelengths])),
+                    timestamp, self.active_timeseries_variables_reset)
+                self.active_timeseries_variables_reset = False  # Reset here as potentially set by update_active_timeseries_variables
             finally:
                 self.active_timeseries_variables_lock.release()
         else:
@@ -140,6 +143,7 @@ class ACS(Instrument):
             return
         if self.active_timeseries_variables_lock.acquire(timeout=0.25):
             try:
+                self.active_timeseries_variables_reset = True
                 if name[0] == 'c':
                     index = self.widget_active_timeseries_variables_names.index(name)
                     self.active_timeseries_c_wavelengths[index] = state
