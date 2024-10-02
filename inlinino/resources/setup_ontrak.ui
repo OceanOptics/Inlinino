@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>742</width>
+    <width>808</width>
     <height>435</height>
    </rect>
   </property>
@@ -325,7 +325,7 @@
             </property>
             <item>
              <property name="text">
-              <string>Switch</string>
+              <string>Switch (one-wire)</string>
              </property>
             </item>
             <item>
@@ -342,7 +342,12 @@
             </property>
             <item>
              <property name="text">
-              <string>Switch</string>
+              <string>Switch (one-wire)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Switch (two-wire)</string>
              </property>
             </item>
             <item>
@@ -359,7 +364,7 @@
             </property>
             <item>
              <property name="text">
-              <string>Switch</string>
+              <string>Switch (one-wire)</string>
              </property>
             </item>
             <item>

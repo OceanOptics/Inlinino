@@ -1,6 +1,6 @@
 from time import time, sleep, strftime
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict, Union
 from math import isnan
 import platform
 
@@ -21,7 +21,7 @@ GALLONS_TO_LITERS = 3.78541
 
 @dataclass
 class ADUPacket:
-    relay: bool = None
+    relays: List[bool] = field(default_factory=list)
     event_counter_values: List[int] = field(default_factory=list)
     event_counter_timestamps: List[float] = field(default_factory=list)
     analog_values: List[int] = field(default_factory=list)
@@ -34,15 +34,14 @@ class ADUPacket:
         Packet representation for raw data logging
         :return:
         """
-        repr = f'{self.relay}' if self.relay is not None else ''
+        repr = ','.join(self.relays)
         for t, v in zip(self.event_counter_timestamps, self.event_counter_values):
-            repr += f', {t}, {v}' if repr else f'{t}, {v}'
-        for v in self.analog_values:
-            repr += f', {v}' if repr else f'{v}'
+            repr += f',{t},{v}' if repr else f'{t},{v}'
+        repr += (',' if repr else '') + ','.join(self.analog_values)
         return repr
 
     def __bool__(self):
-        if self.relay is not None or self.event_counter_values or self.analog_values:
+        if self.relays or self.event_counter_values or self.analog_values:
             return True
         return False
 
@@ -79,9 +78,9 @@ class Ontrak(Instrument):
         super().__init__(uuid, cfg, signal, *args, setup=False, **kwargs)
         # Instrument Specific attributes
         # Relay
-        self.relay_enabled = True
-        self.relay_gui_mode = 'Switch'
-        self.relay = Relay(0)
+        self.relays_enabled = []
+        self.relays_gui_mode: Union[List[str], List[None]] = [None] * 4
+        self.relays: Union[List[Relay], List[None]] = [None] * 4
         # Event Counter(s) / Flowmeter(s)
         self.event_counter_channels = [0]
         self.event_counter_k_factors = [1381]
@@ -103,9 +102,10 @@ class Ontrak(Instrument):
         self.widget_aux_data_enabled = True
         self.widget_aux_data_variable_names = []
         # Init Flow Control Widget
-        self.widget_flow_control_enabled = True
-        self.widget_pump_control_enabled = True
-        self.widgets_to_load = ['FlowControlWidget', 'PumpControlWidget']
+        self.widget_flow_controls_enabled: Union[List[bool], List[None]] = [None] * 4
+        self.widget_pump_controls_enabled: Union[List[bool], List[None]] = [None] * 4
+        self.widgets_to_load: List[str] = ['FlowControlWidget', 'PumpControlWidget'] * 4
+        self.widgets_to_load_kwargs: List[Dict] = [{'id': k} for k in range(4)] * 2
         # Setup
         self.setup(cfg)
 
@@ -115,26 +115,40 @@ class Ontrak(Instrument):
             raise ValueError('Missing field model')
         if self.model and self.model not in ['ADU100', 'ADU200', 'ADU208']:
             raise ValueError('Model not supported. Supported models are: ADU100, ADU200, and ADU208')
-        if 'relay0_enabled' not in cfg.keys():
-            raise ValueError('Missing field relay0 enabled')
-        self.relay_enabled = cfg['relay0_enabled']
-        if 'relay0_mode' not in cfg.keys():
-            raise ValueError('Missing field relay0 mode')
-        if cfg['relay0_mode'] not in ['Switch', 'Switch (one-wire)', 'Switch (two-wire)', 'Pump']:
-            raise ValueError('relay0_mode not supported. Supported models are: Switch and Pump')
-        self.relay_gui_mode = cfg['relay0_mode']
-        self.relay = CoupledExpiringRelay(0, 1) if 'two-wire' in self.relay_gui_mode else Relay(0)
-        if not self.relay_enabled:
-            self.widget_flow_control_enabled = False
-            self.widget_pump_control_enabled = False
-        elif self.relay_gui_mode.startswith('Switch'):
-            self.widget_flow_control_enabled = True
-            self.widget_pump_control_enabled = False
-            self.relay.mode = Relay.HOURLY
-        elif self.relay_gui_mode == 'Pump':
-            self.widget_flow_control_enabled = False
-            self.widget_pump_control_enabled = True
-            self.relay.mode = Relay.HOURLY
+        # Relays
+        n_relays = 1 if cfg['model'] == 'ADU100' else 4
+        relay_mode_supported = ['Switch', 'Switch (one-wire)', 'Pump']
+        if cfg['model'] != 'ADU100':
+            relay_mode_supported.append('Switch (two-wire)')
+        self.relays_enabled, self.relays_gui_mode, self.relays = [], [None]*4, [None]*4
+        self.widget_flow_controls_enabled, self.widget_pump_controls_enabled = [None]*4, [None]*4
+        for r in range(n_relays):
+            if f'relay{r}_enabled' in cfg.keys():
+                if cfg[f'relay{r}_enabled']:
+                    self.relays_enabled.append(r)
+                else:
+                    self.relays_gui_mode[r] = None
+                    self.relays[r] = None
+                    self.widget_flow_controls_enabled[r] = False
+                    self.widget_pump_controls_enabled[r] = False
+                    continue
+            elif r == 0:
+                raise ValueError('Missing field relay0 enabled')
+            if f'relay{r}_mode' in cfg.keys():
+                if cfg[f'relay{r}_mode'] not in relay_mode_supported:
+                    raise ValueError(f"{cfg[f'relay{r}_mode']} not supported by {cfg['model']}.")
+                self.relays_gui_mode[r] = cfg[f'relay{r}_mode']
+            else:
+                raise ValueError(f'Missing field relay{r} mode')
+            self.relays[r] = CoupledExpiringRelay(r, r+1) if 'two-wire' in self.relays_gui_mode[r] else Relay(r)
+            self.relays[r].mode = Relay.HOURLY
+            if self.relays_gui_mode[r].startswith('Switch'):
+                self.widget_flow_controls_enabled[r] = True
+                self.widget_pump_controls_enabled[r] = False
+            elif self.relays_gui_mode[r] == 'Pump':
+                self.widget_flow_controls_enabled[r] = False
+                self.widget_pump_controls_enabled[r] = True
+        # Event Counters
         if 'event_counter_channels_enabled' not in cfg.keys():
             raise ValueError('Missing field event counter channels enabled')
         self.event_counter_channels = cfg['event_counter_channels_enabled']
@@ -144,7 +158,7 @@ class Ontrak(Instrument):
         self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
         if 'low_flow_alarm_enabled' in cfg.keys():
             self.low_flow_alarm_enabled = cfg['low_flow_alarm_enabled']
-
+        # Analog Channels
         if cfg['model'] == 'ADU100':
             if 'analog_channels_enabled' not in cfg.keys():
                 raise ValueError('Missing field analog channels enabled')
@@ -159,19 +173,21 @@ class Ontrak(Instrument):
             self.analog_gains = []
         self._analog_calibration_timestamp = None
         # Overload cfg with DATAQ specific parameters
-        if self.relay_gui_mode.startswith('Switch'):
-            relay_label, relay_units = 'Switch', '0=TOTAL|1=FILTERED'
-        elif self.relay_gui_mode == 'Pump':
-            relay_label, relay_units = 'Pump', '0=OFF|1=ON'
-        else:
-            relay_label, relay_units = 'Relay', '0=OFF|1=ON'
-        cfg['variable_names'] = ([relay_label] if self.relay_enabled else []) + \
+        relays_label, relays_units = [], []
+        for r in self.relays_enabled:
+            if self.relays_gui_mode[r].startswith('Switch'):
+                relays_label.append(f'Switch({r})'), relays_units.append('0=TOTAL|1=FILTERED')
+            elif self.relays_gui_mode[r] == 'Pump':
+                relays_label.append(f'Pump({r})'), relays_units.append('0=OFF|1=ON')
+            else:
+                relays_label.append(f'Relay({r})'), relays_units.append('0=OFF|1=ON')
+        cfg['variable_names'] = relays_label + \
                                 [f'Flow({c})' for c in self.event_counter_channels] + \
                                 [f'Analog({c})' for c in self.analog_channels]
-        cfg['variable_units'] = ([relay_units] if self.relay_enabled else []) + \
+        cfg['variable_units'] = relays_units + \
                                 ['L/min'] * len(self.event_counter_channels) + \
                                 ['V'] * len(self.analog_channels)
-        cfg['variable_precision'] = (['%s'] if self.relay_enabled else []) + \
+        cfg['variable_precision'] = ['%s'] * len(self.relays_enabled) + \
                                     ['%.3f'] * len(self.event_counter_channels) + \
                                     ['%.6f'] * len(self.analog_channels)
         cfg['terminator'] = None  # Not Applicable
@@ -179,13 +195,13 @@ class Ontrak(Instrument):
         super().setup(cfg, raw_logger)
         # Update Auxiliary Widget
         self.widget_aux_data_variable_names = []
-        if self.relay_enabled:
-            if self.relay_gui_mode.startswith('Switch'):
-                self.widget_aux_data_variable_names.append('Switch')
-            elif self.relay_gui_mode == 'Pump':
-                self.widget_aux_data_variable_names.append('Pump')
+        for r in self.relays_enabled:
+            if self.relays_gui_mode[r].startswith('Switch'):
+                self.widget_aux_data_variable_names.append(f'Switch #{r}')
+            elif self.relays_gui_mode[r] == 'Pump':
+                self.widget_aux_data_variable_names.append(f'Pump #{r}')
             else:
-                self.widget_aux_data_variable_names.append('Relay')
+                self.widget_aux_data_variable_names.append(f'Relay #{r}')
         for c in self.event_counter_channels:
             self.widget_aux_data_variable_names.append(f'Flow #{c} (L/min)')
             self.widget_aux_data_variable_names.append(f'Flow Status #{c}')
@@ -218,11 +234,10 @@ class Ontrak(Instrument):
             super().open(**kwargs)
 
     def close(self, wait_thread_join=True):
-        if self.relay_gui_mode == 'Pump':
-            self.relay.mode = Relay.OFF
-            if self.relay_enabled:
-                self.relay.set(self._interface)
-            self.set_relay()
+        for r in self.relays_enabled:
+            if self.relays_gui_mode[r] == 'Pump':
+                self.relays[r].mode = Relay.OFF
+                self.set_relays()
         super().close(wait_thread_join)
 
     def run(self):
@@ -233,11 +248,11 @@ class Ontrak(Instrument):
             try:
                 tic = time()
                 # Set relay, read event counters, and analog
-                relay = self.relay.set(self._interface) if self.relay_enabled else None
+                relays = self.set_relays()
                 ec_timestamps, ec_values = self.read_event_counters()
                 analog_values = self.read_analog()
                 timestamp = time()
-                packet = ADUPacket(relay, ec_values, ec_timestamps, analog_values)
+                packet = ADUPacket(relays, ec_values, ec_timestamps, analog_values)
                 if packet:
                     try:
                         self.handle_packet(packet, timestamp)
@@ -260,20 +275,22 @@ class Ontrak(Instrument):
         for channel in self.event_counter_channels:
             self._interface.write(f'RC{channel}')  # Set all event counters to 0
             self._interface.read()
-        self.relay.read(self._interface)
-        if self.relay_gui_mode == 'Pump':
-            # Skip first hour
-            self.relay.hourly_skip_before = time() + 3600
-            # self.relay.interval_start = time() - self.relay_on_duration * 60  # Default to off on start
-        else:
-            self.relay.hourly_skip_before = 0
-        self.relay.interval_start = time()
+        for r in self.relays_enabled:
+            self.relays[r].read(self._interface)
+            if self.relays_gui_mode[r] == 'Pump':
+                # Skip first hour
+                self.relays[r].hourly_skip_before = time() + 3600
+                # self.relay.interval_start = time() - self.relay_on_duration * 60  # Default to off on start
+            else:
+                self.relays[r].hourly_skip_before = 0
+            self.relays[r].interval_start = time()
         # Reset low flow alarm
         self._low_flow_alarm_started = False
         self._low_flow_alarm_on = False
 
     def parse(self, packet: ADUPacket):
-        data: List[bool, float] = [packet.relay] if self.relay_enabled else []
+        data: List[bool, float] = []
+        data.extend(packet.relays)
         for t, v, pt, k in zip(packet.event_counter_timestamps, packet.event_counter_values,
                                self._event_counter_past_timestamps, self.event_counter_k_factors):
             if isnan(pt):
@@ -289,8 +306,8 @@ class Ontrak(Instrument):
         super().handle_data(data, timestamp)
         # Format and signal aux data
         aux, i = [None] * len(self.widget_aux_data_variable_names), 0
-        if self.relay_enabled:
-            if self.relay_gui_mode.startswith('Switch'):
+        for r in self.relays_enabled:
+            if self.relays_gui_mode[r].startswith('Switch'):
                 aux[i] = 'Filter' if data[i] else 'Total'
             else:
                 aux[i] = 'On' if data[i] else 'Off'
@@ -317,7 +334,7 @@ class Ontrak(Instrument):
         #   alarm is triggered after three consecutive flow below the threshold
         #   alarm is disabled after 30 consecutive flow above threshold
         if self.low_flow_alarm_enabled:
-            i = 1 if self.relay_enabled else 0
+            i = len(self.relay_enabled)
             low_flow_detected = False
             for _ in self.event_counter_channels:
                 if self._low_flow_alarm_started:
@@ -344,14 +361,12 @@ class Ontrak(Instrument):
             # elif self._low_flow_alarm_on and self._low_flow_alarm_off_counter > 20:
             #     self._low_flow_alarm_on = False
 
-    def set_relay(self):
+    def set_relays(self):
         """
         Set relay(s)
-        TODO work on interfacing relay 1, 2, and 3 on ADU20X (only relay 0) for now
         :return:
         """
-        if not self.relay_enabled:
-            self.relay.set(self._interface)
+        return [self.relays[r].set(self._interface) for r in self.relays_enabled]
 
     def read_event_counters(self):
         timestamps, values = [], []

@@ -105,8 +105,8 @@ class MainWindow(QtGui.QMainWindow):
         self.widget_metadata = None
         self.widgets = []
 
-    def add_widget(self, widget, secondary_dock=True):
-        self.widgets.append(widget(self.instrument))
+    def add_widget(self, widget, secondary_dock=True, widget_kwargs={}):
+        self.widgets.append(widget(self.instrument, **widget_kwargs))
         self.widgets[-1].layout.setContentsMargins(QtCore.QMargins(0, 0, 0, 0))
         if secondary_dock:
             self.docked_widget_secondary_layout.addWidget(self.widgets[-1])
@@ -144,22 +144,31 @@ class MainWindow(QtGui.QMainWindow):
         if self.instrument.signal.alarm_custom is not None:
             self.instrument.signal.alarm_custom.connect(self.on_custom_alarm)
         # Set Widgets
-        available_widgets = ((AuxDataWidget, False),
-                             (FlowControlWidget, True),
-                             (HyperNavCalWidget, True),
-                             (MetadataWidget, True),
-                             (PumpControlWidget, True),
-                             (SelectChannelWidget, False))
+        available_widgets = {AuxDataWidget.__name__: (AuxDataWidget, False),
+                             FlowControlWidget.__name__: (FlowControlWidget, True),
+                             HyperNavCalWidget.__name__: (HyperNavCalWidget, True),
+                             MetadataWidget.__name__: (MetadataWidget, True),
+                             PumpControlWidget.__name__: (PumpControlWidget, True),
+                             SelectChannelWidget.__name__: (SelectChannelWidget, False)}
         primary_vertical_spacer, secondary_vertical_spacer = True, True
-        for widget, secondary_dock in available_widgets:
-            if getattr(self.instrument, f'widget_{widget.__snake_name__[:-7]}_enabled') or\
-                    widget.__name__ in self.instrument.widgets_to_load:
+        for widget, secondary_dock in available_widgets.values():
+            id = f'widget_{widget.__snake_name__[:-7]}_enabled'
+            if hasattr(self.instrument, id) and getattr(self.instrument, id):
                 self.add_widget(widget, secondary_dock)
                 if widget.expanding:
                     if secondary_dock:
                         secondary_vertical_spacer = False
                     else:
                         primary_vertical_spacer = False
+        # Add same widget multiple times
+        for widget_key, widget_kwargs in zip(self.instrument.widgets_to_load, self.instrument.widgets_to_load_kwargs):
+            widget, secondary_dock = available_widgets[widget_key]
+            self.add_widget(widget, secondary_dock, widget_kwargs)
+            if widget.expanding:
+                if secondary_dock:
+                    secondary_vertical_spacer = False
+                else:
+                    primary_vertical_spacer = False
         # Add vertical spacer to docks
         if primary_vertical_spacer:
             self.docked_widget_primary_layout.addItem(
@@ -660,6 +669,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.spinbox_analog_channel2_gain.valueChanged.connect(self.act_update_analog_channel2_input_range)
         if 'combobox_model' in self.__dict__.keys():
             self.combobox_model.currentIndexChanged.connect(self.act_activate_fields_for_adu_model)
+        if 'combobox_relay0_mode' in self.__dict__.keys():
+            self.combobox_relay0_mode.currentIndexChanged.connect(self.act_adu_update_relay1_available)
+        if 'combobox_relay2_mode' in self.__dict__.keys():
+            self.combobox_relay2_mode.currentIndexChanged.connect(self.act_adu_update_relay3_available)
 
         # Cannot use default save button as does not provide mean to correctly validate user input
         self.button_save = QtGui.QPushButton('Save')
@@ -766,10 +779,45 @@ class DialogInstrumentSetup(QtGui.QDialog):
         model = self.combobox_model.currentText()
         if model == 'ADU100':
             self.group_box_analog.setEnabled(True)
+            self.checkbox_relay1_enabled.setEnabled(False)
+            self.checkbox_relay1_enabled.setChecked(False)
+            self.combobox_relay1_mode.setEnabled(False)
+            self.checkbox_relay2_enabled.setEnabled(False)
+            self.checkbox_relay2_enabled.setChecked(False)
+            self.combobox_relay2_mode.setEnabled(False)
+            self.checkbox_relay3_enabled.setEnabled(False)
+            self.checkbox_relay3_enabled.setChecked(False)
+            self.combobox_relay3_mode.setEnabled(False)
         elif model in ('ADU200', 'ADU208'):
             self.group_box_analog.setEnabled(False)
+            if self.combobox_relay0_mode.currentText() != 'Switch (two-wire)':
+                self.checkbox_relay1_enabled.setEnabled(True)
+                self.combobox_relay1_mode.setEnabled(True)
+            self.checkbox_relay2_enabled.setEnabled(True)
+            self.combobox_relay2_mode.setEnabled(True)
+            if self.combobox_relay2_mode.currentText() != 'Switch (two-wire)':
+                self.checkbox_relay3_enabled.setEnabled(True)
+                self.combobox_relay3_mode.setEnabled(True)
         else:
             raise ValueError(f'Model {model} not supported.')
+
+    def act_adu_update_relay1_available(self):
+        if self.combobox_relay0_mode.currentText() != 'Switch (two-wire)':
+            self.checkbox_relay1_enabled.setEnabled(True)
+            self.combobox_relay1_mode.setEnabled(True)
+        else:
+            self.checkbox_relay1_enabled.setEnabled(False)
+            self.checkbox_relay1_enabled.setChecked(False)
+            self.combobox_relay1_mode.setEnabled(False)
+
+    def act_adu_update_relay3_available(self):
+        if self.combobox_relay2_mode.currentText() != 'Switch (two-wire)':
+            self.checkbox_relay3_enabled.setEnabled(True)
+            self.combobox_relay3_mode.setEnabled(True)
+        else:
+            self.checkbox_relay3_enabled.setEnabled(False)
+            self.checkbox_relay3_enabled.setChecked(False)
+            self.combobox_relay3_mode.setEnabled(False)
 
     def act_save(self):
         # Read form
@@ -891,7 +939,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'ontrak':
             self.cfg['model'] = self.combobox_model.currentText()
-            self.cfg['relay0_enabled'] = self.checkbox_relay0_enabled.isChecked()
+            for c in range(4):
+                self.cfg['relay%d_enabled' % c] = getattr(self, 'checkbox_relay%d_enabled' % c).isChecked()
+            if (self.cfg['model'] == 'ADU100' and
+                    self.cfg['relay0_enabled'] and self.cfg['relay0_mode'] == 'Switch (two-wire)'):
+                self.notification('Switch (two-wire) is not supported by ADU100.')
+                return
             self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors'] = [], []
             for c in range(4):
                 if getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).isChecked():
@@ -906,11 +959,13 @@ class DialogInstrumentSetup(QtGui.QDialog):
                     g = getattr(self, 'spinbox_analog_channel%d_gain' % (c)).value()
                     self.cfg['analog_channels_gains'].append(g)
             if not (self.cfg['relay0_enabled'] or self.cfg['event_counter_channels_enabled'] or
-                    (self.cfg['model'] == 'ADU100' and self.cfg['analog_channels_enabled'])):
+                    (self.cfg['model'] == 'ADU100' and self.cfg['analog_channels_enabled']) or
+                    (self.cfg['model'] != 'ADU100' and (self.cfg['relay1_enabled'] or self.cfg['relay2_enabled'] or
+                                                        self.cfg['relay3_enabled']))):
                 self.notification('At least one switch, one flowmeter, or one analog channel must be selected.')
                 return
             if not (self.cfg['log_raw'] or self.cfg['log_products']):
-                self.notification('Warning: no data will be logged.')
+                self.notification('No data will be logged.')
         elif self.cfg['module'] == 'dataq':
             self.cfg['channels_enabled'] = []
             for c in range(8):
@@ -1098,13 +1153,14 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
             except ValueError:
                 logger.warning('Configured model not available in GUI. Interface set to GUI default.')
             self.act_activate_fields_for_adu_model()
-            try:
-                self.combobox_relay0_mode.setCurrentIndex([self.combobox_relay0_mode.itemText(i)
-                                                           for i in range(self.combobox_relay0_mode.count())]
-                                                          .index(self.cfg['relay0_mode']))
-            except ValueError:
-                logger.warning('Configured relay0_mode not available in GUI. Interface set to GUI default.')
-            self.checkbox_relay0_enabled.setChecked(self.cfg['relay0_enabled'])
+            for r in range(4):
+                try:
+                    cb_relay_mode = getattr(self, f'combobox_relay{r}_mode')
+                    cb_relay_mode.setCurrentIndex([cb_relay_mode.itemText(i) for i in range(cb_relay_mode.count())]
+                                                  .index(self.cfg[f'relay{r}_mode']))
+                except ValueError:
+                    logger.warning(f'Configured relay{r}_mode not available in GUI. Interface set to GUI default.')
+                getattr(self, f'checkbox_relay{r}_enabled').setChecked(self.cfg[f'relay{r}_enabled'])
             for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
                 getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
                 getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)

@@ -60,12 +60,13 @@ class Instrument:
         # widgets
         self.spectrum_plot_enabled = False
         self.widget_aux_data_enabled = False
-        self.widget_flow_control_enabled = False
+        self.widget_flow_controls_enabled = []
         self.widget_hypernav_cal_enabled = False
         self.widget_metadata_enabled = False
-        self.widget_pump_control_enabled = False
+        self.widget_pump_controls_enabled = []
         self.widget_select_channel_enabled = False
         self.widgets_to_load = []  # To load widgets disabled on setup
+        self.widgets_to_load_kwargs = []
 
         # Load cfg
         self.uuid = uuid
@@ -96,8 +97,8 @@ class Instrument:
     @property
     def secondary_dock_widget_enabled(self) -> bool:
         return self.widget_metadata_enabled or \
-            self.widget_flow_control_enabled or \
-            self.widget_pump_control_enabled or \
+            any(self.widget_flow_controls_enabled) or \
+            any(self.widget_pump_controls_enabled) or \
             self.widget_hypernav_cal_enabled
 
     def setup(self, cfg, raw_logger=LogText):
