@@ -802,7 +802,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             raise ValueError(f'Model {model} not supported.')
 
     def act_adu_update_relay1_available(self):
-        if self.combobox_relay0_mode.currentText() != 'Switch (two-wire)':
+        if (self.combobox_relay0_mode.currentText() != 'Switch (two-wire)' and
+                self.combobox_model.currentText() != 'ADU100'):
             self.checkbox_relay1_enabled.setEnabled(True)
             self.combobox_relay1_mode.setEnabled(True)
         else:
@@ -836,6 +837,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 value = getattr(self, f).text().strip()
                 if not field_optional and not value:
                     empty_fields.append(field_pretty_name)
+                    if self.cfg['module'] == 'dataq' and field_name.startswith('variable'):
+                        self.cfg[field_name] = []
                     continue
                 # Apply special formatting to specific variables
                 try:
@@ -865,6 +868,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 value = getattr(self, f).toPlainText().strip()
                 if not value:
                     empty_fields.append(field_pretty_name)
+                    if self.cfg['module'] == 'dataq' and field_name.startswith('variable'):
+                        self.cfg[field_name] = []
                     continue
                 try:
                     value = [v.strip() for v in value.split(',')]
