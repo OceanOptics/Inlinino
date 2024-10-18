@@ -104,7 +104,7 @@ class Ontrak(Instrument):
         # Init Flow Control Widget
         self.widget_flow_controls_enabled: Union[List[bool], List[None]] = [None] * 4
         self.widget_pump_controls_enabled: Union[List[bool], List[None]] = [None] * 4
-        self.widgets_to_load: List[str] = ['FlowControlWidget', 'PumpControlWidget'] * 4
+        self.widgets_to_load: List[str] = ['FlowControlWidget'] * 4 + ['PumpControlWidget'] * 4
         self.widgets_to_load_kwargs: List[Dict] = [{'id': k} for k in range(4)] * 2
         # Setup
         self.setup(cfg)
@@ -123,17 +123,14 @@ class Ontrak(Instrument):
         self.relays_enabled, self.relays_gui_mode, self.relays = [], [None]*4, [None]*4
         self.widget_flow_controls_enabled, self.widget_pump_controls_enabled = [None]*4, [None]*4
         for r in range(n_relays):
-            if f'relay{r}_enabled' in cfg.keys():
-                if cfg[f'relay{r}_enabled']:
-                    self.relays_enabled.append(r)
-                else:
-                    self.relays_gui_mode[r] = None
-                    self.relays[r] = None
-                    self.widget_flow_controls_enabled[r] = False
-                    self.widget_pump_controls_enabled[r] = False
-                    continue
-            elif r == 0:
-                raise ValueError('Missing field relay0 enabled')
+            if f'relay{r}_enabled' in cfg.keys() and cfg[f'relay{r}_enabled']:
+                self.relays_enabled.append(r)
+            else:
+                self.relays_gui_mode[r] = None
+                self.relays[r] = None
+                self.widget_flow_controls_enabled[r] = False
+                self.widget_pump_controls_enabled[r] = False
+                continue
             if f'relay{r}_mode' in cfg.keys():
                 if cfg[f'relay{r}_mode'] not in relay_mode_supported:
                     raise ValueError(f"{cfg[f'relay{r}_mode']} not supported by {cfg['model']}.")

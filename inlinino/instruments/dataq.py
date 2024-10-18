@@ -1,6 +1,6 @@
 import numpy as np  # Needed to compute advanced products
 
-from inlinino.instruments import Instrument
+from inlinino.instruments import Instrument, InterfaceException
 from time import time, sleep
 
 class DATAQ(Instrument):
@@ -38,7 +38,9 @@ class DATAQ(Instrument):
             if len(cfg[k]) == 1 and cfg[k][0] == '':
                 del cfg[k]
         # Overload cfg with DATAQ specific parameters
-        cfg['variable_names'] = ['C%d' % (c+1) for c in self.channels_enabled] + \
+        channels_names = cfg['channels_names'] if 'channels_names' in cfg.keys() else [None] * 8
+        channels_names = [('_' + c.strip().replace(' ', '_')) if c is not None and len(c.strip()) > 0 else '' for c in channels_names]
+        cfg['variable_names'] = ['C%d%s' % (c+1, channels_names[c]) for c in self.channels_enabled] + \
                                 (cfg['variable_names'] if 'variable_names' in cfg.keys() else [])
         cfg['variable_units'] = ['V'] * len(self.channels_enabled) + \
                                 (cfg['variable_units'] if 'variable_units' in cfg.keys() else [])
@@ -55,8 +57,11 @@ class DATAQ(Instrument):
 
     def close(self, *args, **kwargs):
         if self.alive:
-            self.send_cmd('stop')
-            sleep(self._interface.timeout)
+            try:
+                self.send_cmd('stop')
+                sleep(self._interface.timeout)
+            except InterfaceException as e:
+                self.logger.warning(f'unable to stop instrument, {e}')
         super().close(*args, **kwargs)
 
     def send_cmd(self, command):

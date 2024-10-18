@@ -417,48 +417,57 @@ class MainWindow(QtGui.QMainWindow):
             self.packets_corrupted_flag = True
         self.last_packet_corrupted_timestamp = ts
 
+
+    def reset_ts(self, data, reset):
+        n = len(data)
+        if reset or len(self._buffer_data) != len(data) or self.reset_ts_trace:
+            self.reset_ts_trace = False
+            # Init legend
+            if hasattr(self.instrument, 'widget_active_timeseries_variables_selected'):
+                legend = self.instrument.widget_active_timeseries_variables_selected[
+                         :]  # Shallow copy to prevent update
+            else:
+                legend = [f"{name} ({units})" for name, units in
+                          zip(self.instrument.variable_names, self.instrument.variable_units)]
+            # Check data is correct length
+            if len(legend) != n:
+                # Possible in rare instance widget_active_timeseries_variables_selected is updated by user after the data is received and updated
+                logger.warning('Variables selected do not match data received. Skip timeseries update.')
+                self.reset_ts_trace = True
+                return
+            # Init buffers
+            self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
+            self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
+            # Re-initialize Plot (need to do so when number of curve changes)
+            self.timeseries_plot_widget.clear()
+            # Init curves
+            for i in range(n):
+                self.timeseries_plot_widget.plotItem.addItem(
+                    pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
+                                     name=legend[i])
+                )
+
     @QtCore.pyqtSlot(list, float)
     @QtCore.pyqtSlot(np.ndarray, float)
     @QtCore.pyqtSlot(list, float, bool)
     @QtCore.pyqtSlot(np.ndarray, float, bool)
     def on_new_ts_data(self, data, timestamp, reset=False):
-        if self.instrument.active_timeseries_variables_lock.acquire(timeout=0.25):
-            try:
-                n = len(data)
+        if self.instrument.widget_select_channel_enabled:
+            # Select channel widget enabled, hence user can change channels while receiving data
+            if self.instrument.active_timeseries_variables_lock.acquire(timeout=0.25):
+                try:
+                    self.reset_ts(data, reset)
+                finally:
+                    self.instrument.active_timeseries_variables_lock.release()
+            else:
                 if reset or len(self._buffer_data) != len(data) or self.reset_ts_trace:
-                    self.reset_ts_trace = False
-                    # Init legend
-                    if hasattr(self.instrument, 'widget_active_timeseries_variables_selected'):
-                        legend = self.instrument.widget_active_timeseries_variables_selected[
-                                 :]  # Shallow copy to prevent update
-                    else:
-                        legend = [f"{name} ({units})" for name, units in
-                                  zip(self.instrument.variable_names, self.instrument.variable_units)]
-                    # Check data is correct length
-                    if len(legend) != n:
-                        # Possible in rare instance widget_active_timeseries_variables_selected is updated by user after the data is received and updated
-                        logger.warning('Variables selected do not match data received. Skip timeseries update.')
-                        self.reset_ts_trace = True
-                        return
-                    # Init buffers
-                    self._buffer_timestamp = RingBuffer(self.BUFFER_LENGTH)
-                    self._buffer_data = [RingBuffer(self.BUFFER_LENGTH) for i in range(len(data))]
-                    # Re-initialize Plot (need to do so when number of curve changes)
-                    self.timeseries_plot_widget.clear()
-                    # Init curves
-                    for i in range(n):
-                        self.timeseries_plot_widget.plotItem.addItem(
-                            pg.PlotCurveItem(pen=pg.mkPen(color=self.PEN_COLORS[i % len(self.PEN_COLORS)], width=2),
-                                             name=legend[i])
-                        )
-            finally:
-                self.instrument.active_timeseries_variables_lock.release()
+                    logger.warning('Unable to acquire lock to update timeseries variables.')
+                    self.reset_ts_trace = True
+                    return
         else:
-            if reset or len(self._buffer_data) != len(data) or self.reset_ts_trace:
-                logger.warning('Unable to acquire lock to update timeseries variables.')
-                self.reset_ts_trace = True
-                return
-            n = len(data)
+            # No select channel widget, hence user can't change channels while receiving data
+            self.reset_ts(data, reset)
+        n = len(data)
         # Update buffers
         self._buffer_timestamp.extend(timestamp)
         for i in range(n):
@@ -973,9 +982,11 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.notification('No data will be logged.')
         elif self.cfg['module'] == 'dataq':
             self.cfg['channels_enabled'] = []
+            self.cfg['channels_names'] = [None] * 8
             for c in range(8):
                 if getattr(self, 'checkbox_channel%d_enabled' % (c+1)).isChecked():
                     self.cfg['channels_enabled'].append(c)
+                self.cfg['channels_names'][c] = getattr(self, 'optional_le_channel%d_name' % (c+1)).text()
             if not self.cfg['channels_enabled']:
                 self.notification('At least one channel must be enabled.', 'Nothing to log if no channels are enabled.')
                 return
@@ -1146,6 +1157,10 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
         if self.cfg['module'] == 'dataq':
             for c in self.cfg['channels_enabled']:
                 getattr(self, 'checkbox_channel%d_enabled' % (c + 1)).setChecked(True)
+            if 'channels_names' in self.cfg:
+                for c, name in enumerate(self.cfg['channels_names']):
+                    if name is not None:
+                        getattr(self, 'optional_le_channel%d_name' % (c + 1)).setText(name)
             # Handle legacy configuration
             for k in [k for k in self.cfg.keys() if k.startswith('variable_')]:
                 if len(self.cfg[k]) == 1 and self.cfg[k][0] == '':
@@ -1157,7 +1172,6 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                                                     .index(self.cfg['model']))
             except ValueError:
                 logger.warning('Configured model not available in GUI. Interface set to GUI default.')
-            self.act_activate_fields_for_adu_model()
             for r in range(4):
                 try:
                     cb_relay_mode = getattr(self, f'combobox_relay{r}_mode')
@@ -1165,7 +1179,8 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                                                   .index(self.cfg[f'relay{r}_mode']))
                 except ValueError:
                     logger.warning(f'Configured relay{r}_mode not available in GUI. Interface set to GUI default.')
-                getattr(self, f'checkbox_relay{r}_enabled').setChecked(self.cfg[f'relay{r}_enabled'])
+                getattr(self, f'checkbox_relay{r}_enabled').setChecked(
+                    self.cfg[f'relay{r}_enabled'] if f'relay{r}_enabled' in self.cfg.keys() else False)
             for c, g in zip(self.cfg['event_counter_channels_enabled'], self.cfg['event_counter_k_factors']):
                 getattr(self, 'checkbox_event_counter_channel%d_enabled' % (c)).setChecked(True)
                 getattr(self, 'spinbox_event_counter_channel%d_k_factor' % (c)).setValue(g)
@@ -1174,6 +1189,7 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
             for c, g in zip(self.cfg['analog_channels_enabled'], self.cfg['analog_channels_gains']):
                 getattr(self, 'checkbox_analog_channel%d_enabled' % (c)).setChecked(True)
                 getattr(self, 'spinbox_analog_channel%d_gain' % (c)).setValue(g)
+            self.act_activate_fields_for_adu_model()
         if hasattr(self, 'combobox_interface'):
             if 'interface' in self.cfg.keys():
                 try:

@@ -9,7 +9,7 @@ class FlowControlWidget(GenericWidget):
     def __init__(self, instrument, id=0):
         self.id = id
         super().__init__(instrument)
-        self.group_box_instrument_control.setTitle(f'Flow Control {self.id}')
+        self.group_box_instrument_control.setTitle(f'Switch {self.id}')
         self.radio_instrument_control_filter.clicked.connect(self.set_switch_mode)
         self.radio_instrument_control_total.clicked.connect(self.set_switch_mode)
         self.radio_instrument_control_hourly.clicked.connect(self.set_switch_mode)

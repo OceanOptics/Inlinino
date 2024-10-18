@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>390</width>
-    <height>510</height>
+    <width>503</width>
+    <height>588</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -87,60 +87,116 @@
        <property name="alignment">
         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout">
-        <item>
+       <layout class="QFormLayout" name="formLayout">
+        <item row="0" column="0">
          <widget class="QCheckBox" name="checkbox_channel1_enabled">
           <property name="text">
            <string>Channel 1</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="1" column="0">
          <widget class="QCheckBox" name="checkbox_channel2_enabled">
           <property name="text">
            <string>Channel 2</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="2" column="0">
          <widget class="QCheckBox" name="checkbox_channel3_enabled">
           <property name="text">
            <string>Channel 3</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="3" column="0">
          <widget class="QCheckBox" name="checkbox_channel4_enabled">
           <property name="text">
            <string>Channel 4</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="4" column="0">
          <widget class="QCheckBox" name="checkbox_channel5_enabled">
           <property name="text">
            <string>Channel 5</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="5" column="0">
          <widget class="QCheckBox" name="checkbox_channel6_enabled">
           <property name="text">
            <string>Channel 6</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="6" column="0">
          <widget class="QCheckBox" name="checkbox_channel7_enabled">
           <property name="text">
            <string>Channel 7</string>
           </property>
          </widget>
         </item>
-        <item>
+        <item row="7" column="0">
          <widget class="QCheckBox" name="checkbox_channel8_enabled">
           <property name="text">
            <string>Channel 8</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLineEdit" name="optional_le_channel1_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="optional_le_channel2_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QLineEdit" name="optional_le_channel3_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QLineEdit" name="optional_le_channel4_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QLineEdit" name="optional_le_channel5_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QLineEdit" name="optional_le_channel6_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="1">
+         <widget class="QLineEdit" name="optional_le_channel7_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="1">
+         <widget class="QLineEdit" name="optional_le_channel8_name">
+          <property name="placeholderText">
+           <string>Instr. Model S/N</string>
           </property>
          </widget>
         </item>
