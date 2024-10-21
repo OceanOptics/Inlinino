@@ -469,6 +469,8 @@ class MainWindow(QtGui.QMainWindow):
             self.reset_ts(data, reset)
         n = len(data)
         # Update buffers
+        if n == 0: # Nothing to update (won't trigger reset)
+            return
         self._buffer_timestamp.extend(timestamp)
         for i in range(n):
             self._buffer_data[i].extend(data[i])
@@ -889,8 +891,18 @@ class DialogInstrumentSetup(QtGui.QDialog):
             elif field_prefix == 'combobox':
                 if getattr(self, f).currentText() == 'on':
                     self.cfg[field_name] = True
-                else:
+                elif getattr(self, f).currentText() == 'off':
                     self.cfg[field_name] = False
+                else:
+                    value = getattr(self, f).currentText()
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        try:
+                            value = float(value)
+                        except ValueError:
+                            pass
+                    self.cfg[field_name] = value
             elif field_prefix == 'cb':
                 self.cfg[field_name] = getattr(self, f).isChecked()
         if self.cfg['module'] == 'dataq':
@@ -1140,19 +1152,23 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                 else:
                     getattr(self, 'te_' + k).setPlainText(v)
             elif hasattr(self, 'combobox_' + k):
-                if v:
-                    getattr(self, 'combobox_' + k).setCurrentIndex(0)
+                cb = getattr(self, 'combobox_' + k)
+                if isinstance(v, bool):
+                    cb.setCurrentIndex(0 if v else 1)
                 else:
-                    getattr(self, 'combobox_' + k).setCurrentIndex(1)
+                    try:
+                        cb.setCurrentIndex([cb.itemText(i) for i in range(cb.count())].index(str(v)))
+                    except ValueError:
+                        logger.warning(f'Value {v} not available in GUI for parameter {k}. GUI set to GUI default.')
             elif hasattr(self, 'dsb_' + k):
                 # double spin box
-                getattr(self, 'dsb_' + k).setValue(self.cfg[k])
+                getattr(self, 'dsb_' + k).setValue(v)
             elif hasattr(self, 'sb_' + k):
                 # spin box
-                getattr(self, 'sb_' + k).setValue(self.cfg[k])
+                getattr(self, 'sb_' + k).setValue(v)
             elif hasattr(self, 'cb_' + k):
                 # check boxes
-                getattr(self, 'cb_' + k).setChecked(self.cfg[k])
+                getattr(self, 'cb_' + k).setChecked(v)
         # Populate special fields specific to each module
         if self.cfg['module'] == 'dataq':
             for c in self.cfg['channels_enabled']:

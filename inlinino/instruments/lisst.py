@@ -68,6 +68,7 @@ class LISST(Instrument):
         self.spectrum_plot_x_values = [np.log10(self._parser.angles)]
         # Update Active Timeseries Variables
         self.widget_active_timeseries_variables_names = ['beta(%.5f)' % x for x in self._parser.angles]
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_angles = np.zeros(len(self._parser.angles), dtype=bool)
         for theta in [0.08, 0.32, 1.28, 5.12]:
             channel_name = 'beta(%.5f)' % self._parser.angles[np.argmin(np.abs(self._parser.angles - theta))]

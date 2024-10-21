@@ -21,6 +21,7 @@ class HyperBB(Instrument):
         # Instrument Specific Attributes
         self._parser: Optional[HyperBBParser] = None
         self.signal_reconstructed = None
+        self.invalid_packet_alarm_triggered = False
         # Default serial communication parameters
         self.default_serial_baudrate = 9600
         self.default_serial_timeout = 1
@@ -49,7 +50,9 @@ class HyperBB(Instrument):
             raise ValueError('Missing calibration plaque file (*.mat)')
         if 'temperature_file' not in cfg.keys():
             raise ValueError('Missing calibration temperature file (*.mat)')
-        self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'])
+        if 'firmware_version' not in cfg.keys():
+            cfg['firmware_version'] = 1
+        self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'], cfg['firmware_version'])
         self.signal_reconstructed = np.empty(len(self._parser.wavelength)) * np.nan
         # Overload cfg with received data
         prod_var_names = ['beta_u', 'bb']
@@ -65,13 +68,25 @@ class HyperBB(Instrument):
         self.spectrum_plot_x_values = [self._parser.wavelength]
         # Update Active Timeseries Variables
         self.widget_active_timeseries_variables_names = ['beta(%d)' % x for x in self._parser.wavelength]
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_wavelength = np.zeros(len(self._parser.wavelength), dtype=bool)
         for wl in np.arange(450, 700, 50):
             channel_name = 'beta(%d)' % self._parser.wavelength[np.argmin(np.abs(self._parser.wavelength - wl))]
             self.update_active_timeseries_variables(channel_name, True)
+        # Reset Alarm
+        self.invalid_packet_alarm_triggered = False
 
     def parse(self, packet):
-        return self._parser.parse(packet)
+        if len(packet) == 0:  # Empty lines on firmware v2 at end of wavelength scan
+            return []
+        data = self._parser.parse(packet)
+        if len(data) == 0:
+            self.signal.packet_corrupted.emit()
+            if self.invalid_packet_alarm_triggered is False:
+                self.invalid_packet_alarm_triggered = True
+                self.logger.warning('Unable to parse frame. Check firmware version.')
+                self.signal.alarm_custom.emit('Unable to parse frame.', 'Check HyperBB firmware version in "Setup".')
+        return data
 
     def handle_data(self, raw, timestamp):
         beta_u, bb, wl, gain, net_ref_zero_flag = self._parser.calibrate(np.array([raw], dtype=float))
@@ -122,27 +137,44 @@ class HyperBB(Instrument):
             ['beta(%d)' % wl for wl in self._parser.wavelength[self.active_timeseries_wavelength]]
 
 
-class MetaHyperBBParser(type):
-    def __init__(cls, name, bases, dct):
-        cls.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
-                               'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
-                               'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
-                               'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']
-        cls.FRAME_TYPES = [int, int, str, str, int, int, int, int, int,
-                           float, float, float, float, float, float, float,
-                           float, float, float, float, float, float, float,
-                           float, float, float, float, float, int, int]
-        # FRAME_PRECISIONS = ['%d', '%d', '%s', '%s', '%d', '%d', '%d', '%d', '%d',
-        #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
-        #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
-        #                    '%.1f', '%.1f', '%.2f', '%.2f', '%.2f', '%d', '%d']
-        cls.FRAME_PRECISIONS = ['%s'] * len(cls.FRAME_VARIABLES)
-        for x in cls.FRAME_VARIABLES:
-            setattr(cls, f'idx_{x}', cls.FRAME_VARIABLES.index(x))
+class HyperBBParser():
+    def __init__(self, plaque_cal_file, temperature_cal_file, firmware_version=1):
+        # Frame Parser
+        self.firmware_version = firmware_version
+        if firmware_version == 1:
+            self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
+                                   'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
+                                   'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
+                                   'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']
+            self.FRAME_TYPES = [int, int, str, str, int, int, int, int, int,
+                               float, float, float, float, float, float, float,
+                               float, float, float, float, float, float, float,
+                               float, float, float, float, float, int, int]
+            # FRAME_PRECISIONS = ['%d', '%d', '%s', '%s', '%d', '%d', '%d', '%d', '%d',
+            #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
+            #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
+            #                    '%.1f', '%.1f', '%.2f', '%.2f', '%.2f', '%d', '%d']
+            self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
+            for x in self.FRAME_VARIABLES:
+                setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
+        elif firmware_version == 2:
+            self.FRAME_VARIABLES = ['ScanIdx', 'Date', 'Time', 'wl', 'PmtGain',
+                                   'NetRef', 'NetSig1', 'NetSig2', 'NetSig3',
+                                   'LedTemp', 'WaterTemp', 'Depth', 'SupplyVolt', 'ChSaturated']
+            self.FRAME_TYPES = [int, str, str, int, int,
+                                float, float, float, float, float,
+                                float, float, float, float, float]
+            # FRAME_PRECISIONS = ['%d', '%d', '%s', '%s', '%d', '%d', '%d', '%d', '%d',
+            #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
+            #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
+            #                    '%.1f', '%.1f', '%.2f', '%.2f', '%.2f', '%d', '%d']
+            self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
+            for x in self.FRAME_VARIABLES:
+                setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
+        else:
+            raise ValueError('Firmware version not supported.')
 
-
-class HyperBBParser(metaclass=MetaHyperBBParser):
-    def __init__(self, plaque_cal_file, temperature_cal_file):
+        # Instrument Specific Attributes
         self._theta = float('nan')
         self.Xp = float('nan')
 
@@ -229,22 +261,29 @@ class HyperBBParser(metaclass=MetaHyperBBParser):
                     raw = np.delete(raw, sel, axis=0)
         # Shortcuts
         wl = raw[:, self.idx_wl]
-        # Remove saturated reading
-        raw[raw[:, self.idx_SigOn1] > self.saturation_level, self.idx_SigOn1] = np.nan
-        raw[raw[:, self.idx_SigOn2] > self.saturation_level, self.idx_SigOn2] = np.nan
-        raw[raw[:, self.idx_SigOn3] > self.saturation_level, self.idx_SigOn3] = np.nan
-        raw[raw[:, self.idx_SigOff1] > self.saturation_level, self.idx_SigOff1] = np.nan
-        raw[raw[:, self.idx_SigOff2] > self.saturation_level, self.idx_SigOff2] = np.nan
-        raw[raw[:, self.idx_SigOff3] > self.saturation_level, self.idx_SigOff3] = np.nan
-        # Calculate net signal for ref, low gain (2), high gain (3)
-        net_ref = raw[:, self.idx_RefOn] - raw[:, self.idx_RefOff]
-        net_sig2 = raw[:, self.idx_SigOn2] - raw[:, self.idx_SigOff2]
-        net_sig3 = raw[:, self.idx_SigOn3] - raw[:, self.idx_SigOff3]
-        net_ref_zero_flag = np.any(net_ref == 0)
-        net_ref[net_ref == 0] = np.nan
-        scat1 = raw[:, self.idx_NetSig1] / net_ref
-        scat2 = net_sig2 / net_ref
-        scat3 = net_sig3 / net_ref
+        if self.firmware_version == 1:
+            # Remove saturated reading
+            raw[raw[:, self.idx_SigOn1] > self.saturation_level, self.idx_SigOn1] = np.nan
+            raw[raw[:, self.idx_SigOn2] > self.saturation_level, self.idx_SigOn2] = np.nan
+            raw[raw[:, self.idx_SigOn3] > self.saturation_level, self.idx_SigOn3] = np.nan
+            raw[raw[:, self.idx_SigOff1] > self.saturation_level, self.idx_SigOff1] = np.nan
+            raw[raw[:, self.idx_SigOff2] > self.saturation_level, self.idx_SigOff2] = np.nan
+            raw[raw[:, self.idx_SigOff3] > self.saturation_level, self.idx_SigOff3] = np.nan
+            # Calculate net signal for ref, low gain (2), high gain (3)
+            net_ref = raw[:, self.idx_RefOn] - raw[:, self.idx_RefOff]
+            net_sig2 = raw[:, self.idx_SigOn2] - raw[:, self.idx_SigOff2]
+            net_sig3 = raw[:, self.idx_SigOn3] - raw[:, self.idx_SigOff3]
+            net_ref_zero_flag = np.any(net_ref == 0)
+            net_ref[net_ref == 0] = np.nan
+            scat1 = raw[:, self.idx_NetSig1] / net_ref
+            scat2 = net_sig2 / net_ref
+            scat3 = net_sig3 / net_ref
+        else:  # Assume firmware 2
+            net_ref_zero_flag = np.any(raw[:, self.idx_NetRef] == 0)
+            # TODO Check if need to flag saturated (ChSaturated)
+            scat1 = raw[:, self.idx_NetSig1] / raw[:, self.idx_NetRef]
+            scat2 = raw[:, self.idx_NetSig2] / raw[:, self.idx_NetRef]
+            scat3 = raw[:, self.idx_NetSig3] / raw[:, self.idx_NetRef]
         # Subtract dark offset
         scat1_dark_removed = scat1 - self.f_dark_cal_scat_1(raw[:, self.idx_PmtGain], wl)
         scat2_dark_removed = scat2 - self.f_dark_cal_scat_2(raw[:, self.idx_PmtGain], wl)
@@ -264,9 +303,15 @@ class HyperBBParser(metaclass=MetaHyperBBParser):
         scatx_corrected[np.isnan(scatx_corrected)] = scat2_t_corrected[np.isnan(scatx_corrected)] # otherwise low gain
         scatx_corrected[np.isnan(scatx_corrected)] = scat1_t_corrected[np.isnan(scatx_corrected)] # otherwise raw pmt
         # Keep gain setting
-        gain = np.ones((len(raw), 1)) * 3
-        gain[np.isnan(raw[:, self.idx_SigOn3])] = 2
-        gain[np.isnan(raw[:, self.idx_SigOn2])] = 1
+        if self.firmware_version == 1:
+            gain = np.ones((len(raw), 1)) * 3
+            gain[np.isnan(raw[:, self.idx_SigOn3])] = 2
+            gain[np.isnan(raw[:, self.idx_SigOn2])] = 1
+        else:
+            # TODO Check if method is correct based on documentation
+            gain = np.ones((len(raw), 1)) * 3
+            gain[raw[:, self.idx_ChSaturated] == 3] = 2
+            gain[raw[:, self.idx_ChSaturated] == 2] = 1
         # Calculate beta
         uwl = np.unique(wl)
         # mu = pchip_interpolate(self.wavelength, self.mu, uwl)  # Optimized as no need of interpolation as same wavelength as calibration

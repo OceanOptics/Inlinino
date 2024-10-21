@@ -133,6 +133,7 @@ class Satlantic(Instrument):
         # TODO if no core variables disable spectrum plot widget
         # Update Active Timeseries Variables
         self.widget_active_timeseries_variables_names = []
+        self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables = []
         for head, cal in self._parser.cal.items():
             self.widget_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
