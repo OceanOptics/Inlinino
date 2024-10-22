@@ -50,9 +50,9 @@ class HyperBB(Instrument):
             raise ValueError('Missing calibration plaque file (*.mat)')
         if 'temperature_file' not in cfg.keys():
             raise ValueError('Missing calibration temperature file (*.mat)')
-        if 'firmware_version' not in cfg.keys():
-            cfg['firmware_version'] = 1
-        self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'], cfg['firmware_version'])
+        if 'data_format' not in cfg.keys():
+            cfg['data_format'] = 'advanced'
+        self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'], cfg['data_format'])
         self.signal_reconstructed = np.empty(len(self._parser.wavelength)) * np.nan
         # Overload cfg with received data
         prod_var_names = ['beta_u', 'bb']
@@ -84,8 +84,8 @@ class HyperBB(Instrument):
             self.signal.packet_corrupted.emit()
             if self.invalid_packet_alarm_triggered is False:
                 self.invalid_packet_alarm_triggered = True
-                self.logger.warning('Unable to parse frame. Check firmware version.')
-                self.signal.alarm_custom.emit('Unable to parse frame.', 'Check HyperBB firmware version in "Setup".')
+                self.logger.warning('Unable to parse frame. Check data format.')
+                self.signal.alarm_custom.emit('Unable to parse frame.', 'Check HyperBB data format in "Setup".')
         return data
 
     def handle_data(self, raw, timestamp):
@@ -137,11 +137,22 @@ class HyperBB(Instrument):
             ['beta(%d)' % wl for wl in self._parser.wavelength[self.active_timeseries_wavelength]]
 
 
+ADVANCED_DATA_FORMAT = 1
+LIGHT_DATA_FORMAT = 2
+
 class HyperBBParser():
-    def __init__(self, plaque_cal_file, temperature_cal_file, firmware_version=1):
+    def __init__(self, plaque_cal_file, temperature_cal_file, data_format='advanced'):
         # Frame Parser
-        self.firmware_version = firmware_version
-        if firmware_version == 1:
+        if data_format.lower() == 'advanced':
+            self.data_format = ADVANCED_DATA_FORMAT
+        elif data_format.lower() == 'light':
+            self.data_format = LIGHT_DATA_FORMAT
+        else:
+            raise ValueError('Data format not recognized.')
+        if self.data_format == ADVANCED_DATA_FORMAT:
+            # The advanced output contains extra parameters:
+            #     - The standard deviation can be used as a proxy for particle size.
+            #     - The stepper position can be used to determine wavelength registration in case of instrument issues.
             self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
                                    'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
                                    'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
@@ -157,17 +168,13 @@ class HyperBBParser():
             self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
             for x in self.FRAME_VARIABLES:
                 setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
-        elif firmware_version == 2:
+        elif self.data_format == LIGHT_DATA_FORMAT:
             self.FRAME_VARIABLES = ['ScanIdx', 'Date', 'Time', 'wl', 'PmtGain',
                                    'NetRef', 'NetSig1', 'NetSig2', 'NetSig3',
                                    'LedTemp', 'WaterTemp', 'Depth', 'SupplyVolt', 'ChSaturated']
             self.FRAME_TYPES = [int, str, str, int, int,
                                 float, float, float, float, float,
-                                float, float, float, float, float]
-            # FRAME_PRECISIONS = ['%d', '%d', '%s', '%s', '%d', '%d', '%d', '%d', '%d',
-            #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
-            #                    '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f', '%.1f',
-            #                    '%.1f', '%.1f', '%.2f', '%.2f', '%.2f', '%d', '%d']
+                                float, float, float, float, int]
             self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
             for x in self.FRAME_VARIABLES:
                 setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
@@ -261,7 +268,7 @@ class HyperBBParser():
                     raw = np.delete(raw, sel, axis=0)
         # Shortcuts
         wl = raw[:, self.idx_wl]
-        if self.firmware_version == 1:
+        if self.data_format == ADVANCED_DATA_FORMAT:
             # Remove saturated reading
             raw[raw[:, self.idx_SigOn1] > self.saturation_level, self.idx_SigOn1] = np.nan
             raw[raw[:, self.idx_SigOn2] > self.saturation_level, self.idx_SigOn2] = np.nan
@@ -278,12 +285,24 @@ class HyperBBParser():
             scat1 = raw[:, self.idx_NetSig1] / net_ref
             scat2 = net_sig2 / net_ref
             scat3 = net_sig3 / net_ref
-        else:  # Assume firmware 2
+            # Keep gain setting
+            gain = np.ones((len(raw), 1)) * 3
+            gain[np.isnan(raw[:, self.idx_SigOn3])] = 2
+            gain[np.isnan(raw[:, self.idx_SigOn2])] = 1
+            gain[np.isnan(raw[:, self.idx_SigOn1])] = 0  # All signals saturated
+        else:  # Light Format
             net_ref_zero_flag = np.any(raw[:, self.idx_NetRef] == 0)
-            # TODO Check if need to flag saturated (ChSaturated)
+            raw[raw[:, self.idx_ChSaturated] == 1, self.idx_NetSig1] = np.nan
+            raw[(0 < raw[:, self.idx_ChSaturated]) & (raw[:, self.idx_ChSaturated] <= 2), self.idx_NetSig2] = np.nan
+            raw[(0 < raw[:, self.idx_ChSaturated]) & (raw[:, self.idx_ChSaturated] <= 3), self.idx_NetSig3] = np.nan
             scat1 = raw[:, self.idx_NetSig1] / raw[:, self.idx_NetRef]
             scat2 = raw[:, self.idx_NetSig2] / raw[:, self.idx_NetRef]
             scat3 = raw[:, self.idx_NetSig3] / raw[:, self.idx_NetRef]
+            # Keep Gain setting
+            gain = np.ones((len(raw), 1)) * 3
+            gain[raw[:, self.idx_ChSaturated] == 3] = 2
+            gain[raw[:, self.idx_ChSaturated] == 2] = 1
+            gain[raw[:, self.idx_ChSaturated] == 1] = 0  # All signals saturated
         # Subtract dark offset
         scat1_dark_removed = scat1 - self.f_dark_cal_scat_1(raw[:, self.idx_PmtGain], wl)
         scat2_dark_removed = scat2 - self.f_dark_cal_scat_2(raw[:, self.idx_PmtGain], wl)
@@ -302,16 +321,6 @@ class HyperBBParser():
         scatx_corrected = scat3_t_corrected  # default is high gain
         scatx_corrected[np.isnan(scatx_corrected)] = scat2_t_corrected[np.isnan(scatx_corrected)] # otherwise low gain
         scatx_corrected[np.isnan(scatx_corrected)] = scat1_t_corrected[np.isnan(scatx_corrected)] # otherwise raw pmt
-        # Keep gain setting
-        if self.firmware_version == 1:
-            gain = np.ones((len(raw), 1)) * 3
-            gain[np.isnan(raw[:, self.idx_SigOn3])] = 2
-            gain[np.isnan(raw[:, self.idx_SigOn2])] = 1
-        else:
-            # TODO Check if method is correct based on documentation
-            gain = np.ones((len(raw), 1)) * 3
-            gain[raw[:, self.idx_ChSaturated] == 3] = 2
-            gain[raw[:, self.idx_ChSaturated] == 2] = 1
         # Calculate beta
         uwl = np.unique(wl)
         # mu = pchip_interpolate(self.wavelength, self.mu, uwl)  # Optimized as no need of interpolation as same wavelength as calibration

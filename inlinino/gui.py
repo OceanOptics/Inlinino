@@ -845,22 +845,25 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if f in ['combobox_interface', 'combobox_model', *[f'combobox_relay{i}_mode' for i in range(4)]]:
                 self.cfg[field_name] = self.__dict__[f].currentText()
             elif field_prefix in ['le', 'sb', 'dsb']:
-                value = getattr(self, f).text().strip()
-                if not field_optional and not value:
-                    empty_fields.append(field_pretty_name)
-                    if self.cfg['module'] == 'dataq' and field_name.startswith('variable'):
-                        self.cfg[field_name] = []
-                    continue
-                # Apply special formatting to specific variables
                 try:
-                    if 'variable_' in field_name:
+                    value = getattr(self, f).text()
+                    # Pre-format value (needed here to handle special characters of some fields)
+                    if field_name in ['terminator', 'separator']:
+                        # Space are allowed as terminator or separator
+                        value = value.encode(self.ENCODING).decode('unicode_escape').encode(self.ENCODING)
+                    else:
+                        value = value.strip()
+                    # Check if field is optional, add to warning list otherwise
+                    if not field_optional and not value:
+                        empty_fields.append(field_pretty_name)
+                        if self.cfg['module'] == 'dataq' and field_name.startswith('variable'):
+                            self.cfg[field_name] = []
+                        continue
+                    # Apply special formatting
+                    if 'variable_' in field_name:  # Generic Instrument: Variable Names, Units, Columns, Types, Precision
                         value = [v.strip() for v in value.split(',')]
                         if 'variable_columns' in field_name:
                             value = [int(x) for x in value]
-                    elif field_name in ['terminator', 'separator']:
-                        # if len(value) > 3 and (value[:1] == "b'" and value[-1] == "'"):
-                        #     value = bytes(value[2:-1], 'ascii')
-                        value = value.strip().encode(self.ENCODING).decode('unicode_escape').encode(self.ENCODING)
                     elif field_prefix == 'sb':  # SpinBox
                         # a spinbox will contain either an int or float
                         try:
@@ -869,8 +872,6 @@ class DialogInstrumentSetup(QtGui.QDialog):
                             value = float(value)
                     elif field_prefix == 'dsb':  # DoubleSpinBox
                         value = float(value)
-                    else:
-                        value.strip()
                 except:
                     self.notification('Unable to parse special variable: ' + field_pretty_name, sys.exc_info()[0])
                     return
@@ -901,7 +902,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         try:
                             value = float(value)
                         except ValueError:
-                            pass
+                            pass  # Type is string
                     self.cfg[field_name] = value
             elif field_prefix == 'cb':
                 self.cfg[field_name] = getattr(self, f).isChecked()
