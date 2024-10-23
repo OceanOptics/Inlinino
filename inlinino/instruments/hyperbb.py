@@ -84,8 +84,9 @@ class HyperBB(Instrument):
             self.signal.packet_corrupted.emit()
             if self.invalid_packet_alarm_triggered is False:
                 self.invalid_packet_alarm_triggered = True
-                self.logger.warning('Unable to parse frame. Check data format.')
-                self.signal.alarm_custom.emit('Unable to parse frame.', 'Check HyperBB data format in "Setup".')
+                self.logger.warning('Unable to parse frame.')
+                self.signal.alarm_custom.emit('Unable to parse frame.',
+                                              'If all frames are like this, check HyperBB data format in "Setup".')
         return data
 
     def handle_data(self, raw, timestamp):
@@ -137,26 +138,28 @@ class HyperBB(Instrument):
             ['beta(%d)' % wl for wl in self._parser.wavelength[self.active_timeseries_wavelength]]
 
 
+LEGACY_DATA_FORMAT = 0
 ADVANCED_DATA_FORMAT = 1
 LIGHT_DATA_FORMAT = 2
 
 class HyperBBParser():
     def __init__(self, plaque_cal_file, temperature_cal_file, data_format='advanced'):
         # Frame Parser
-        if data_format.lower() == 'advanced':
+        if data_format.lower() == 'legacy':
+            self.data_format = LEGACY_DATA_FORMAT
+        elif data_format.lower() == 'advanced':
             self.data_format = ADVANCED_DATA_FORMAT
         elif data_format.lower() == 'light':
             self.data_format = LIGHT_DATA_FORMAT
         else:
             raise ValueError('Data format not recognized.')
-        if self.data_format == ADVANCED_DATA_FORMAT:
-            # The advanced output contains extra parameters:
-            #     - The standard deviation can be used as a proxy for particle size.
-            #     - The stepper position can be used to determine wavelength registration in case of instrument issues.
-            self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain', 'NetSig1',
-                                   'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std', 'RefOff',
-                                   'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2', 'SigOff2Std',
-                                   'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp', 'Depth', 'Debug1', 'zDistance']
+        if self.data_format == LEGACY_DATA_FORMAT:  # Manual version 1.2
+            self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain',
+                                    'NetSig1', 'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std',
+                                    'RefOff', 'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std', 'SigOff2',
+                                    'SigOff2Std', 'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp',
+                                    'Depth', 'Saturation', 'CalPlaqueDist']
+            # Channel "Saturation" might be "Debug1" depending on firmware version
             self.FRAME_TYPES = [int, int, str, str, int, int, int, int, int,
                                float, float, float, float, float, float, float,
                                float, float, float, float, float, float, float,
@@ -168,10 +171,26 @@ class HyperBBParser():
             self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
             for x in self.FRAME_VARIABLES:
                 setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
+        elif self.data_format == ADVANCED_DATA_FORMAT:  # Firmware version >= 1.68 or Manual version 1.3
+            # The advanced output contains extra parameters:
+            #     - The standard deviation can be used as a proxy for particle size.
+            #     - The stepper position can be used to determine wavelength registration in case of instrument issues.
+            self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain',
+                                    'NetSig1', 'SigOn1', 'SigOn1Std', 'RefOn', 'RefOnStd', 'SigOff1', 'SigOff1Std',
+                                    'RefOff', 'RefOffStd', 'SigOn2', 'SigOn2Std', 'SigOn3', 'SigOn3Std',
+                                    'SigOff2', 'SigOff2Std', 'SigOff3', 'SigOff3Std', 'LedTemp', 'WaterTemp',
+                                    'Depth', 'SupplyVolt', 'Saturation', 'CalPlaqueDist']
+            self.FRAME_TYPES = [int, int, str, str, int, int, int, int, int,
+                                float, float, float, float, float, float, float,
+                                float, float, float, float, float, float, float,
+                                float, float, float, float, float, float, int, int]
+            self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
+            for x in self.FRAME_VARIABLES:
+                setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
         elif self.data_format == LIGHT_DATA_FORMAT:
             self.FRAME_VARIABLES = ['ScanIdx', 'Date', 'Time', 'wl', 'PmtGain',
-                                   'NetRef', 'NetSig1', 'NetSig2', 'NetSig3',
-                                   'LedTemp', 'WaterTemp', 'Depth', 'SupplyVolt', 'ChSaturated']
+                                    'NetRef', 'NetSig1', 'NetSig2', 'NetSig3',
+                                    'LedTemp', 'WaterTemp', 'Depth', 'SupplyVolt', 'ChSaturated']
             self.FRAME_TYPES = [int, str, str, int, int,
                                 float, float, float, float, float,
                                 float, float, float, float, int]
@@ -268,7 +287,7 @@ class HyperBBParser():
                     raw = np.delete(raw, sel, axis=0)
         # Shortcuts
         wl = raw[:, self.idx_wl]
-        if self.data_format == ADVANCED_DATA_FORMAT:
+        if self.data_format == ADVANCED_DATA_FORMAT or self.data_format == LEGACY_DATA_FORMAT:
             # Remove saturated reading
             raw[raw[:, self.idx_SigOn1] > self.saturation_level, self.idx_SigOn1] = np.nan
             raw[raw[:, self.idx_SigOn2] > self.saturation_level, self.idx_SigOn2] = np.nan

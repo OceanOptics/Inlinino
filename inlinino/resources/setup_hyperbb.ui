@@ -275,6 +275,9 @@
        <layout class="QHBoxLayout" name="horizontalLayout_3">
         <item>
          <widget class="QComboBox" name="combobox_data_format">
+          <property name="currentText">
+           <string>advanced</string>
+          </property>
           <item>
            <property name="text">
             <string>light</string>
@@ -283,6 +286,11 @@
           <item>
            <property name="text">
             <string>advanced</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>legacy</string>
            </property>
           </item>
          </widget>
