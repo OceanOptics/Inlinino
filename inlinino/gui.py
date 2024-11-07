@@ -224,15 +224,17 @@ class MainWindow(QtGui.QMainWindow):
 
     def set_spectrum_plot_widget(self):
         self.spectrum_plot_widget.clear()  # Remove all items (past frame headers)
-        min_x, max_x = None, None
+        min_x, max_x, n_x = None, None, None
         for i, (name, x) in enumerate(zip(self.instrument.spectrum_plot_trace_names,
                                           self.instrument.spectrum_plot_x_values)):
                 min_x = min(min_x, min(x)) if min_x is not None else (min(x) if len(x) > 0 else 0)
                 max_x = max(max_x, max(x)) if max_x is not None else (max(x) if len(x) > 0 else 10)
+                n_x = max(n_x, len(x)) if n_x is not None else len(x)
                 self.spectrum_plot_widget.addItem(pg.PlotCurveItem(
                     pen=pg.mkPen(color=COLOR_SET[i % len(COLOR_SET)], width=2), name=name))
         min_x = 0 if min_x is None else min_x
         max_x = 1 if max_x is None else max_x
+        n_x = 1 if n_x is None else n_x
         self.spectrum_plot_widget.setXRange(min_x, max_x)
         if hasattr(self.instrument, 'spectrum_plot_x_label'):
             x_label_name, x_label_units = self.instrument.spectrum_plot_x_label
@@ -240,7 +242,8 @@ class MainWindow(QtGui.QMainWindow):
         if hasattr(self.instrument, 'spectrum_plot_y_label'):
             y_label_name, y_label_units = self.instrument.spectrum_plot_y_label
             self.spectrum_plot_widget.plotItem.setLabel('left', y_label_name, units=y_label_units)
-        self.spectrum_plot_widget.setLimits(minXRange=min_x, maxXRange=max_x)
+        x_range = max_x - min_x
+        self.spectrum_plot_widget.setLimits(minXRange=x_range / n_x, maxXRange=x_range)
 
     def set_clock(self):
         zulu = gmtime(time())
