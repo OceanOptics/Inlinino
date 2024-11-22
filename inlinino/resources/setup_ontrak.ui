@@ -79,6 +79,11 @@
            <string>ADU208</string>
           </property>
          </item>
+         <item>
+          <property name="text">
+           <string>ADU222</string>
+          </property>
+         </item>
         </widget>
        </item>
        <item row="3" column="0">
@@ -396,6 +401,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
         <widget class="QGroupBox" name="group_box_flowmeters">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
          <property name="title">
           <string>Digital Input(s)</string>
          </property>

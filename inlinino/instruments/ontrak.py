@@ -49,10 +49,11 @@ class ADUPacket:
 class Ontrak(Instrument):
     """
     ontrak Control Systems Data Acquisition Interface
-    Supported Model: ADU100
     """
 
     VENDOR_ID = 0x0a07
+
+    SUPPORTED_MODELS = ['ADU100', 'ADU200', 'ADU208', 'ADU222']
 
     # Specific ADU 100
     ADC_RESOLUTION = 65535
@@ -113,13 +114,16 @@ class Ontrak(Instrument):
         # Set specific attributes
         if 'model' not in cfg.keys():
             raise ValueError('Missing field model')
-        if self.model and self.model not in ['ADU100', 'ADU200', 'ADU208']:
-            raise ValueError('Model not supported. Supported models are: ADU100, ADU200, and ADU208')
+        if self.model and self.model not in Ontrak.SUPPORTED_MODELS:
+            raise ValueError(f"Model not supported. Supported models are: {', '.join(Ontrak.SUPPORTED_MODELS)}")
         # Relays
-        n_relays = 1 if cfg['model'] == 'ADU100' else 4
-        relay_mode_supported = ['Switch', 'Switch (one-wire)', 'Pump']
-        if cfg['model'] != 'ADU100':
-            relay_mode_supported.append('Switch (two-wire)')
+        n_relays = 4
+        relay_mode_supported = ['Switch', 'Switch (one-wire)', 'Switch (two-wire)', 'Pump']
+        if cfg['model'] == 'ADU100':
+            n_relays = 1
+            relay_mode_supported.remove('Switch (two-wire)')
+        elif cfg['model'] == 'ADU222':
+            n_relays = 2
         self.relays_enabled, self.relays_gui_mode, self.relays = [], [None]*4, [None]*4
         self.widget_flow_controls_enabled, self.widget_pump_controls_enabled = [None]*4, [None]*4
         for r in range(n_relays):
@@ -146,15 +150,21 @@ class Ontrak(Instrument):
                 self.widget_flow_controls_enabled[r] = False
                 self.widget_pump_controls_enabled[r] = True
         # Event Counters
-        if 'event_counter_channels_enabled' not in cfg.keys():
-            raise ValueError('Missing field event counter channels enabled')
-        self.event_counter_channels = cfg['event_counter_channels_enabled']
-        if 'event_counter_k_factors' not in cfg.keys():
-            raise ValueError('Missing field event counter k factors')
-        self.event_counter_k_factors = cfg['event_counter_k_factors']
-        self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
-        if 'low_flow_alarm_enabled' in cfg.keys():
-            self.low_flow_alarm_enabled = cfg['low_flow_alarm_enabled']
+        if cfg['model'] != 'ADU222':
+            if 'event_counter_channels_enabled' not in cfg.keys():
+                raise ValueError('Missing field event counter channels enabled')
+            self.event_counter_channels = cfg['event_counter_channels_enabled']
+            if 'event_counter_k_factors' not in cfg.keys():
+                raise ValueError('Missing field event counter k factors')
+            self.event_counter_k_factors = cfg['event_counter_k_factors']
+            self._event_counter_past_timestamps = [float('nan')] * len(self.event_counter_channels)
+            if 'low_flow_alarm_enabled' in cfg.keys():
+                self.low_flow_alarm_enabled = cfg['low_flow_alarm_enabled']
+        else:
+            self.event_counter_channels = []
+            self.event_counter_k_factors = []
+            self._event_counter_past_timestamps = []
+            self.low_flow_alarm_enabled = False
         # Analog Channels
         if cfg['model'] == 'ADU100':
             if 'analog_channels_enabled' not in cfg.keys():
@@ -218,12 +228,8 @@ class Ontrak(Instrument):
 
     def open(self, **kwargs):
         if self._interface.name.startswith('usb'):
-            if self.model == 'ADU100':
-                product_id = 100
-            elif self.model == 'ADU200':
-                product_id = 200
-            elif self.model == 'ADU208':
-                product_id = 208
+            if self.model in Ontrak.SUPPORTED_MODELS:
+                product_id = int(self.model[3:])
             else:
                 raise ValueError('Model not supported.')
             super().open(vendor_id=self.VENDOR_ID, product_id=product_id, **kwargs)

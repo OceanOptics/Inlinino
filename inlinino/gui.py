@@ -793,6 +793,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
         model = self.combobox_model.currentText()
         if model == 'ADU100':
             self.group_box_analog.setEnabled(True)
+            self.group_box_flowmeters.setEnabled(True)
+            self.checkbox_low_flow_alarm_enabled.setEnabled(True)
             self.checkbox_relay1_enabled.setEnabled(False)
             self.checkbox_relay1_enabled.setChecked(False)
             self.combobox_relay1_mode.setEnabled(False)
@@ -804,6 +806,8 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.combobox_relay3_mode.setEnabled(False)
         elif model in ('ADU200', 'ADU208'):
             self.group_box_analog.setEnabled(False)
+            self.group_box_flowmeters.setEnabled(True)
+            self.checkbox_low_flow_alarm_enabled.setEnabled(True)
             if self.combobox_relay0_mode.currentText() != 'Switch (two-wire)':
                 self.checkbox_relay1_enabled.setEnabled(True)
                 self.combobox_relay1_mode.setEnabled(True)
@@ -812,6 +816,19 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if self.combobox_relay2_mode.currentText() != 'Switch (two-wire)':
                 self.checkbox_relay3_enabled.setEnabled(True)
                 self.combobox_relay3_mode.setEnabled(True)
+        elif model == 'ADU222':
+            self.group_box_analog.setEnabled(False)
+            self.group_box_flowmeters.setEnabled(False)
+            self.checkbox_low_flow_alarm_enabled.setEnabled(False)
+            if self.combobox_relay0_mode.currentText() != 'Switch (two-wire)':
+                self.checkbox_relay1_enabled.setEnabled(True)
+                self.combobox_relay1_mode.setEnabled(True)
+            self.checkbox_relay2_enabled.setEnabled(False)
+            self.checkbox_relay2_enabled.setChecked(False)
+            self.combobox_relay2_mode.setEnabled(False)
+            self.checkbox_relay3_enabled.setEnabled(False)
+            self.checkbox_relay3_enabled.setChecked(False)
+            self.combobox_relay3_mode.setEnabled(False)
         else:
             raise ValueError(f'Model {model} not supported.')
 
@@ -1244,7 +1261,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
-        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys001', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
+        self.ports.append(type('obj', (object,), {'device': '/dev/ttys004', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
         ports_device = []
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
