@@ -337,7 +337,7 @@ class Ontrak(Instrument):
         #   alarm is triggered after three consecutive flow below the threshold
         #   alarm is disabled after 30 consecutive flow above threshold
         if self.low_flow_alarm_enabled:
-            i = len(self.relay_enabled)
+            i = len(self.relays_enabled)
             low_flow_detected = False
             for _ in self.event_counter_channels:
                 if self._low_flow_alarm_started:
