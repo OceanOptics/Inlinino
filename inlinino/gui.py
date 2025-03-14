@@ -973,7 +973,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'lisst':
             self.cfg['manufacturer'] = 'Sequoia'
-            self.cfg['model'] = 'LISST'
+            self.cfg['model'] = 'LISST100X'
             try:
                 self.cfg['serial_number'] = str(LISSTParser(self.cfg['device_file'], self.cfg['ini_file'],
                                                             self.cfg['dcal_file'], self.cfg['zsc_file']).serial_number)
@@ -1261,7 +1261,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
-        self.ports.append(type('obj', (object,), {'device': '/dev/ttys004', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
+        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys004', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
         ports_device = []
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')
