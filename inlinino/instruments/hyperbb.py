@@ -1,4 +1,5 @@
 import os.path
+from time import sleep
 
 from typing import Optional
 from threading import Lock
@@ -23,7 +24,7 @@ class HyperBB(Instrument):
         self.signal_reconstructed = None
         self.invalid_packet_alarm_triggered = False
         # Default serial communication parameters
-        self.default_serial_baudrate = 9600
+        self.default_serial_baudrate = 19200
         self.default_serial_timeout = 1
         # Init Auxiliary Data widget
         self.widget_aux_data_enabled = True
@@ -88,6 +89,16 @@ class HyperBB(Instrument):
                 self.signal.alarm_custom.emit('Unable to parse frame.',
                                               'If all frames are like this, check HyperBB data format in "Setup".')
         return data
+
+    def init_interface(self):
+        self._interface.write(b'\x03')  # Send Ctrl+C to stop acquisition
+        sleep(0.25)
+        self._interface.write(b'savedata 0\r\n')
+        sleep(0.1)
+        self._interface.write(b'scan\r\n')
+        sleep(0.1)
+        # flush to prevent unable to parse
+        self._interface.init()
 
     def handle_data(self, raw, timestamp):
         beta_u, bb, wl, gain, net_ref_zero_flag = self._parser.calibrate(np.array([raw], dtype=float))
