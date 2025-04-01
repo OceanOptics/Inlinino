@@ -731,7 +731,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
         if is_sip:
             self.tdf_files = file_names[0]
             file_names = [f for f in zipfile.ZipFile(self.tdf_files, 'r').namelist()
-                          if os.path.splitext(f)[1].lower() in pySat.Parser.VALID_CAL_EXTENSIONS
+                          if os.path.splitext(f)[1].lower() in pySat.Instrument.VALID_CAL_EXTENSIONS
                           and os.path.basename(f)[0] != '.']
         else:
             self.tdf_files = file_names
@@ -1237,8 +1237,29 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                     logger.warning('Configured interface not available in GUI. Interface set to GUI default.')
         if hasattr(self, 'scroll_area_layout_immersed'):
             if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
-                self.tdf_files = self.cfg['tdf_files']
-                for f, i in zip(self.tdf_files, self.cfg['immersed']):
+                # Check if sip file
+                if isinstance(self.cfg['tdf_files'], str):
+                    if os.path.splitext(self.cfg['tdf_files'])[1].lower() == '.sip':
+                        is_sip = True
+                    else:
+                        raise ValueError('Expect a sip file, tdf/cal not supported here.')
+                elif isinstance(self.cfg['tdf_files'], list):
+                    for f in self.cfg['tdf_files']:
+                        if os.path.splitext(f)[1].lower() == '.sip':
+                            raise ValueError('Expect a tdf/cal file, sip file not supported here.')
+                    is_sip = False
+                else:
+                    raise ValueError('Expect list or str for tdf_files')
+                # Update local file list
+                if is_sip:
+                    self.tdf_files = self.cfg['tdf_files']
+                    tmp_files = [f for f in zipfile.ZipFile(self.tdf_files, 'r').namelist()
+                                 if os.path.splitext(f)[1].lower() in pySat.Instrument.VALID_CAL_EXTENSIONS
+                                 and os.path.basename(f)[0] != '.']
+                else:
+                    self.tdf_files = self.cfg['tdf_files']
+                    tmp_files = self.cfg['tdf_files']
+                for f, i in zip(tmp_files, self.cfg['immersed']):
                     widget = QtWidgets.QCheckBox(os.path.basename(f))
                     if i:
                         widget.setChecked(True)
