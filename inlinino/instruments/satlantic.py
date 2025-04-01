@@ -136,37 +136,29 @@ class Satlantic(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables = []
-        if any('HyperProPower' for header in self._parser.cal.keys() if 'MPR' in header):
-            # HyperPro
-            for head, cal in self._parser.cal.items():
-                self.widget_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
+        is_hyperpro = any('HyperProPower' for header in self._parser.cal.keys() if 'MPR' not in header)
+        for head, cal in self._parser.cal.items():
+            self.widget_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
+            if is_hyperpro:
                 if 'MPR' not in head:
                     continue
-                varnames = []
                 cal_key_lower = [k.lower() for k in cal.key]
-                for k in ['pres_none', 'tilt_x', 'tilt_y']:
-                    if k in cal_key_lower:
-                        varnames.append(f'{head}_{cal.key[cal_key_lower.index(k)]}')
-                for varname in varnames:
-                    self.widget_active_timeseries_variables_selected.append(varname)
-                    self.active_timeseries_variables.append(self.active_timeseries_unpack_variable_name(varname))
-        else: # HyperOCR, HyperNav, SUNA, or others
-            for head, cal in self._parser.cal.items():
-                self.widget_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
-                # Append middle core variable to timeseries if instruments with few wavelength
-                if cal.core_variables and len(cal.core_variables) < 500:
-                    varnames = [f'{head}_{cal.key[cal.core_variables[int(len(cal.core_variables)/2)]]}']
-                elif cal.core_variables and 'D' not in head:  # Likely light frame from HyperNAV
-                    wl_idx = np.argmin(np.abs(self.spectrum_plot_x_values[self.frame_headers_idx[head]] - 490))
-                    varnames = [f'{head}_{cal.key[cal.core_variables[wl_idx]]}']
-                    for k in cal.key:
-                        if 'PRES' in k:
-                            varnames.append(f'{head}_{k}')
-                else:
-                    continue
-                for varname in varnames:
-                    self.widget_active_timeseries_variables_selected.append(varname)
-                    self.active_timeseries_variables.append(self.active_timeseries_unpack_variable_name(varname))
+                varnames = [f'{head}_{cal.key[cal_key_lower.index(k)]}' for k in ['pres_none', 'tilt_x', 'tilt_y'] if k in cal_key_lower]
+            elif cal.core_variables and len(cal.core_variables) < 500:
+                # Append middle core variable to timeseries, for HyperOCRs, Suna's
+                varnames = [f'{head}_{cal.key[cal.core_variables[int(len(cal.core_variables)/2)]]}']
+            elif cal.core_variables and 'D' not in head:
+                # Append 490 to timeseries, for HyperNav
+                wl_idx = np.argmin(np.abs(self.spectrum_plot_x_values[self.frame_headers_idx[head]] - 490))
+                varnames = [f'{head}_{cal.key[cal.core_variables[wl_idx]]}']
+                for k in cal.key:
+                    if 'PRES' in k:
+                        varnames.append(f'{head}_{k}')
+            else:
+                continue
+            for varname in varnames:
+                self.widget_active_timeseries_variables_selected.append(varname)
+                self.active_timeseries_variables.append(self.active_timeseries_unpack_variable_name(varname))
         # Update Metadata Widget
         self.widget_metadata_idx = {}
         self.widget_metadata_keys = []
@@ -240,7 +232,6 @@ class Satlantic(Instrument):
             self.logger.error('Unable to acquire lock to update timeseries plot')
         # Update Spectrum Plot
         if cal.core_variables:
-            idx = self.frame_headers_idx[data.frame_header]
             spectrum_data = [None] * len(self.frame_headers_idx)
             spectrum_data[self.frame_headers_idx[data.frame_header]] = data.frame[cal.core_groupname]
             self.signal.new_spectrum_data.emit(spectrum_data)
@@ -313,7 +304,9 @@ class ProdLogger:
                     keys.append(k)
                     core.append(False)
                     # TODO Compute Precision Required from calibration file using fit_type
-                    if t in ['AI', 'BU', 'BS'] and f in ['NONE', 'COUNT']:
+                    if f == 'NONE':
+                        precision.append('%s')  # Fit type NONE returns a None
+                    elif t in ['AI', 'BU', 'BS'] and f == 'COUNT':
                         precision.append('%d')
                     elif t in ['AF', 'AF16', 'BD', 'BF', 'AI', 'BU', 'BS']:  # Any fit type
                         precision.append('%.5f')

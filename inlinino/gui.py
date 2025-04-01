@@ -496,8 +496,9 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot(list)
     def on_new_spectrum_data(self, data):
-        if time() - self.last_spectrum_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
-            return
+        # Does not support MAX_PLOT_REFRESH_RATE as in some instances two spectrum are received back to back
+        # followed by a lapse of time permanently preventing to display one spectrum.
+        # This was an issue for the HyperPro.
         for i, y in enumerate(data):
             if y is None or i > len(self.instrument.spectrum_plot_x_values):
                 continue
