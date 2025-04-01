@@ -496,8 +496,9 @@ class MainWindow(QtGui.QMainWindow):
 
     @QtCore.pyqtSlot(list)
     def on_new_spectrum_data(self, data):
-        if time() - self.last_spectrum_plot_refresh < 1 / self.MAX_PLOT_REFRESH_RATE:
-            return
+        # Does not support MAX_PLOT_REFRESH_RATE as in some instances two spectrum are received back to back
+        # followed by a lapse of time permanently preventing to display one spectrum.
+        # This was an issue for the HyperPro.
         for i, y in enumerate(data):
             if y is None or i > len(self.instrument.spectrum_plot_x_values):
                 continue
@@ -731,7 +732,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
         if is_sip:
             self.tdf_files = file_names[0]
             file_names = [f for f in zipfile.ZipFile(self.tdf_files, 'r').namelist()
-                          if os.path.splitext(f)[1].lower() in pySat.Parser.VALID_CAL_EXTENSIONS
+                          if os.path.splitext(f)[1].lower() in pySat.Instrument.VALID_CAL_EXTENSIONS
                           and os.path.basename(f)[0] != '.']
         else:
             self.tdf_files = file_names
@@ -973,7 +974,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_products'] = True
         elif self.cfg['module'] == 'lisst':
             self.cfg['manufacturer'] = 'Sequoia'
-            self.cfg['model'] = 'LISST'
+            self.cfg['model'] = 'LISST100X'
             try:
                 self.cfg['serial_number'] = str(LISSTParser(self.cfg['device_file'], self.cfg['ini_file'],
                                                             self.cfg['dcal_file'], self.cfg['zsc_file']).serial_number)
@@ -1237,8 +1238,29 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                     logger.warning('Configured interface not available in GUI. Interface set to GUI default.')
         if hasattr(self, 'scroll_area_layout_immersed'):
             if 'immersed' in self.cfg.keys() and 'tdf_files' in self.cfg.keys():
-                self.tdf_files = self.cfg['tdf_files']
-                for f, i in zip(self.tdf_files, self.cfg['immersed']):
+                # Check if sip file
+                if isinstance(self.cfg['tdf_files'], str):
+                    if os.path.splitext(self.cfg['tdf_files'])[1].lower() == '.sip':
+                        is_sip = True
+                    else:
+                        raise ValueError('Expect a sip file, tdf/cal not supported here.')
+                elif isinstance(self.cfg['tdf_files'], list):
+                    for f in self.cfg['tdf_files']:
+                        if os.path.splitext(f)[1].lower() == '.sip':
+                            raise ValueError('Expect a tdf/cal file, sip file not supported here.')
+                    is_sip = False
+                else:
+                    raise ValueError('Expect list or str for tdf_files')
+                # Update local file list
+                if is_sip:
+                    self.tdf_files = self.cfg['tdf_files']
+                    tmp_files = [f for f in zipfile.ZipFile(self.tdf_files, 'r').namelist()
+                                 if os.path.splitext(f)[1].lower() in pySat.Instrument.VALID_CAL_EXTENSIONS
+                                 and os.path.basename(f)[0] != '.']
+                else:
+                    self.tdf_files = self.cfg['tdf_files']
+                    tmp_files = self.cfg['tdf_files']
+                for f, i in zip(tmp_files, self.cfg['immersed']):
                     widget = QtWidgets.QCheckBox(os.path.basename(f))
                     if i:
                         widget.setChecked(True)
@@ -1261,7 +1283,7 @@ class DialogSerialConnection(QtGui.QDialog):
         self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
-        self.ports.append(type('obj', (object,), {'device': '/dev/ttys004', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
+        # self.ports.append(type('obj', (object,), {'device': '/dev/ttys004', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
         ports_device = []
         for p in self.ports:
             # print(f'\n\n===\n{p.description}\n{p.device}\n{p.hwid}\n{p.interface}\n{p.location}\n{p.manufacturer}\n{p.name}\n{p.pid}\n{p.product}\n{p.serial_number}\n{p.vid}')

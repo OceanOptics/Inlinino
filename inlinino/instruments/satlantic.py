@@ -34,7 +34,7 @@ class Satlantic(Instrument):
             super().__init__(uuid, cfg, signal, setup=False, *args, **kwargs)
         # Instrument Specific Attributes
         self._parser = None
-        self.frame_headers_idx = []
+        self.frame_headers_idx = []  # Only for core variables
         # Default serial communication parameters
         self._max_buffer_length = 2**18  # Need larger buffer for HyperNAV
         self.default_serial_baudrate = 115200  # for HyperNAV
@@ -54,6 +54,7 @@ class Satlantic(Instrument):
         # Init Secondary Dock
         self.widget_metadata_enabled = True
         # Init Metadata Data Widget
+        self.widget_metadata_idx = {}
         self.widget_metadata_keys = []
         self.widget_metadata_frame_counters = []
         # Setup
@@ -88,16 +89,16 @@ class Satlantic(Instrument):
                 if not os.path.exists(dirsip):
                     os.mkdir(dirsip)
                 archive.extractall(path=dirsip)
-                for f in zip(archive.namelist()):
+                for f in archive.namelist():
                     if os.path.splitext(f)[1].lower() not in self._parser.VALID_CAL_EXTENSIONS \
                             or os.path.basename(f)[0] == '.':
                         continue
-                    empty_sip, i = False, i + 1
                     self.logger.debug(f"Reading [immersed={cfg['immersed'][i]}] {f}")
                     foo = pySat.Parser(os.path.join(dirsip, f), cfg['immersed'][i])
                     self._parser.cal[foo.frame_header] = foo
                     self._parser.max_frame_header_length = max(self._parser.max_frame_header_length,
                                                                len(foo.frame_header))
+                    empty_sip, i = False, i + 1
                 if empty_sip:
                     raise pySat.CalibrationFileEmptyError('No calibration file found in sip')
             else:
@@ -135,12 +136,19 @@ class Satlantic(Instrument):
         self.widget_active_timeseries_variables_names = []
         self.widget_active_timeseries_variables_selected = []
         self.active_timeseries_variables = []
+        is_hyperpro = any('HyperProPower' for header in self._parser.cal.keys() if 'MPR' not in header)
         for head, cal in self._parser.cal.items():
             self.widget_active_timeseries_variables_names += [f'{head}_{k}' for k in cal.key if k not in self.KEYS_TO_IGNORE]
-            # Append middle core variable to timeseries if instruments with few wavelength
-            if cal.core_variables and len(cal.core_variables) < 500:
+            if is_hyperpro:
+                if 'MPR' not in head:
+                    continue
+                cal_key_lower = [k.lower() for k in cal.key]
+                varnames = [f'{head}_{cal.key[cal_key_lower.index(k)]}' for k in ['pres_none', 'tilt_x', 'tilt_y'] if k in cal_key_lower]
+            elif cal.core_variables and len(cal.core_variables) < 500:
+                # Append middle core variable to timeseries, for HyperOCRs, Suna's
                 varnames = [f'{head}_{cal.key[cal.core_variables[int(len(cal.core_variables)/2)]]}']
-            elif cal.core_variables and 'D' not in head:  # Likely light frame from HyperNAV
+            elif cal.core_variables and 'D' not in head:
+                # Append 490 to timeseries, for HyperNav
                 wl_idx = np.argmin(np.abs(self.spectrum_plot_x_values[self.frame_headers_idx[head]] - 490))
                 varnames = [f'{head}_{cal.key[cal.core_variables[wl_idx]]}']
                 for k in cal.key:
@@ -152,9 +160,12 @@ class Satlantic(Instrument):
                 self.widget_active_timeseries_variables_selected.append(varname)
                 self.active_timeseries_variables.append(self.active_timeseries_unpack_variable_name(varname))
         # Update Metadata Widget
+        self.widget_metadata_idx = {}
         self.widget_metadata_keys = []
         self.widget_metadata_frame_counters = []
-        for head, cal in self._parser.cal.items():
+        for idx, head in enumerate(sorted(self._parser.cal.keys())):
+            cal = self._parser.cal[head]
+            self.widget_metadata_idx[head] = idx
             if cal.core_variables:
                 fields = [cal.key[i] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
             else:
@@ -194,13 +205,14 @@ class Satlantic(Instrument):
     def handle_data(self, data: SatPacket, timestamp: float):
         cal = self._parser.cal[data.frame_header]
         # Update Metadata Widget
-        metadata = [(None, None)] * len(self.frame_headers_idx)
-        idx = self.frame_headers_idx[data.frame_header]
+        metadata = [(None, None)] * len(self.widget_metadata_idx)
+        idx = self.widget_metadata_idx[data.frame_header]
         self.widget_metadata_frame_counters[idx] += 1
         if cal.core_variables:
             values = [data.frame[cal.key[i]] for i in cal.auxiliary_variables if cal.key[i] not in self.KEYS_TO_NOT_DISPLAY]
         else:
-            values = [data.frame[k] for k in cal.key if k not in self.KEYS_TO_NOT_DISPLAY]
+            values = [f'{data.frame[k]:.2f}' if isinstance(data.frame[k], float) else data.frame[k]
+                      for k in cal.key if k not in self.KEYS_TO_NOT_DISPLAY]
         metadata[idx] = (self.widget_metadata_frame_counters[idx], values)
         self.signal.new_meta_data.emit(metadata)
         # Update Timeseries
@@ -292,7 +304,9 @@ class ProdLogger:
                     keys.append(k)
                     core.append(False)
                     # TODO Compute Precision Required from calibration file using fit_type
-                    if t in ['AI', 'BU', 'BS'] and f in ['NONE', 'COUNT']:
+                    if f == 'NONE':
+                        precision.append('%s')  # Fit type NONE returns a None
+                    elif t in ['AI', 'BU', 'BS'] and f == 'COUNT':
                         precision.append('%d')
                     elif t in ['AF', 'AF16', 'BD', 'BF', 'AI', 'BU', 'BS']:  # Any fit type
                         precision.append('%.5f')
