@@ -262,7 +262,7 @@ class HyperBBParser():
 
     def compute_temperature_coefficients(self, wl, t):
         # Generate temperature correction grid
-        led_t = np.arange(np.min(t), np.max(t) + 0.1, 0.1) # TODO optimize by creating grid for extensive range of value once
+        led_t = np.arange(np.min(t), np.max(t) + 0.1001, 0.1) # TODO optimize by creating grid for extensive range of value once
         t_correction = np.empty((len(self.wavelength), len(led_t)))
         for k in range(len(self.wavelength)):
             t_correction[k, :] = np.polyval(self.cal_t_coef[k, :], led_t)
