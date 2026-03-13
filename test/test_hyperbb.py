@@ -89,15 +89,7 @@ class TestHyperBBParserCreation:
 
     def test_invalid_format_raises(self):
         with pytest.raises(ValueError, match='Data format not recognized'):
-            HyperBBParser.__new__(HyperBBParser)
-            parser = object.__new__(HyperBBParser)
-            # Call init with dummy files (expect format error before file loading)
-            try:
-                HyperBBParser('dummy.mat', 'dummy.mat', 'invalid_format')
-            except ValueError as e:
-                if 'Data format not recognized' in str(e):
-                    raise
-                raise AssertionError(f'Wrong error: {e}')
+            HyperBBParser('dummy.mat', 'dummy.mat', 'invalid_format')
 
     @_skip_if_no_cal_files()
     def test_old_format_without_temp_file_raises(self):
@@ -257,11 +249,12 @@ if __name__ == '__main__':
                 method()
                 print(f'PASS: {type(test_obj).__name__}.{method_name}')
                 passed += 1
-            except pytest.skip.Exception as e:
-                print(f'SKIP: {type(test_obj).__name__}.{method_name}: {e}')
-                skipped += 1
             except Exception as e:
-                print(f'FAIL: {type(test_obj).__name__}.{method_name}: {e}')
-                traceback.print_exc()
-                failed += 1
+                if 'Skipped' in type(e).__name__ or 'skip' in type(e).__name__.lower():
+                    print(f'SKIP: {type(test_obj).__name__}.{method_name}: {e}')
+                    skipped += 1
+                else:
+                    print(f'FAIL: {type(test_obj).__name__}.{method_name}: {e}')
+                    traceback.print_exc()
+                    failed += 1
     print(f'\nTotal: {passed} passed, {failed} failed, {skipped} skipped')

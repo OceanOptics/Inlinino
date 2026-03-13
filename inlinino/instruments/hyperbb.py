@@ -248,7 +248,10 @@ class HyperBBParser():
                 np.any(p_cal['darkCalWavelength'] != t_cal['wl']):
             raise ValueError('Wavelength from calibration files don\'t match.')
 
-        # Pre-compute temperature correction grid over an extensive temperature range
+        # Pre-compute temperature correction grid over an extensive temperature range.
+        # The grid spans 0–50°C, covering the full operational range of the LED.
+        # RegularGridInterpolator uses fill_value=None which extrapolates beyond the grid
+        # edges; log a warning if data temperatures fall outside this range.
         _led_t_grid = np.arange(0, 50.01, 0.1)
         _t_corr_grid = np.empty((len(self.wavelength), len(_led_t_grid)))
         for k in range(len(self.wavelength)):
