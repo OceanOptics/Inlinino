@@ -1077,6 +1077,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
             except FileNotFoundError:
                 self.notification(f"No such calibration file: {self.cfg['calibration_file']}")
                 return
+        elif self.cfg['module'] == 'hyperbb':
+            self.cfg['manufacturer'] = 'Sequoia'
+            self.cfg['model'] = 'HyperBB'
+            # Temperature file is optional when using a new combined calibration file
+            if 'Temperature File' in empty_fields:
+                empty_fields.remove('Temperature File')
+            if not self.cfg.get('temperature_file'):
+                self.cfg.pop('temperature_file', None)
         # Update global instrument cfg
         CFG.read()  # Update local cfg if other instance updated cfg
         CFG.instruments[self.cfg_uuid] = self.cfg.copy()

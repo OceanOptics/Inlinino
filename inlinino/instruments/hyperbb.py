@@ -6,7 +6,7 @@ from threading import Lock
 
 import numpy as np
 from scipy.io import loadmat
-from scipy.interpolate import interp2d, splrep, splev  # , pchip_interpolate
+from scipy.interpolate import RegularGridInterpolator, splrep, splev  # , pchip_interpolate
 
 from inlinino.instruments import Instrument
 
@@ -49,11 +49,10 @@ class HyperBB(Instrument):
         # Set HyperBB specific attributes
         if 'plaque_file' not in cfg.keys():
             raise ValueError('Missing calibration plaque file (*.mat)')
-        if 'temperature_file' not in cfg.keys():
-            raise ValueError('Missing calibration temperature file (*.mat)')
         if 'data_format' not in cfg.keys():
             cfg['data_format'] = 'advanced'
-        self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'], cfg['data_format'])
+        temperature_file = cfg.get('temperature_file', None)
+        self._parser = HyperBBParser(cfg['plaque_file'], temperature_file, cfg['data_format'])
         self.signal_reconstructed = np.empty(len(self._parser.wavelength)) * np.nan
         # Overload cfg with received data
         prod_var_names = ['beta_u', 'bb']
@@ -152,9 +151,10 @@ class HyperBB(Instrument):
 LEGACY_DATA_FORMAT = 0
 ADVANCED_DATA_FORMAT = 1
 LIGHT_DATA_FORMAT = 2
+STANDARD_DATA_FORMAT = 3  # New data format (firmware v2.x)
 
 class HyperBBParser():
-    def __init__(self, plaque_cal_file, temperature_cal_file, data_format='advanced'):
+    def __init__(self, plaque_cal_file, temperature_cal_file=None, data_format='advanced'):
         # Frame Parser
         if data_format.lower() == 'legacy':
             self.data_format = LEGACY_DATA_FORMAT
@@ -162,6 +162,8 @@ class HyperBBParser():
             self.data_format = ADVANCED_DATA_FORMAT
         elif data_format.lower() == 'light':
             self.data_format = LIGHT_DATA_FORMAT
+        elif data_format.lower() == 'standard':
+            self.data_format = STANDARD_DATA_FORMAT
         else:
             raise ValueError('Data format not recognized.')
         if self.data_format == LEGACY_DATA_FORMAT:  # Manual version 1.2
@@ -208,6 +210,17 @@ class HyperBBParser():
             self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
             for x in self.FRAME_VARIABLES:
                 setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
+        elif self.data_format == STANDARD_DATA_FORMAT:  # New standard format (firmware v2.x)
+            # Simplified output with net signals pre-computed by firmware
+            self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain',
+                                    'NetRef', 'NetSig1', 'NetSig2', 'NetSig3',
+                                    'LedTemp', 'WaterTemp', 'Depth', 'SupplyVolt', 'Saturation', 'CalPlaqueDist']
+            self.FRAME_TYPES = [int, int, str, str, int, int, int, int,
+                                float, float, float, float, float,
+                                float, float, float, int, int]
+            self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
+            for x in self.FRAME_VARIABLES:
+                setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
         else:
             raise ValueError('Firmware version not supported.')
 
@@ -220,33 +233,104 @@ class HyperBBParser():
         self.saturation_level = 4000
         self.theta = 135  # calls theta setter which sets Xp
 
-        # Load Temperature calibration file
-        t = loadmat(temperature_cal_file, simplify_cells=True)
-        self.wavelength = t['cal_temp']['wl']
-        self.cal_t_coef = t['cal_temp']['coeff']
+        # Load calibration files (supports old two-file format and new combined file format)
+        p_cal, t_cal = self._load_calibration(plaque_cal_file, temperature_cal_file)
 
-        # Load plaque calibration file
-        p = loadmat(plaque_cal_file, simplify_cells=True)
-        self.pmt_ref_gain = p['cal']['pmtRefGain']
-        self.pmt_gamma = p['cal']['pmtGamma']
-        self.gain12 = p['cal']['gain12']
-        self.gain23 = p['cal']['gain23']
+        self.wavelength = t_cal['wl']
+        self.cal_t_coef = t_cal['coeff']
+        self.pmt_ref_gain = p_cal['pmtRefGain']
+        self.pmt_gamma = p_cal['pmtGamma']
+        self.gain12 = p_cal['gain12']
+        self.gain23 = p_cal['gain23']
 
         # Check wavelength match in all calibration files
-        if np.any(p['cal']['darkCalWavelength'] != p['cal']['muWavelengths']) or \
-                np.any(p['cal']['darkCalWavelength'] != t['cal_temp']['wl']):
+        if np.any(p_cal['darkCalWavelength'] != p_cal['muWavelengths']) or \
+                np.any(p_cal['darkCalWavelength'] != t_cal['wl']):
             raise ValueError('Wavelength from calibration files don\'t match.')
 
+        # Pre-compute temperature correction grid over an extensive temperature range
+        _led_t_grid = np.arange(0, 50.01, 0.1)
+        _t_corr_grid = np.empty((len(self.wavelength), len(_led_t_grid)))
+        for k in range(len(self.wavelength)):
+            _t_corr_grid[k, :] = np.polyval(self.cal_t_coef[k, :], _led_t_grid)
+        self._f_t_correction = RegularGridInterpolator(
+            (self.wavelength.astype(float), _led_t_grid),
+            _t_corr_grid, method='linear', bounds_error=False, fill_value=None)
+
         # Prepare interpolation tables for dark offsets
-        self.f_dark_cal_scat_1 = interp2d(p['cal']['darkCalPmtGain'], p['cal']['darkCalWavelength'],
-                                          p['cal']['darkCalScat1'], kind='linear')
-        self.f_dark_cal_scat_2 = interp2d(p['cal']['darkCalPmtGain'], p['cal']['darkCalWavelength'],
-                                          p['cal']['darkCalScat2'], kind='linear')
-        self.f_dark_cal_scat_3 = interp2d(p['cal']['darkCalPmtGain'], p['cal']['darkCalWavelength'],
-                                          p['cal']['darkCalScat3'], kind='linear')
+        _gain_vals = p_cal['darkCalPmtGain'].astype(float)
+        _wl_vals = p_cal['darkCalWavelength'].astype(float)
+        self.f_dark_cal_scat_1 = RegularGridInterpolator(
+            (_wl_vals, _gain_vals), p_cal['darkCalScat1'],
+            method='linear', bounds_error=False, fill_value=None)
+        self.f_dark_cal_scat_2 = RegularGridInterpolator(
+            (_wl_vals, _gain_vals), p_cal['darkCalScat2'],
+            method='linear', bounds_error=False, fill_value=None)
+        self.f_dark_cal_scat_3 = RegularGridInterpolator(
+            (_wl_vals, _gain_vals), p_cal['darkCalScat3'],
+            method='linear', bounds_error=False, fill_value=None)
         # mu calibration corrected for temperature
-        self.mu = p['cal']['muFactors'] * self.compute_temperature_coefficients(p['cal']['muWavelengths'],
-                                                                               p['cal']['muLedTemp'])
+        self.mu = p_cal['muFactors'] * self.compute_temperature_coefficients(p_cal['muWavelengths'],
+                                                                              p_cal['muLedTemp'])
+
+    @staticmethod
+    def _load_calibration(plaque_cal_file, temperature_cal_file=None):
+        """Load calibration data from old two-file format or new combined single-file format.
+
+        Old format: Two separate .mat files, one with a 'cal' struct (plaque) and one with a
+        'cal_temp' struct (temperature).
+
+        New combined format: A single .mat file containing both plaque and temperature calibration
+        data. The file must contain a top-level struct (e.g. 'calibration') that includes all
+        plaque calibration fields as well as 'wl' and 'coeff' fields for temperature calibration.
+
+        :param plaque_cal_file: Path to plaque calibration .mat file (old format) or combined
+            calibration .mat file (new format).
+        :param temperature_cal_file: Path to temperature calibration .mat file (old format only).
+            Set to None when using a new combined calibration file.
+        :return: Tuple (p_cal, t_cal) where p_cal is a dict of plaque calibration parameters and
+            t_cal is a dict with keys 'wl' and 'coeff' for temperature calibration.
+        :raises ValueError: If required calibration fields are missing.
+        """
+        mat = loadmat(plaque_cal_file, simplify_cells=True)
+        # Remove MATLAB metadata keys
+        data_keys = [k for k in mat.keys() if not k.startswith('__')]
+
+        if 'cal' in mat:
+            # Old two-file format: plaque file has 'cal' struct
+            p_cal = mat['cal']
+            if temperature_cal_file is None:
+                raise ValueError(
+                    'Missing temperature calibration file (*.mat). '
+                    'The old calibration format requires two separate files.')
+            t_mat = loadmat(temperature_cal_file, simplify_cells=True)
+            if 'cal_temp' not in t_mat:
+                raise ValueError(
+                    f"Temperature calibration file '{temperature_cal_file}' does not contain "
+                    "'cal_temp' struct. Check that the correct file is specified.")
+            t_cal = t_mat['cal_temp']
+        elif len(data_keys) == 1:
+            # New combined format: single struct containing all calibration data
+            combined = mat[data_keys[0]]
+            _required_plaque = {'pmtRefGain', 'pmtGamma', 'gain12', 'gain23',
+                                 'darkCalWavelength', 'darkCalPmtGain',
+                                 'darkCalScat1', 'darkCalScat2', 'darkCalScat3',
+                                 'muWavelengths', 'muFactors', 'muLedTemp'}
+            _required_temp = {'wl', 'coeff'}
+            _missing = (_required_plaque | _required_temp) - set(combined.keys())
+            if _missing:
+                raise ValueError(
+                    f"Combined calibration file '{plaque_cal_file}' is missing required "
+                    f"fields: {', '.join(sorted(_missing))}. "
+                    "Ensure the file is a valid HyperBB calibration file.")
+            p_cal = combined
+            t_cal = {'wl': combined['wl'], 'coeff': combined['coeff']}
+        else:
+            raise ValueError(
+                f"Calibration file '{plaque_cal_file}' format not recognized. "
+                "Expected either 'cal' struct (old format) or a single combined struct "
+                f"(new format). Found keys: {data_keys}.")
+        return p_cal, t_cal
 
     @property
     def theta(self) -> float:
@@ -261,14 +345,9 @@ class HyperBBParser():
         self.Xp = float(splev(self.theta, splrep(theta_ref, Xp_ref)))
 
     def compute_temperature_coefficients(self, wl, t):
-        # Generate temperature correction grid
-        led_t = np.arange(np.min(t), np.max(t) + 0.1001, 0.1) # TODO optimize by creating grid for extensive range of value once
-        t_correction = np.empty((len(self.wavelength), len(led_t)))
-        for k in range(len(self.wavelength)):
-            t_correction[k, :] = np.polyval(self.cal_t_coef[k, :], led_t)
-        # mu temperature correction
-        t_correction = interp2d(led_t, self.wavelength, t_correction, kind='linear')(t, wl)
-        return np.diag(t_correction) if t_correction.ndim > 1 else t_correction
+        wl_arr = np.atleast_1d(np.asarray(wl, dtype=float))
+        t_arr = np.atleast_1d(np.asarray(t, dtype=float))
+        return self._f_t_correction(np.column_stack([wl_arr, t_arr]))
 
     def parse(self, raw):
         tmp = raw.decode().split()
@@ -320,6 +399,20 @@ class HyperBBParser():
             gain[np.isnan(raw[:, self.idx_SigOn3])] = 2
             gain[np.isnan(raw[:, self.idx_SigOn2])] = 1
             gain[np.isnan(raw[:, self.idx_SigOn1])] = 0  # All signals saturated
+        elif self.data_format == STANDARD_DATA_FORMAT:  # New standard format: net signals pre-computed
+            net_ref_zero_flag = np.any(raw[:, self.idx_NetRef] == 0)
+            # Saturation field: 0=none, 1=ch1 saturated, 2=ch1+ch2, 3=all channels saturated
+            raw[raw[:, self.idx_Saturation] >= 1, self.idx_NetSig1] = np.nan
+            raw[raw[:, self.idx_Saturation] >= 2, self.idx_NetSig2] = np.nan
+            raw[raw[:, self.idx_Saturation] >= 3, self.idx_NetSig3] = np.nan
+            scat1 = raw[:, self.idx_NetSig1] / raw[:, self.idx_NetRef]
+            scat2 = raw[:, self.idx_NetSig2] / raw[:, self.idx_NetRef]
+            scat3 = raw[:, self.idx_NetSig3] / raw[:, self.idx_NetRef]
+            # Keep Gain setting
+            gain = np.ones((len(raw), 1)) * 3
+            gain[raw[:, self.idx_Saturation] == 3] = 2
+            gain[raw[:, self.idx_Saturation] == 2] = 1
+            gain[raw[:, self.idx_Saturation] == 1] = 0  # All signals saturated
         else:  # Light Format
             net_ref_zero_flag = np.any(raw[:, self.idx_NetRef] == 0)
             raw[raw[:, self.idx_ChSaturated] == 1, self.idx_NetSig1] = np.nan
@@ -334,9 +427,10 @@ class HyperBBParser():
             gain[raw[:, self.idx_ChSaturated] == 2] = 1
             gain[raw[:, self.idx_ChSaturated] == 1] = 0  # All signals saturated
         # Subtract dark offset
-        scat1_dark_removed = scat1 - self.f_dark_cal_scat_1(raw[:, self.idx_PmtGain], wl)
-        scat2_dark_removed = scat2 - self.f_dark_cal_scat_2(raw[:, self.idx_PmtGain], wl)
-        scat3_dark_removed = scat3 - self.f_dark_cal_scat_3(raw[:, self.idx_PmtGain], wl)
+        _pts = np.column_stack([wl, raw[:, self.idx_PmtGain]])
+        scat1_dark_removed = scat1 - self.f_dark_cal_scat_1(_pts)
+        scat2_dark_removed = scat2 - self.f_dark_cal_scat_2(_pts)
+        scat3_dark_removed = scat3 - self.f_dark_cal_scat_3(_pts)
         # Apply PMT and front end gain factors
         g_pmt = (raw[:, self.idx_PmtGain] / self.pmt_ref_gain) ** self.pmt_gamma
         scat1_gain_corrected = scat1_dark_removed * self.gain12 * self.gain23 * g_pmt

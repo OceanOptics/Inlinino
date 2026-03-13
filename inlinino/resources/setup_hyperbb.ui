@@ -280,6 +280,11 @@
           </property>
           <item>
            <property name="text">
+            <string>standard</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>light</string>
            </property>
           </item>
