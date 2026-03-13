@@ -25,7 +25,7 @@ setuptools.setup(
     url="https://github.com/OceanOptics/Inlinino",
     packages=setuptools.find_packages(),
     install_requires=['pyserial>=3.4', 'numpy>=2.0', 'scipy>=1.14', 'PyQt6>=6.7', 'pyqtgraph>=0.13.7', 'pyACS', 'pySatlantic', 'pynmea2'],
-    python_requires='>=3.12',
+    python_requires='>=3.12,<4',
     license='GPLv3',
     classifiers=[
         "Programming Language :: Python :: 3",

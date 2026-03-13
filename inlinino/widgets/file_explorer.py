@@ -81,7 +81,6 @@ class FileExplorerWidget(GenericWidget):
         msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         if msg.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             dialog = DialogDownloadFiles(self, items)
-            status = dialog.exec()
             if not dialog.exec():  # 0: reject | 1: accept
                 # User cancelled
                 self.instrument.signal.warning.emit(
