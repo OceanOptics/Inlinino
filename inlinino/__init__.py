@@ -12,7 +12,7 @@ __version__ = '2.9.17'
 
 # Setup Logger
 logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('PyQt5').setLevel(logging.WARNING)
+logging.getLogger('PyQt6').setLevel(logging.WARNING)
 root_logger = logging.getLogger()   # Get root logger
 
 

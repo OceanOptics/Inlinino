@@ -12,7 +12,7 @@ from serial.tools.list_ports import comports as list_serial_comports
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
-from PyQt5 import QtMultimedia
+from PyQt6 import QtMultimedia
 from pyACS.acs import ACS as ACSParser
 import pySatlantic.instrument as pySat
 
@@ -50,7 +50,7 @@ def seconds_to_strmmss(seconds):
     return '%d:%02d' % (min, sec)
 
 
-class MainWindow(QtGui.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     BACKGROUND_COLOR = '#F8F8F2'
     FOREGROUND_COLOR = '#26292C'
     PEN_COLORS = COLOR_SET
@@ -61,13 +61,13 @@ class MainWindow(QtGui.QMainWindow):
         super(MainWindow, self).__init__()
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'main.ui'), self)
         # Graphical Adjustments
-        self.dock_widget_primary.setTitleBarWidget(QtGui.QWidget(None))
-        self.dock_widget_secondary.setTitleBarWidget(QtGui.QWidget(None))
+        self.dock_widget_primary.setTitleBarWidget(QtWidgets.QWidget(None))
+        self.dock_widget_secondary.setTitleBarWidget(QtWidgets.QWidget(None))
         self.label_app_version.setText('Inlinino v' + __version__)
         # Set Colors
         palette = QtGui.QPalette()
-        palette.setColor(palette.Window, QtGui.QColor(self.BACKGROUND_COLOR))  # Background
-        palette.setColor(palette.WindowText, QtGui.QColor(self.FOREGROUND_COLOR))  # Foreground
+        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColor(self.BACKGROUND_COLOR))  # Background
+        palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor(self.FOREGROUND_COLOR))  # Foreground
         self.setPalette(palette)
         pg.setConfigOption('background', pg.mkColor(self.BACKGROUND_COLOR))
         pg.setConfigOption('foreground', pg.mkColor(self.FOREGROUND_COLOR))
@@ -172,11 +172,11 @@ class MainWindow(QtGui.QMainWindow):
         # Add vertical spacer to docks
         if primary_vertical_spacer:
             self.docked_widget_primary_layout.addItem(
-                QtGui.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+                QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.MinimumExpanding)
             )
         if secondary_vertical_spacer:
             self.docked_widget_secondary_layout.addItem(
-                QtGui.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+                QtWidgets.QSpacerItem(20, 0, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.MinimumExpanding)
             )
         # Set secondary dock
         self.toggle_secondary_dock(init=True)
@@ -254,7 +254,7 @@ class MainWindow(QtGui.QMainWindow):
         logger.debug('Setup instrument')
         setup_dialog = DialogInstrumentUpdate(self.instrument.uuid, self)
         setup_dialog.show()
-        if setup_dialog.exec_():
+        if setup_dialog.exec():
             self.instrument.setup(setup_dialog.cfg)
             self.label_instrument_name.setText(self.instrument.short_name)
             # Set Interface Name
@@ -276,10 +276,10 @@ class MainWindow(QtGui.QMainWindow):
     def act_instrument_interface(self):
         def error_dialog():
             logger.warning(e)
-            QtGui.QMessageBox.warning(self, "Inlinino: Connect " + self.instrument.name,
-                                      'ERROR: Failed connecting ' + self.instrument.name + '. ' +
-                                      str(e),
-                                      QtGui.QMessageBox.Ok)
+            QtWidgets.QMessageBox.warning(self, "Inlinino: Connect " + self.instrument.name,
+                                          'ERROR: Failed connecting ' + self.instrument.name + '. ' +
+                                          str(e),
+                                          QtWidgets.QMessageBox.StandardButton.Ok)
         if self.instrument.alive:
             logger.debug('Disconnect instrument')
             self.instrument.close()
@@ -287,7 +287,7 @@ class MainWindow(QtGui.QMainWindow):
             if issubclass(type(self.instrument._interface), SerialInterface):
                 dialog = DialogSerialConnection(self)
                 dialog.show()
-                if dialog.exec_():
+                if dialog.exec():
                     try:
                         self.instrument.open(port=dialog.port, baudrate=dialog.baudrate, bytesize=dialog.bytesize,
                                              parity=dialog.parity, stopbits=dialog.stopbits, timeout=dialog.timeout)
@@ -302,7 +302,7 @@ class MainWindow(QtGui.QMainWindow):
             elif issubclass(type(self.instrument._interface), SocketInterface):
                 dialog = DialogSocketConnection(self)
                 dialog.show()
-                if dialog.exec_():
+                if dialog.exec():
                     try:
                         self.instrument.open(ip=dialog.ip, port=dialog.port)
                         # Save connection parameters for next time
@@ -332,7 +332,7 @@ class MainWindow(QtGui.QMainWindow):
         else:
             dialog = DialogLoggerOptions(self)
             dialog.show()
-            if dialog.exec_():
+            if dialog.exec():
                 self.instrument.log_update_cfg({'filename_prefix': dialog.cover_log_prefix +
                                                                    self.instrument.bare_log_prefix,
                                                 'path': dialog.log_path})
@@ -529,16 +529,16 @@ class MainWindow(QtGui.QMainWindow):
             self.alarm_message_box.show(text, info_text, sound=False)
 
     def closeEvent(self, event):
-        icon, txt = QtGui.QMessageBox.Question, "Are you sure you want to exit?"
+        icon, txt = QtWidgets.QMessageBox.Icon.Question, "Are you sure you want to exit?"
         if self.instrument.widget_hypernav_cal_enabled:
             sbs_txt = self.instrument.check_sbs_sn()
             if sbs_txt:
-                icon, txt = QtGui.QMessageBox.Warning, txt + "\nDo you want to exit anyway?"
-        msg = QtGui.QMessageBox(icon, "Inlinino: Closing Application", txt,
-                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, self)
-        msg.setWindowModality(QtCore.Qt.WindowModal)
-        if msg.exec_() == QtGui.QMessageBox.Yes:
-            QtGui.QApplication.instance().closeAllWindows()  # NEEDED IF OTHER WINDOWS OPEN BY SPECIFIC INSTRUMENTS
+                icon, txt = QtWidgets.QMessageBox.Icon.Warning, txt + "\nDo you want to exit anyway?"
+        msg = QtWidgets.QMessageBox(icon, "Inlinino: Closing Application", txt,
+                                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No, self)
+        msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        if msg.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+            QtWidgets.QApplication.instance().closeAllWindows()  # NEEDED IF OTHER WINDOWS OPEN BY SPECIFIC INSTRUMENTS
             event.accept()
         else:
             event.ignore()
@@ -552,22 +552,21 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
                 "  + Is the instruments configured properly (e.g. automatically send data)?\n"
 
     def __init__(self, parent):
-        super().__init__(QtWidgets.QMessageBox.Warning, "Inlinino: Data Timeout Alarm",
-                         self.TEXT, QtWidgets.QMessageBox.Ignore, parent)
+        super().__init__(QtWidgets.QMessageBox.Icon.Warning, "Inlinino: Data Timeout Alarm",
+                         self.TEXT, QtWidgets.QMessageBox.StandardButton.Ignore, parent)
         self.setInformativeText(self.INFO_TEXT)
-        self.setWindowModality(QtCore.Qt.WindowModal)
+        self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         self.active = False
         self.buttonClicked.connect(self.ignore)
 
         # Setup Sound
-        self.alarm_sound = QtMultimedia.QMediaPlayer()
-        self.alarm_playlist = QtMultimedia.QMediaPlaylist(self.alarm_sound)
-        for file in sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'alarm*.wav'))):
-            self.alarm_playlist.addMedia(QtMultimedia.QMediaContent(QtCore.QUrl.fromLocalFile(file)))
-        if self.alarm_playlist.mediaCount() < 1:
+        self.alarm_sound = QtMultimedia.QSoundEffect()
+        alarm_files = sorted(glob.glob(os.path.join(PATH_TO_RESOURCES, 'alarm*.wav')))
+        if alarm_files:
+            self.alarm_sound.setSource(QtCore.QUrl.fromLocalFile(alarm_files[0]))
+            self.alarm_sound.setLoopCount(-1)  # -1 = infinite loop
+        else:
             logger.warning('No alarm sounds available: disabled alarm')
-        self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
-        self.alarm_sound.setPlaylist(self.alarm_playlist)
 
     def show(self, txt: str = None, info_txt: str = None, sound: bool = True):
         if not self.active:
@@ -575,7 +574,6 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
             self.setInformativeText(self.INFO_TEXT if info_txt is None else info_txt)
             super().show()
             if sound:
-                self.alarm_playlist.setCurrentIndex(0)
                 self.alarm_sound.play()
             self.active = True
 
@@ -590,7 +588,7 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
         self.hide()
 
 
-class DialogStartUp(QtGui.QDialog):
+class DialogStartUp(QtWidgets.QDialog):
     LOAD_INSTRUMENT = 1
     SETUP_INSTRUMENT = 2
 
@@ -622,17 +620,17 @@ class DialogStartUp(QtGui.QDialog):
         index = self.combo_box_instrument_to_delete.currentIndex()
         uuid = self.instrument_uuids[index]
         instrument = self.combo_box_instrument_to_delete.currentText()
-        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, f"Inlinino: Delete {instrument}",
-                                f"Are you sure to delete instrument: {instrument} ?",
-                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, self)
-        msg.setWindowModality(QtCore.Qt.WindowModal)
-        if msg.exec_() == QtGui.QMessageBox.Yes:
+        msg = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Icon.Warning, f"Inlinino: Delete {instrument}",
+                                    f"Are you sure to delete instrument: {instrument} ?",
+                                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No, self)
+        msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        if msg.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             CFG.read()
             if uuid not in CFG.instruments.keys():
                 txt = f"Failed to delete instrument [{uuid}] {instrument}, " \
                       f"configuration was updated by another instance of Inlinino."
                 logger.warning(txt)
-                QtGui.QMessageBox.warning(self, "Inlinino: Configuration Error", txt, QtGui.QMessageBox.Ok)
+                QtWidgets.QMessageBox.warning(self, "Inlinino: Configuration Error", txt, QtWidgets.QMessageBox.StandardButton.Ok)
                 return
             del CFG.instruments[uuid]
             CFG.write()
@@ -642,7 +640,7 @@ class DialogStartUp(QtGui.QDialog):
             logger.warning(f"Deleted instrument [{uuid}] {instrument}")
 
 
-class DialogInstrumentSetup(QtGui.QDialog):
+class DialogInstrumentSetup(QtWidgets.QDialog):
     ENCODING = 'ascii'
     OPTIONAL_FIELDS = ['Variable Precision', 'Prefix Custom']
     ADU100_AN01_GAIN2RANGE = {0: '2.5V', 1: '1.25V', 2: '0.625V', 3: '0.312V', 4: '0.156V', 5: '78.12mV', 6: '39.06mV',
@@ -690,27 +688,27 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.combobox_relay2_mode.currentIndexChanged.connect(self.act_adu_update_relay3_available)
 
         # Cannot use default save button as does not provide mean to correctly validate user input
-        self.button_save = QtGui.QPushButton('Save')
+        self.button_save = QtWidgets.QPushButton('Save')
         self.button_save.setDefault(True)
         self.button_save.clicked.connect(self.act_save)
-        self.button_box.addButton(self.button_save, QtGui.QDialogButtonBox.ActionRole)
+        self.button_box.addButton(self.button_save, QtWidgets.QDialogButtonBox.ButtonRole.ActionRole)
         self.button_box.rejected.connect(self.reject)
 
     def act_browse_log_directory(self):
-        self.le_log_path.setText(QtGui.QFileDialog.getExistingDirectory(caption='Choose logging directory'))
+        self.le_log_path.setText(QtWidgets.QFileDialog.getExistingDirectory(caption='Choose logging directory'))
 
     def act_browse_device_file(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose device file', filter='Device File (*.dev *.txt)')
         self.le_device_file.setText(file_name)
 
     def act_browse_calibration_file(self):  # Specific to Suna and HydroScat
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose calibration file', filter='Calibration File (*.cal *.CAL)')
         self.le_calibration_file.setText(file_name)
 
     def act_browse_tdf_files(self):  # sip, cal, or tdf
-        file_names, selected_filter = QtGui.QFileDialog.getOpenFileNames(
+        file_names, selected_filter = QtWidgets.QFileDialog.getOpenFileNames(
             caption='Choose calibration file', filter='Calibration File (*.cal *.CAL *.tdf *.TDF *.sip)')
         # Check if sip file
         is_sip = False
@@ -724,9 +722,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
         # Empty current files for immersed selection
         for i in reversed(range(self.scroll_area_layout_immersed.count())):
             item = self.scroll_area_layout_immersed.itemAt(i)
-            if type(item) == QtGui.QWidgetItem:
+            if type(item) == QtWidgets.QWidgetItem:
                 item.widget().setParent(None)
-            elif type(item) == QtGui.QLayoutItem:
+            elif type(item) == QtWidgets.QLayoutItem:
                 item.layout().setParent(None)
         # Update selection of immersed files
         if is_sip:
@@ -739,41 +737,41 @@ class DialogInstrumentSetup(QtGui.QDialog):
         for f in file_names:
             self.scroll_area_layout_immersed.addWidget(QtWidgets.QCheckBox(os.path.basename(f)))
         self.scroll_area_layout_immersed.addItem(
-            QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
+            QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding))
 
     def act_browse_ini_file(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose initialization file', filter='Ini File (*.ini)')
         self.le_ini_file.setText(file_name)
 
     def act_browse_dcal_file(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose DCAL file', filter='DCAL File (*.asc)')
         self.le_dcal_file.setText(file_name)
 
     def act_browse_zsc_file(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose ZSC file', filter='ZSC File (*.asc)')
         self.le_zsc_file.setText(file_name)
 
     def act_browse_plaque_file(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose plaque calibration file', filter='Plaque File (*.mat)')
         self.le_plaque_file.setText(file_name)
 
     def act_browse_temperature_file(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose temperature calibration file', filter='Temperature File (*.mat)')
         self.le_temperature_file.setText(file_name)
 
     def act_browse_px_reg_prt(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose port side pixel registration file',
             filter='Registration File (*.cgs *.cal *.tdf *.CGS *.CAL *.TDF)')
         self.le_optional_px_reg_path_prt.setText(file_name)
 
     def act_browse_px_reg_sbd(self):
-        file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
+        file_name, selected_filter = QtWidgets.QFileDialog.getOpenFileName(
             caption='Choose starboard pixel registration file',
             filter='Registration File (*.cgs *.cal *.tdf *.CGS *.CAL *.TDF)')
         self.le_optional_px_reg_path_sbd.setText(file_name)
@@ -1035,7 +1033,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.cfg['immersed'] = []
             for i in range(self.scroll_area_layout_immersed.count()):
                 item = self.scroll_area_layout_immersed.itemAt(i)
-                if type(item) == QtGui.QWidgetItem:
+                if type(item) == QtWidgets.QWidgetItem:
                     self.cfg['immersed'].append(bool(item.widget().checkState()))
         elif self.cfg['module'] == 'hypernav':
             try:
@@ -1114,13 +1112,13 @@ class DialogInstrumentSetup(QtGui.QDialog):
         return True
 
     def notification(self, message, details=None):
-        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: Setup Instrument Warning",
-                                message,
-                                QtGui.QMessageBox.Ok, self)
+        msg = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Icon.Warning, "Inlinino: Setup Instrument Warning",
+                                    message,
+                                    QtWidgets.QMessageBox.StandardButton.Ok, self)
         if details:
             msg.setDetailedText(str(details))
-        msg.setWindowModality(QtCore.Qt.WindowModal)
-        msg.exec_()
+        msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        msg.exec()
 
 
 class DialogInstrumentCreate(DialogInstrumentSetup):
@@ -1145,9 +1143,9 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
         # Check if instrument exists
         if uuid not in CFG.instruments.keys():
             logger.warning('Instrument was deleted.')
-            QtGui.QMessageBox.warning(self, "Inlinino: Configuration Error",
-                                      'ERROR: Instrument was deleted.',
-                                      QtGui.QMessageBox.Ok)
+            QtWidgets.QMessageBox.warning(self, "Inlinino: Configuration Error",
+                                          'ERROR: Instrument was deleted.',
+                                          QtWidgets.QMessageBox.StandardButton.Ok)
             self.cancel()
         # Load from preconfigured instrument
         self.cfg_uuid = uuid
@@ -1266,21 +1264,21 @@ class DialogInstrumentUpdate(DialogInstrumentSetup):
                         widget.setChecked(True)
                     self.scroll_area_layout_immersed.addWidget(widget)
                 self.scroll_area_layout_immersed.addItem(
-                    QtGui.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
+                    QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding))
             else:
                 self.tdf_files = []
         # Connect Buttons
         self.connect_backend()
 
 
-class DialogSerialConnection(QtGui.QDialog):
+class DialogSerialConnection(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'serial_connection.ui'), self)
         instrument = parent.instrument
         # Connect buttons
-        self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
-        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Open).clicked.connect(self.accept)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel).clicked.connect(self.reject)
         # Update ports list
         self.ports = list_serial_comports()
         # self.ports.append(type('obj', (object,), {'device': '/dev/ttys004', 'product': 'macOS Virtual Serial', 'description': 'n/a'}))  # Debug macOS serial
@@ -1377,7 +1375,7 @@ class DialogSerialConnection(QtGui.QDialog):
         return self.sb_timeout.value()
 
 
-class DialogSocketConnection(QtGui.QDialog):
+class DialogSocketConnection(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         instrument = parent.instrument
@@ -1393,8 +1391,8 @@ class DialogSocketConnection(QtGui.QDialog):
                 port = CFG.interfaces[instrument.uuid]['socket_port']
                 self.sb_port.setValue(port)
         # Connect buttons
-        self.button_box.button(QtGui.QDialogButtonBox.Open).clicked.connect(self.accept)
-        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Open).clicked.connect(self.accept)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel).clicked.connect(self.reject)
 
     @property
     def ip(self) -> str:
@@ -1409,7 +1407,7 @@ class DialogSocketConnection(QtGui.QDialog):
     #     return int(self.sb_timeout.value())
 
 
-class DialogLoggerOptions(QtGui.QDialog):
+class DialogLoggerOptions(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)  #, QtCore.Qt.WindowStaysOnTopHint
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'logger_options.ui'), self)
@@ -1425,9 +1423,9 @@ class DialogLoggerOptions(QtGui.QDialog):
         self.cb_prefix_dark.toggled.connect(self.update_filename_template)
         self.cb_prefix_custom.toggled.connect(self.update_filename_template)
         # Connect buttons
-        self.button_box.button(QtGui.QDialogButtonBox.Save).setDefault(True)
-        self.button_box.button(QtGui.QDialogButtonBox.Save).clicked.connect(self.accept)
-        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Save).setDefault(True)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Save).clicked.connect(self.accept)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel).clicked.connect(self.reject)
 
     @property
     def cover_log_prefix(self) -> str:
@@ -1456,7 +1454,7 @@ class DialogLoggerOptions(QtGui.QDialog):
         return self.le_log_path.text()
 
     def act_browse_log_directory(self):
-        self.le_log_path.setText(QtGui.QFileDialog.getExistingDirectory(caption='Choose logging directory',
+        self.le_log_path.setText(QtWidgets.QFileDialog.getExistingDirectory(caption='Choose logging directory',
                                                      directory=self.le_log_path.text()))
         self.show()
 
@@ -1466,10 +1464,10 @@ class DialogLoggerOptions(QtGui.QDialog):
                                           '_YYYYMMDD_hhmmss.' + self.instrument.log_get_file_ext())
 
 
-class App(QtGui.QApplication):
+class App(QtWidgets.QApplication):
     def __init__(self, *args):
-        QtGui.QApplication.__init__(self, *args)
-        self.splash_screen = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
+        QtWidgets.QApplication.__init__(self, *args)
+        self.splash_screen = QtWidgets.QSplashScreen(QtGui.QPixmap(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
         self.splash_screen.show()
         self.setWindowIcon(QtGui.QIcon(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
         self.main_window = MainWindow()
@@ -1485,13 +1483,13 @@ class App(QtGui.QApplication):
         else:
             logger.debug('Startup Dialog')
             self.startup_dialog.show()
-            act = self.startup_dialog.exec_()
+            act = self.startup_dialog.exec()
             if act == self.startup_dialog.LOAD_INSTRUMENT:
                 instrument_uuid = self.startup_dialog.selected_uuid
             elif act == self.startup_dialog.SETUP_INSTRUMENT:
                 setup_dialog = DialogInstrumentCreate(self.startup_dialog.selected_template)
                 setup_dialog.show()
-                if setup_dialog.exec_():
+                if setup_dialog.exec():
                     instrument_uuid = setup_dialog.cfg_uuid
                 else:
                     logger.info('Setup closed')
@@ -1531,11 +1529,11 @@ class App(QtGui.QApplication):
                 setup_dialog = DialogInstrumentUpdate(instrument_uuid)
                 setup_dialog.show()
                 setup_dialog.notification('Unable to load instrument. Please check configuration.', e)
-                if setup_dialog.exec_():
+                if setup_dialog.exec():
                     logger.info('Updated configuration')
                 else:
                     logger.info('Setup closed')
                     self.start()  # Restart application to go back to startup screen
         # Start Main Window
         self.main_window.show()
-        sys.exit(self.exec_())
+        sys.exit(self.exec())
