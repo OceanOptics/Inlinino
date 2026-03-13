@@ -49,11 +49,11 @@ class GenericDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         if parent is not None and parent.isActiveWindow():
-            self.setWindowModality(QtCore.Qt.WindowModal)
+            self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, f'dialog_{self.__snake_name__[:-7]}.ui'), self)
-        self.run_button = self.button_box.addButton("Run", QtGui.QDialogButtonBox.ActionRole)
+        self.run_button = self.button_box.addButton("Run", QtWidgets.QDialogButtonBox.ButtonRole.ActionRole)
         self.run_button.clicked.connect(self.start)
-        self.button_box.button(QtGui.QDialogButtonBox.Close).clicked.connect(self.accept)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Close).clicked.connect(self.accept)
 
     def disable_run_button(self, text='Processing ...'):
         self.run_button.setText(text)

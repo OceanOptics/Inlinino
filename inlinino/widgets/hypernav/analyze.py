@@ -1,6 +1,6 @@
 import os
 
-from pyqtgraph.Qt import QtCore, QtGui, uic
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, uic
 
 from inlinino.shared.worker import Worker
 from inlinino.instruments.hypernav import HyperNav
@@ -71,7 +71,7 @@ class HyperNavCharacterizeDMDialog(GenericDialog, Worker):
 
     @QtCore.pyqtSlot()
     def browse_datafile(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                          caption='Choose HyperNav data file',
                                                          filter='Device File (*.raw *.txt)')
         self.le_datafile.setText(file_name)
@@ -130,14 +130,14 @@ class HyperNavWavelengthRegistrationDialog(GenericDialog, Worker):
 
     @QtCore.pyqtSlot()
     def browse_datafile(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                          caption='Choose HyperNav data file',
                                                          filter='Device File (*.raw *.txt)')
         self.le_raw_filename.setText(file_name)
 
     @QtCore.pyqtSlot()
     def browse_wavelength_file(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                          caption='Choose wavelength registration file',
                                                          filter='Device File (*.cgs)')
         self.le_wavelength_path.setText(file_name)
@@ -192,7 +192,7 @@ class HyperNavCalibrationHistoryDialog(GenericDialog, Worker):
 
     @QtCore.pyqtSlot()
     def browse_history_path(self):
-        path = QtGui.QFileDialog.getExistingDirectory(self, caption='Choose history directory')
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, caption='Choose history directory')
         self.le_history_path.setText(path)
 
     def start(self):

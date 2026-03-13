@@ -1,4 +1,4 @@
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from inlinino.widgets import GenericWidget
 
@@ -19,8 +19,8 @@ class AuxDataWidget(GenericWidget):
             self.group_box_aux_data_layout.itemAt(i).widget().setParent(None)
         # Set aux variable names
         for v in self.instrument.widget_aux_data_variable_names:
-            self.variable_names.append(QtGui.QLabel(v))
-            self.variable_values.append(QtGui.QLabel('?'))
+            self.variable_names.append(QtWidgets.QLabel(v))
+            self.variable_values.append(QtWidgets.QLabel('?'))
             self.group_box_aux_data_layout.addRow(self.variable_names[-1],
                                                   self.variable_values[-1])
 

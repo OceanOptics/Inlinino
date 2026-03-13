@@ -90,18 +90,18 @@ class HyperNavCalWidget(GenericWidget):
     @QtCore.pyqtSlot(str, str, str)
     def warning_message_box(self, message, informative_text='', icon='warning'):
         if icon in ('error', 'critical'):
-            icon = QtWidgets.QMessageBox.Critical
+            icon = QtWidgets.QMessageBox.Icon.Critical
         elif icon in ('info', 'information'):
-            icon = QtWidgets.QMessageBox.Information
+            icon = QtWidgets.QMessageBox.Icon.Information
         else:
-            icon = QtWidgets.QMessageBox.Warning
-        msg = QtGui.QMessageBox(icon, "Inlinino: HyperNav",
-                                message, QtGui.QMessageBox.Ok, parent=self)
+            icon = QtWidgets.QMessageBox.Icon.Warning
+        msg = QtWidgets.QMessageBox(icon, "Inlinino: HyperNav",
+                                    message, QtWidgets.QMessageBox.StandardButton.Ok, parent=self)
         if informative_text:
             msg.setInformativeText(informative_text)
         if self.isActiveWindow():
-            msg.setWindowModality(QtCore.Qt.WindowModal)
-        msg.exec_()
+            msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        msg.exec()
 
     """
     Control
@@ -196,9 +196,9 @@ class HyperNavCalWidget(GenericWidget):
     @QtCore.pyqtSlot(bytes)
     def update_serial_console(self, data: bytes):
         data.replace(b'\r', b'')  # Use only \n otherwise create extra line
-        self.serial_monitor_console.moveCursor(QtGui.QTextCursor.End)
+        self.serial_monitor_console.moveCursor(QtGui.QTextCursor.MoveOperation.End)
         self.serial_monitor_console.insertPlainText(data.decode('utf8', errors='replace'))
-        self.serial_monitor_console.moveCursor(QtGui.QTextCursor.StartOfLine)
+        self.serial_monitor_console.moveCursor(QtGui.QTextCursor.MoveOperation.StartOfLine)
 
     def send_command(self):
         cmd = self.serial_monitor_command.text()

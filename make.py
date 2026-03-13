@@ -64,9 +64,9 @@ for item, dest in ls:
 # Include hidden imports
 hidden_imports = []
 for i in [
-    'pyqtgraph.graphicsItems.ViewBox.axisCtrlTemplate_pyqt5',
-    'pyqtgraph.graphicsItems.PlotItem.plotConfigTemplate_pyqt5',
-    'pyqtgraph.imageview.ImageViewTemplate_pyqt5',
+    'pyqtgraph.graphicsItems.ViewBox.axisCtrlTemplate_generic',
+    'pyqtgraph.graphicsItems.PlotItem.plotConfigTemplate_generic',
+    'pyqtgraph.imageview.ImageViewTemplate_generic',
 ]:
     hidden_imports.append(f'--hidden-import={i}')
 

@@ -24,9 +24,9 @@ class MonitorWidget(GenericWidget):
     @QtCore.pyqtSlot(bytes)
     def update_monitor(self, data: bytes):
         data.replace(b'\r', b'')  # Use only \n otherwise create extra line
-        self.monitor_view.moveCursor(QtGui.QTextCursor.End)
+        self.monitor_view.moveCursor(QtGui.QTextCursor.MoveOperation.End)
         self.monitor_view.insertPlainText(data.decode('utf8', errors='replace'))
-        self.monitor_view.moveCursor(QtGui.QTextCursor.StartOfLine)
+        self.monitor_view.moveCursor(QtGui.QTextCursor.MoveOperation.StartOfLine)
 
     def send_command(self):
         cmd = self.command_field.text()
