@@ -37,27 +37,40 @@ class NMEA(Instrument):
     #     super().open(port, baudrate, bytesize, parity, stopbits, timeout)
 
     def parse(self, packet):
-        data = [None] * len(self.variable_names)
-        try:  # Remove try statement to raise error
+        data = [float('nan')] * len(self.variable_names)
+        try:
             msg = pynmea2.parse(packet.decode())
-        except ValueError:  # Skip error for corrupted frames (probability to fill log is too high)
+        except ValueError:
             return data
-        # Commented line for dev purpose only
-        # print(packet)
-        # print(msg.fields)
+        # MWV special parsing
+        if msg.sentence_type == 'MWV':
+            for i, k in enumerate(self.variable_names):
+                if msg.reference == 'R':  # apparent wind
+                    if k == 'wind_speed_apparent':
+                        data[i] = float(msg.wind_speed)
+                    elif k == 'wind_angle_apparent':
+                        data[i] = float(msg.wind_angle)
+                elif msg.reference == 'T':  # true wind
+                    if k == 'wind_speed_true':
+                        data[i] = float(msg.wind_speed)
+                    elif k == 'wind_angle_true':
+                        data[i] = float(msg.wind_angle)
+            return data
+        # Default parsing
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):
-            try:
-                if t == 'int':
-                    data[i] = int(getattr(msg, k)) if hasattr(msg, k) and getattr(msg, k) != '' else float('nan')
-                elif t == 'float':
-                    data[i] = float(getattr(msg, k)) if hasattr(msg, k) and getattr(msg, k) != '' else float('nan')
-                elif t == 'str':
-                    data[i] = str(getattr(msg, k)) if hasattr(msg, k) else 'nan'
-                else:
-                    raise ValueError("Variable type not supported.")
-            except TypeError:
-                # Typical of pynmea2 unable to parse datetime
-                data[i] = 'nan' if t == 'str' else float('nan')
+            if not hasattr(msg, k):
+                continue
+            value = getattr(msg, k)
+            if value in ['', None]:
+                continue
+            if t == 'int':
+                data[i] = int(value)
+            elif t == 'float':
+                data[i] = float(value)
+            elif t == 'str':
+                data[i] = str(value)
+            else:
+                raise ValueError("Variable type not supported. Correct Instrument Setup > Variable Types.")
         return data
 
     def handle_data(self, data, timestamp):
