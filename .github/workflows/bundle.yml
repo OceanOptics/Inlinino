@@ -8,6 +8,7 @@ on:
         value: |
           ${{ jobs.Bundle.outputs.ubuntu_artifact_filename }}
           ${{ jobs.Bundle.outputs.macos_artifact_filename }}
+          ${{ jobs.Bundle.outputs.macos_intel_artifact_filename }}
           ${{ jobs.Bundle.outputs.windows_artifact_filename }}
 
 jobs:
@@ -16,21 +17,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ 'ubuntu-latest', 'macos-13', 'windows-latest' ]
+        os: [ 'ubuntu-latest', 'macos-latest', 'macos-15-intel', 'windows-latest' ]
 
     runs-on: ${{ matrix.os }}
 
     outputs:
       ubuntu_artifact_filename: ${{ steps.artifact_id.outputs.ubuntu-latest-name }}
-      macos_artifact_filename: ${{ steps.artifact_id.outputs.macos-13-name }}
+      macos_artifact_filename: ${{ steps.artifact_id.outputs.macos-latest-name }}
+      macos_intel_artifact_filename: ${{ steps.artifact_id.outputs.macos-15-intel-name }}
       windows_artifact_filename: ${{ steps.artifact_id.outputs.windows-latest-name }}
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout HyperNav Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: OceanOptics/hypernav
           ssh-key: ${{ secrets.HYPERNAV_DEPLOY_KEY }}
@@ -41,7 +43,7 @@ jobs:
           git clone https://bitbucket.csiro.au/scm/aqrs/aquasense.git optional/aquasense
 
       - name: Setup python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.8'
           cache: 'pip'
@@ -87,7 +89,7 @@ jobs:
         shell: bash
 
       - name: Get Bundle Name (macOS)
-        if: matrix.os == 'macos-13'
+        if: matrix.os == 'macos-latest' || matrix.os == 'macos-15-intel'
         run: echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
 
       - name: Zip Bundle
@@ -99,7 +101,7 @@ jobs:
           filename: '${{ env.BUNDLE_NAME }}.zip'
 
       - name: Upload Bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BUNDLE_NAME }}
           path: bundle/dist/${{ env.BUNDLE_NAME }}.zip

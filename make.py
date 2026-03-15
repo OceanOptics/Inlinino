@@ -25,7 +25,7 @@ if platform.system() == 'Windows':
 elif platform.system() == 'Darwin':
     icon_ext = 'icns'
     os_specific_args = [
-        # '--target-arch=universal2',  # Fails on GitHub but bundle works on both architecture
+        f'--target-arch={platform.machine()}',
         # Required for code signing
         '--osx-bundle-identifier=com.umaine.sms.inlinino'
         # f'--codesign-identity={os.getenv("CODESIGN_HASH")}',
@@ -70,9 +70,14 @@ for i in [
 ]:
     hidden_imports.append(f'--hidden-import={i}')
 
+# Build bundle name
+bundle_name = f'Inlinino-v{version}-{platform.system()}'
+if platform.system() == 'Darwin' and platform.machine() == 'x86_64':
+    bundle_name += '-intel'
+
 # Bundle application
 PyInstaller.__main__.run([
-    f'--name=Inlinino-v{version}-{platform.system()}',
+    f'--name={bundle_name}',
     f"--icon={os.path.relpath(os.path.join('inlinino', 'resources', f'inlinino.{icon_ext}'), root)}",
     f'--distpath={os.path.join(root, "dist")}',
     f'--workpath={os.path.join(root, "build")}',
