@@ -17,7 +17,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ 'ubuntu-latest', 'macos-latest', 'macos-15-intel', 'windows-latest' ]
+        include:
+          - os: 'ubuntu-latest'
+            wget_cmd: 'wget'
+          - os: 'macos-latest'
+            wget_cmd: 'wget'
+          - os: 'macos-15-intel'
+            wget_cmd: 'wget'
+          - os: 'windows-latest'
+            wget_cmd: 'C:/msys64/usr/bin/wget.exe'
 
     runs-on: ${{ matrix.os }}
 
@@ -48,25 +56,16 @@ jobs:
           python-version: '3.8'
           cache: 'pip'
 
-      - name: Download external resources (Ubuntu & macOS)
-        if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'macos-13')
+      - name: Download external resources
+        shell: bash
         run: |
-          cd inlinino/resources
-          wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd -
-          cd optional/hypernav/hypernav/
-          wget -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
-          cd -
-
-      - name: Download external resources (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd inlinino/resources
-          C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
-          cd -
-          cd optional/hypernav/hypernav/
-          C:\msys64\usr\bin\wget.exe -r -nv -np -R "index.html*" -nH --cut-dirs=4 https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
-          cd -
+          WGET='${{ matrix.wget_cmd }}'
+          "$WGET" -r -nv -np -R "index.html*" -nH --cut-dirs=4 \
+            -P inlinino/resources \
+            https://misclab.umeoce.maine.edu/ftp/software/Inlinino/resources/
+          "$WGET" -r -nv -np -R "index.html*" -nH --cut-dirs=4 \
+            -P optional/hypernav/hypernav \
+            https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
 
       - name: Install python dependencies
         run: |
@@ -83,14 +82,15 @@ jobs:
         run: |
           python make.py
 
-      - name: Get Bundle Name (Ubuntu & Windows)
-        if: (matrix.os == 'ubuntu-latest') || (matrix.os == 'windows-latest')
-        run: echo "BUNDLE_NAME=$(ls bundle/dist | xargs)" >> $GITHUB_ENV
+      - name: Get Bundle Name
         shell: bash
-
-      - name: Get Bundle Name (macOS)
-        if: matrix.os == 'macos-latest' || matrix.os == 'macos-15-intel'
-        run: echo "BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)" >> $GITHUB_ENV
+        run: |
+          if [[ "${{ matrix.os }}" == macos-* ]]; then
+            BUNDLE_NAME=$(basename bundle/dist/*.app | xargs)
+          else
+            BUNDLE_NAME=$(ls bundle/dist | xargs)
+          fi
+          echo "BUNDLE_NAME=${BUNDLE_NAME}" >> "$GITHUB_ENV"
 
       - name: Zip Bundle
         uses: thedoctor0/zip-release@0.7.1
