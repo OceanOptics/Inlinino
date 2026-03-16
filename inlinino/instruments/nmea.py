@@ -56,6 +56,16 @@ class NMEA(Instrument):
                     elif k == 'wind_angle_true':
                         data[i] = float(msg.wind_angle)
             return data
+        # XDR
+        if msg.sentence_type == 'XDR':
+            for i, k in enumerate(self.variable_names):
+                if k == 'atmospheric_pressure' and msg.type == 'P':
+                    data[i] = float(msg.value)  # Pressure in bar
+                elif k == 'relative_humidity' and msg.type == 'H':
+                    data[i] = float(msg.value)  # Percent
+                elif k == 'air_temperature' and msg.type == 'C':
+                    data[i] = float(msg.value)  # Temperature in Celsius
+            return data
         # Default parsing
         for i, (k, t) in enumerate(zip(self.variable_names, self.variable_types)):
             if not hasattr(msg, k):
@@ -71,9 +81,21 @@ class NMEA(Instrument):
                 data[i] = str(value)
             else:
                 raise ValueError("Variable type not supported. Correct Instrument Setup > Variable Types.")
+        # RMC, overwrite latitude and longitude as computed incorrectly by pyNMEA or missing
+        if msg.sentence_type == 'RMC':
+            for i, k in enumerate(self.variable_names):
+                if k == 'latitude' and hasattr(msg, 'lat') and hasattr(msg, 'lat_dir'):
+                    data[i] = float(msg.lat) * (1 if msg.lat_dir == 'N' else -1)
+                elif k == 'longitude' and hasattr(msg, 'lon') and hasattr(msg, 'lon_dir'):
+                    data[i] = float(msg.lon) * (1 if msg.lon_dir == 'E' else -1)
         return data
 
     def handle_data(self, data, timestamp):
+        for d in data:
+            if not (isinstance(d, float) and np.isnan(d)):
+                break
+        else:
+            return  # Empty list
         if np.any(self.active_timeseries_variables):
             self.signal.new_ts_data.emit(np.array(data)[self.active_timeseries_variables], timestamp)
         if self.log_prod_enabled and self._log_active:
