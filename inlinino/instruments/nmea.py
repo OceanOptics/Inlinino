@@ -84,9 +84,9 @@ class NMEA(Instrument):
         # RMC, overwrite latitude and longitude as computed incorrectly by pyNMEA or missing
         if msg.sentence_type == 'RMC':
             for i, k in enumerate(self.variable_names):
-                if k == 'latitude' and hasattr(msg, 'lat') and hasattr(msg, 'lat_dir'):
+                if k == 'latitude_dd' and hasattr(msg, 'lat') and hasattr(msg, 'lat_dir'):
                     data[i] = float(msg.lat) * (1 if msg.lat_dir == 'N' else -1)
-                elif k == 'longitude' and hasattr(msg, 'lon') and hasattr(msg, 'lon_dir'):
+                elif k == 'longitude_dd' and hasattr(msg, 'lon') and hasattr(msg, 'lon_dir'):
                     data[i] = float(msg.lon) * (1 if msg.lon_dir == 'E' else -1)
         return data
 
