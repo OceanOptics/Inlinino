@@ -51,8 +51,11 @@ class HyperBB(Instrument):
             raise ValueError('Missing calibration plaque file (*.mat)')
         if 'data_format' not in cfg.keys():
             cfg['data_format'] = 'advanced'
+        if 'cal_format' not in cfg.keys():
+            cfg['cal_format'] = 'legacy'
         temperature_file = cfg.get('temperature_file', None)
-        self._parser = HyperBBParser(cfg['plaque_file'], temperature_file, cfg['data_format'])
+        self._parser = HyperBBParser(cfg['plaque_file'], temperature_file, cfg['data_format'],
+                                     cfg['cal_format'])
         self.signal_reconstructed = np.empty(len(self._parser.wavelength)) * np.nan
         # Overload cfg with received data
         prod_var_names = ['beta_u', 'bb']
@@ -151,10 +154,9 @@ class HyperBB(Instrument):
 LEGACY_DATA_FORMAT = 0
 ADVANCED_DATA_FORMAT = 1
 LIGHT_DATA_FORMAT = 2
-STANDARD_DATA_FORMAT = 3  # New data format (firmware v2.x)
 
 class HyperBBParser():
-    def __init__(self, plaque_cal_file, temperature_cal_file=None, data_format='advanced'):
+    def __init__(self, plaque_cal_file, temperature_cal_file=None, data_format='advanced', cal_format='legacy'):
         # Frame Parser
         if data_format.lower() == 'legacy':
             self.data_format = LEGACY_DATA_FORMAT
@@ -162,8 +164,6 @@ class HyperBBParser():
             self.data_format = ADVANCED_DATA_FORMAT
         elif data_format.lower() == 'light':
             self.data_format = LIGHT_DATA_FORMAT
-        elif data_format.lower() == 'standard':
-            self.data_format = STANDARD_DATA_FORMAT
         else:
             raise ValueError('Data format not recognized.')
         if self.data_format == LEGACY_DATA_FORMAT:  # Manual version 1.2
@@ -210,17 +210,6 @@ class HyperBBParser():
             self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
             for x in self.FRAME_VARIABLES:
                 setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
-        elif self.data_format == STANDARD_DATA_FORMAT:  # New standard format (firmware v2.x)
-            # Simplified output with net signals pre-computed by firmware
-            self.FRAME_VARIABLES = ['ScanIdx', 'DataIdx', 'Date', 'Time', 'StepPos', 'wl', 'LedPwr', 'PmtGain',
-                                    'NetRef', 'NetSig1', 'NetSig2', 'NetSig3',
-                                    'LedTemp', 'WaterTemp', 'Depth', 'SupplyVolt', 'Saturation', 'CalPlaqueDist']
-            self.FRAME_TYPES = [int, int, str, str, int, int, int, int,
-                                float, float, float, float, float,
-                                float, float, float, int, int]
-            self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
-            for x in self.FRAME_VARIABLES:
-                setattr(self, f'idx_{x}', self.FRAME_VARIABLES.index(x))
         else:
             raise ValueError('Firmware version not supported.')
 
@@ -233,8 +222,8 @@ class HyperBBParser():
         self.saturation_level = 4000
         self.theta = 135  # calls theta setter which sets Xp
 
-        # Load calibration files (supports old two-file format and new combined file format)
-        p_cal, t_cal = self._load_calibration(plaque_cal_file, temperature_cal_file)
+        # Load calibration files (supports legacy two-file format and current single-file format)
+        p_cal, t_cal = self._load_calibration(plaque_cal_file, temperature_cal_file, cal_format)
 
         self.wavelength = t_cal['wl']
         self.cal_t_coef = t_cal['coeff']
@@ -277,63 +266,143 @@ class HyperBBParser():
                                                                               p_cal['muLedTemp'])
 
     @staticmethod
-    def _load_calibration(plaque_cal_file, temperature_cal_file=None):
-        """Load calibration data from old two-file format or new combined single-file format.
+    def _load_calibration(plaque_cal_file, temperature_cal_file=None, cal_format='legacy'):
+        """Load calibration data from legacy (.mat) or current binary format.
 
-        Old format: Two separate .mat files, one with a 'cal' struct (plaque) and one with a
-        'cal_temp' struct (temperature).
+        Legacy format: Two separate .mat files — a plaque calibration file (containing a 'cal'
+        struct) and a temperature calibration file (containing a 'cal_temp' struct).
 
-        New combined format: A single .mat file containing both plaque and temperature calibration
-        data. The file must contain a top-level struct (e.g. 'calibration') that includes all
-        plaque calibration fields as well as 'wl' and 'coeff' fields for temperature calibration.
+        Current format: Binary plaque calibration file (.hbb_cal) and binary temperature
+        calibration file (.hbb_tcal) as produced by Hbb_ConvertCalibrations.m (Sequoia, 2024).
+        Both files are required for live data temperature correction.
 
-        :param plaque_cal_file: Path to plaque calibration .mat file (old format) or combined
-            calibration .mat file (new format).
-        :param temperature_cal_file: Path to temperature calibration .mat file (old format only).
-            Set to None when using a new combined calibration file.
-        :return: Tuple (p_cal, t_cal) where p_cal is a dict of plaque calibration parameters and
-            t_cal is a dict with keys 'wl' and 'coeff' for temperature calibration.
-        :raises ValueError: If required calibration fields are missing.
+        :param plaque_cal_file: Path to plaque .mat file (legacy) or .hbb_cal binary file (current).
+        :param temperature_cal_file: Path to temperature .mat file (legacy) or .hbb_tcal binary
+            file (current). Required for both calibration formats.
+        :param cal_format: 'legacy' for MATLAB .mat file pair, 'current' for binary .hbb_cal/.hbb_tcal.
+        :return: Tuple (p_cal, t_cal) where p_cal and t_cal are dicts of calibration parameters.
+        :raises ValueError: If required files are missing or the file format is unexpected.
         """
-        mat = loadmat(plaque_cal_file, simplify_cells=True)
-        # Remove MATLAB metadata keys
-        data_keys = [k for k in mat.keys() if not k.startswith('__')]
-
-        if 'cal' in mat:
-            # Old two-file format: plaque file has 'cal' struct
-            p_cal = mat['cal']
+        if cal_format == 'legacy':
+            p_mat = loadmat(plaque_cal_file, simplify_cells=True)
+            if 'cal' not in p_mat:
+                raise ValueError(
+                    f"Plaque calibration file '{plaque_cal_file}' does not contain 'cal' struct. "
+                    "Ensure the correct legacy format plaque file is specified.")
+            p_cal = p_mat['cal']
             if temperature_cal_file is None:
                 raise ValueError(
                     'Missing temperature calibration file (*.mat). '
-                    'The old calibration format requires two separate files.')
+                    'The legacy calibration format requires two separate files.')
             t_mat = loadmat(temperature_cal_file, simplify_cells=True)
             if 'cal_temp' not in t_mat:
                 raise ValueError(
                     f"Temperature calibration file '{temperature_cal_file}' does not contain "
                     "'cal_temp' struct. Check that the correct file is specified.")
             t_cal = t_mat['cal_temp']
-        elif len(data_keys) == 1:
-            # New combined format: single struct containing all calibration data
-            combined = mat[data_keys[0]]
-            _required_plaque = {'pmtRefGain', 'pmtGamma', 'gain12', 'gain23',
-                                 'darkCalWavelength', 'darkCalPmtGain',
-                                 'darkCalScat1', 'darkCalScat2', 'darkCalScat3',
-                                 'muWavelengths', 'muFactors', 'muLedTemp'}
-            _required_temp = {'wl', 'coeff'}
-            _missing = (_required_plaque | _required_temp) - set(combined.keys())
-            if _missing:
+        elif cal_format == 'current':
+            if temperature_cal_file is None:
                 raise ValueError(
-                    f"Combined calibration file '{plaque_cal_file}' is missing required "
-                    f"fields: {', '.join(sorted(_missing))}. "
-                    "Ensure the file is a valid HyperBB calibration file.")
-            p_cal = combined
-            t_cal = {'wl': combined['wl'], 'coeff': combined['coeff']}
+                    'Missing temperature calibration file (*.hbb_tcal). '
+                    'The current calibration format requires both a plaque (.hbb_cal) '
+                    'and a temperature (.hbb_tcal) calibration file.')
+            p_cal = HyperBBParser._read_binary_plaque_cal(plaque_cal_file)
+            t_cal = HyperBBParser._read_binary_temp_cal(temperature_cal_file)
         else:
             raise ValueError(
-                f"Calibration file '{plaque_cal_file}' format not recognized. "
-                "Expected either 'cal' struct (old format) or a single combined struct "
-                f"(new format). Found keys: {data_keys}.")
+                f"Calibration format '{cal_format}' not recognized. Use 'legacy' or 'current'.")
         return p_cal, t_cal
+
+    @staticmethod
+    def _read_binary_plaque_cal(filename):
+        """Read a HyperBB binary plaque calibration file (.hbb_cal) as produced by
+        Hbb_ConvertCalibrations.m (Sequoia Scientific, 2024).
+
+        The file may contain multiple calibration records appended sequentially; the last
+        (most recent) record is returned, consistent with MATLAB's ``cal = cal(end)``.
+
+        Returns a dict with the same field names as the legacy .mat 'cal' struct so the rest
+        of the calibration pipeline requires no changes.
+        """
+        records = []
+        with open(filename, 'rb') as fid:
+            fid.seek(0, 2)
+            eof = fid.tell()
+            fid.seek(0)
+            while fid.tell() < eof:
+                fid.read(24)   # ID string (24 chars, e.g. 'Sequoia Hyper-bb Cal')
+                fid.read(2)    # calLengthBytes (uint16) — read but not needed for seeking
+                fid.read(2)    # processingVersion (uint16 / 100)
+                fid.read(2)    # serialNumber (uint16)
+                fid.read(6)    # cal date  (6 × uint8: year-1900, month, day, hour, min, sec)
+                fid.read(6)    # tempCalDate
+                pmt_ref_gain = int(np.frombuffer(fid.read(2), dtype='<u2')[0])
+                pmt_gamma    = float(np.frombuffer(fid.read(4), dtype='<f4')[0])
+                fid.read(4)    # PMTGammaRMSE (float)
+                gain12 = np.frombuffer(fid.read(2), dtype='<u2')[0] / 1000.0
+                fid.read(4)    # gain1_2_std (float)
+                gain23 = np.frombuffer(fid.read(2), dtype='<u2')[0] / 1000.0
+                fid.read(4)    # gain2_3_std (float)
+                fid.read(2)    # muFactorPMTGain (uint16)
+                fid.read(2)    # transmitReceiveDistance (uint16 / 100)
+                fid.read(1)    # plaqueReflectivity (uint8 / 100)
+                num_mu_wl     = int(np.frombuffer(fid.read(1), dtype='<u1')[0])
+                num_dark_wl   = int(np.frombuffer(fid.read(1), dtype='<u1')[0])
+                num_dark_gain = int(np.frombuffer(fid.read(1), dtype='<u1')[0])
+                mu_wl       = np.frombuffer(fid.read(num_mu_wl * 2),   dtype='<u2').astype(float) / 10.0
+                mu_factors  = np.frombuffer(fid.read(num_mu_wl * 4),   dtype='<f4').copy()
+                fid.read(num_mu_wl * 4)  # muFactorTempCorr — stored but not used in live processing
+                mu_led_temp = np.frombuffer(fid.read(num_mu_wl * 2),   dtype='<u2').astype(float) / 100.0
+                dark_wl     = np.frombuffer(fid.read(num_dark_wl * 2), dtype='<u2').astype(float) / 10.0
+                dark_gain   = np.frombuffer(fid.read(num_dark_gain * 2), dtype='<u2').copy()
+                n = num_dark_wl * num_dark_gain
+                # MATLAB writes 2-D arrays column-major; Fortran order matches reshape behavior
+                dark_scat1 = np.frombuffer(fid.read(n * 4), dtype='<f4').copy().reshape(
+                    (num_dark_wl, num_dark_gain), order='F')
+                dark_scat2 = np.frombuffer(fid.read(n * 4), dtype='<f4').copy().reshape(
+                    (num_dark_wl, num_dark_gain), order='F')
+                dark_scat3 = np.frombuffer(fid.read(n * 4), dtype='<f4').copy().reshape(
+                    (num_dark_wl, num_dark_gain), order='F')
+                records.append({
+                    'pmtRefGain':        pmt_ref_gain,
+                    'pmtGamma':          pmt_gamma,
+                    'gain12':            float(gain12),
+                    'gain23':            float(gain23),
+                    'darkCalWavelength': dark_wl,
+                    'darkCalPmtGain':    dark_gain,
+                    'darkCalScat1':      dark_scat1,
+                    'darkCalScat2':      dark_scat2,
+                    'darkCalScat3':      dark_scat3,
+                    'muWavelengths':     mu_wl,
+                    'muFactors':         mu_factors,
+                    'muLedTemp':         mu_led_temp,
+                })
+        if not records:
+            raise ValueError(f"No valid calibration records found in '{filename}'.")
+        return records[-1]  # last record, consistent with MATLAB: cal = cal(end)
+
+    @staticmethod
+    def _read_binary_temp_cal(filename):
+        """Read a HyperBB binary temperature calibration file (.hbb_tcal) as produced by
+        Hbb_ConvertCalibrations.m (Sequoia Scientific, 2024).
+
+        Returns a dict with 'wl' and 'coeff' keys compatible with the legacy .mat 'cal_temp'
+        struct so the temperature correction code requires no changes.
+        """
+        with open(filename, 'rb') as fid:
+            fid.read(24)   # ID string (24 chars, e.g. 'Sequoia Hyper-bb T Cal')
+            fid.read(2)    # processingVersion (uint16 / 100)
+            fid.read(2)    # serialNumber (uint16)
+            fid.read(6)    # date (6 × uint8: year-1900, month, day, hour, min, sec)
+            fid.read(2)    # normalizedTemp (uint16 / 100)
+            polynomial_order = int(np.frombuffer(fid.read(1), dtype='<u1')[0])
+            num_wl           = int(np.frombuffer(fid.read(1), dtype='<u1')[0])
+            wl = np.frombuffer(fid.read(num_wl * 2), dtype='<u2').astype(float) / 10.0
+            # Coefficients written column-major by MATLAB (numWLs × (order+1) matrix)
+            num_coeffs = num_wl * (polynomial_order + 1)
+            coeffs_raw = np.frombuffer(fid.read(num_coeffs * 4), dtype='<f4').copy()
+            coeff = coeffs_raw.reshape((num_wl, polynomial_order + 1), order='F')
+        return {'wl': wl, 'coeff': coeff}
 
     @property
     def theta(self) -> float:
@@ -402,20 +471,6 @@ class HyperBBParser():
             gain[np.isnan(raw[:, self.idx_SigOn3])] = 2
             gain[np.isnan(raw[:, self.idx_SigOn2])] = 1
             gain[np.isnan(raw[:, self.idx_SigOn1])] = 0  # All signals saturated
-        elif self.data_format == STANDARD_DATA_FORMAT:  # New standard format: net signals pre-computed
-            net_ref_zero_flag = np.any(raw[:, self.idx_NetRef] == 0)
-            # Saturation field: 0=none, 1=ch1 saturated, 2=ch1+ch2, 3=all channels saturated
-            raw[raw[:, self.idx_Saturation] >= 1, self.idx_NetSig1] = np.nan
-            raw[raw[:, self.idx_Saturation] >= 2, self.idx_NetSig2] = np.nan
-            raw[raw[:, self.idx_Saturation] >= 3, self.idx_NetSig3] = np.nan
-            scat1 = raw[:, self.idx_NetSig1] / raw[:, self.idx_NetRef]
-            scat2 = raw[:, self.idx_NetSig2] / raw[:, self.idx_NetRef]
-            scat3 = raw[:, self.idx_NetSig3] / raw[:, self.idx_NetRef]
-            # Keep Gain setting
-            gain = np.ones((len(raw), 1)) * 3
-            gain[raw[:, self.idx_Saturation] == 3] = 2
-            gain[raw[:, self.idx_Saturation] == 2] = 1
-            gain[raw[:, self.idx_Saturation] == 1] = 0  # All signals saturated
         else:  # Light Format
             net_ref_zero_flag = np.any(raw[:, self.idx_NetRef] == 0)
             raw[raw[:, self.idx_ChSaturated] == 1, self.idx_NetSig1] = np.nan
