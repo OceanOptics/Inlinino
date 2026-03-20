@@ -758,12 +758,14 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_browse_plaque_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose plaque calibration file', filter='Plaque File (*.mat)')
+            caption='Choose plaque calibration file',
+            filter='Calibration File (*.mat *.hbb_cal);;Legacy MAT File (*.mat);;Current Binary (*.hbb_cal)')
         self.le_plaque_file.setText(file_name)
 
     def act_browse_temperature_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose temperature calibration file', filter='Temperature File (*.mat)')
+            caption='Choose temperature calibration file',
+            filter='Temperature Calibration File (*.mat *.hbb_tcal);;Legacy MAT File (*.mat);;Current Binary (*.hbb_tcal)')
         self.le_temperature_file.setText(file_name)
 
     def act_browse_px_reg_prt(self):
@@ -1077,6 +1079,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
             except FileNotFoundError:
                 self.notification(f"No such calibration file: {self.cfg['calibration_file']}")
                 return
+        elif self.cfg['module'] == 'hyperbb':
+            self.cfg['manufacturer'] = 'Sequoia'
+            self.cfg['model'] = 'HyperBB'
         # Update global instrument cfg
         CFG.read()  # Update local cfg if other instance updated cfg
         CFG.instruments[self.cfg_uuid] = self.cfg.copy()
