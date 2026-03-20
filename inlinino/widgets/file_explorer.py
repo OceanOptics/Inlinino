@@ -69,20 +69,19 @@ class FileExplorerWidget(GenericWidget):
     def download(self):
         items = [i.internalPointer() for i in self.tree_view.selectedIndexes() if i.column() == 0]
         if len(items) < 1:
-            msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Download File(s)",
-                                    f"Nothing to download, please select files to download first.",
-                                    QtGui.QMessageBox.Close, self)
-            msg.setWindowModality(QtCore.Qt.WindowModal)
-            msg.exec_()
+            msg = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Icon.Warning, "Download File(s)",
+                                        f"Nothing to download, please select files to download first.",
+                                        QtWidgets.QMessageBox.StandardButton.Close, self)
+            msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+            msg.exec()
             return
-        msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Question, "Download File(s)",
-                                f"Are you sure you want to download the {len(items)} file(s) selected?",
-                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, self)
-        msg.setWindowModality(QtCore.Qt.WindowModal)
-        if msg.exec_() == QtGui.QMessageBox.Yes:
+        msg = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Icon.Question, "Download File(s)",
+                                    f"Are you sure you want to download the {len(items)} file(s) selected?",
+                                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No, self)
+        msg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        if msg.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             dialog = DialogDownloadFiles(self, items)
-            status = dialog.exec_()
-            if not dialog.exec_():  # 0: reject | 1: accept
+            if not dialog.exec():  # 0: reject | 1: accept
                 # User cancelled
                 self.instrument.signal.warning.emit(
                     'Data download cancelled. HyperNav is still transmitting data, '
@@ -94,10 +93,10 @@ class FileExplorerWidget(GenericWidget):
     #     raise NotImplementedError('Not Implemented.')
 
 
-class DialogDownloadFiles(QtGui.QDialog):
+class DialogDownloadFiles(QtWidgets.QDialog):
     def __init__(self, parent, items):
         # p = parent
-        # while not isinstance(p, QtGui.QMainWindow):
+        # while not isinstance(p, QtWidgets.QMainWindow):
         #     p = p.parent()
         super().__init__(parent)
         uic.loadUi(os.path.join(PATH_TO_RESOURCES, 'dialog_download_files.ui'), self)
@@ -105,15 +104,16 @@ class DialogDownloadFiles(QtGui.QDialog):
         self.items = items
         self.idx = 0
 
-        self.button_box.button(QtGui.QDialogButtonBox.Close).clicked.connect(self.accept)
-        self.button_box.button(QtGui.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Close).clicked.connect(self.accept)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel).clicked.connect(self.reject)
         self.instrument.signal.cmd_list.connect(self.expand_folder)
         self.instrument.signal.cmd_dump.connect(self.next)
 
-        self.button_box.button(QtGui.QDialogButtonBox.Close).setEnabled(False)
+        self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Close).setEnabled(False)
 
         # Prevent computer to sleep
-        wakepy.set_keepawake(keep_screen_awake=False)
+        self._wakepy_mode = wakepy.keep.running()
+        self._wakepy_mode.__enter__()
         # Start downloading files
         self.next()
 
@@ -124,7 +124,7 @@ class DialogDownloadFiles(QtGui.QDialog):
 
     @QtCore.pyqtSlot(int)
     def next(self, status: int = None):
-        self.view.moveCursor(QtGui.QTextCursor.End)
+        self.view.moveCursor(QtGui.QTextCursor.MoveOperation.End)
         if status == -1:  # Folder expanded
             self.view.insertPlainText(' Done\n')
         elif status == -2:  # Error while downloading file
@@ -142,14 +142,14 @@ class DialogDownloadFiles(QtGui.QDialog):
                 self.instrument.send_cmd(f'dump * {path}', check_timing=False)
                 self.view.insertPlainText(f'Downloading {path} ... ')
                 self.idx += 1
-            self.view.moveCursor(QtGui.QTextCursor.StartOfLine)
+            self.view.moveCursor(QtGui.QTextCursor.MoveOperation.StartOfLine)
         else:
             if self.idx != 0:
                 self.view.insertPlainText('All files downloaded.\n')
             else:
                 self.view.insertPlainText('Nothing to download.\n')
-            self.button_box.button(QtGui.QDialogButtonBox.Close).setEnabled(True)
-            wakepy.unset_keepawake()
+            self.button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Close).setEnabled(True)
+            self._wakepy_mode.__exit__(None, None, None)
 
     @QtCore.pyqtSlot()
     def expand_folder(self):
@@ -198,7 +198,7 @@ class QItemModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return None
         item = index.internalPointer()
-        if role == QtCore.Qt.DisplayRole:
+        if role == QtCore.Qt.ItemDataRole.DisplayRole:
             return item.data(index.column())
         return None
 
@@ -206,17 +206,17 @@ class QItemModel(QtCore.QAbstractItemModel):
 class QRemoteFileSystemModel(QItemModel):
 
     def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role: int):
-        if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole and section < len(QFileItem.HEADER):
+        if orientation == QtCore.Qt.Orientation.Horizontal and role == QtCore.Qt.ItemDataRole.DisplayRole and section < len(QFileItem.HEADER):
             return QFileItem.HEADER[section]
         return super().headerData(section, orientation, role)
 
-    def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
+    def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
         # if index.column() == 0:
-        #     return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsUserCheckable
+        #     return QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable | QtCore.Qt.ItemFlag.ItemIsUserCheckable
         if index.internalPointer().is_dir and index.internalPointer().childCount() != 0:
-            return QtCore.Qt.ItemIsEnabled
+            return QtCore.Qt.ItemFlag.ItemIsEnabled
         else:
-            return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+            return QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable
 
     # Methods from QtWidgets.QFileSystemModel
     # def fileInfo(self):

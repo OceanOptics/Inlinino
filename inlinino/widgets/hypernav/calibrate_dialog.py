@@ -36,26 +36,26 @@ class HyperNavCalibrateDialog(GenericDialog, Worker):
 
     @QtCore.pyqtSlot()
     def browse_datafile(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                          caption='Choose HyperNav data file',
                                                          filter='Device File (*.raw *.txt)')
         self.le_log_file.setText(file_name)
 
     @QtCore.pyqtSlot()
     def browse_lamp_file(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
             caption='Choose FEL lamp file', filter='Device File (*.dat *.FIT)')
         self.le_lamp_path.setText(file_name)
 
     @QtCore.pyqtSlot()
     def browse_plaque_file(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
             caption='Choose reflectance plaque file', filter='Device File (*.dat *.FIT)')
         self.le_plaque_path.setText(file_name)
 
     @QtCore.pyqtSlot()
     def browse_wavelength_file(self):
-        file_name, _ = QtGui.QFileDialog.getOpenFileName(self,
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self,
             caption='Choose wavelength registration file', filter='Device File (*.cgs *.txt)')
         self.le_wavelength_path.setText(file_name)
         try:
@@ -70,7 +70,7 @@ class HyperNavCalibrateDialog(GenericDialog, Worker):
 
     @QtCore.pyqtSlot()
     def browse_history_cal_dir(self):
-        self.le_history_cal_path.setText(QtGui.QFileDialog.getExistingDirectory(
+        self.le_history_cal_path.setText(QtWidgets.QFileDialog.getExistingDirectory(
             caption='Choose historical calibration directory'))
 
     @QtCore.pyqtSlot(str)
