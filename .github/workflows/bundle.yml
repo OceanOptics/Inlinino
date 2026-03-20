@@ -48,7 +48,7 @@ jobs:
 
       - name: Checkout Aquasense Repository
         run: |
-          git clone https://bitbucket.csiro.au/scm/aqrs/aquasense.git optional/aquasense
+          git clone https://github.com/csiro/aquasense optional/aquasense
 
       - name: Setup python
         uses: actions/setup-python@v6
