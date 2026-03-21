@@ -96,6 +96,41 @@
        </item>
       </layout>
      </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_log_period">
+       <property name="text">
+        <string>File Rotation (min)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QDoubleSpinBox" name="sb_length">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="toolTip">
+        <string>File rotation interval in minutes, correspond to the length of files recorded. A new file is created beyond that time. Default is 60 minutes.</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>0.0</double>
+       </property>
+       <property name="maximum">
+        <double>525600.0</double>
+       </property>
+       <property name="singleStep">
+        <double>1.0</double>
+       </property>
+       <property name="value">
+        <double>60.0</double>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item>

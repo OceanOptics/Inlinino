@@ -13,6 +13,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets, uic
 from PyQt5 import QtMultimedia
+from PyQt5.QtCore import QLocale
 from pyACS.acs import ACS as ACSParser
 import pySatlantic.instrument as pySat
 
@@ -1469,6 +1470,8 @@ class DialogLoggerOptions(QtGui.QDialog):
 class App(QtGui.QApplication):
     def __init__(self, *args):
         QtGui.QApplication.__init__(self, *args)
+        # Set locale (important for decimal-separators)
+        QLocale.setDefault(QLocale(QLocale.English, QLocale.UnitedStates))
         self.splash_screen = QtGui.QSplashScreen(QtGui.QPixmap(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
         self.splash_screen.show()
         self.setWindowIcon(QtGui.QIcon(os.path.join(PATH_TO_RESOURCES, 'inlinino.ico')))
