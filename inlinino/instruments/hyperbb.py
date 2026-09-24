@@ -9,6 +9,7 @@ from scipy.io import loadmat
 from scipy.interpolate import interp2d, splrep, splev  # , pchip_interpolate
 
 from inlinino.instruments import Instrument
+from inlinino.instruments.hyperbb_binary import BinaryCalibration, USER_FIELDS, USER_TYPES
 
 
 class HyperBB(Instrument):
@@ -48,12 +49,20 @@ class HyperBB(Instrument):
     def setup(self, cfg):
         # Set HyperBB specific attributes
         if 'plaque_file' not in cfg.keys():
-            raise ValueError('Missing calibration plaque file (*.mat)')
-        if 'temperature_file' not in cfg.keys():
+            raise ValueError('Missing calibration plaque file (*.mat or *.hbb_cal)')
+        if not str(cfg['plaque_file']).lower().endswith('.hbb_cal') and not cfg.get('temperature_file'):
             raise ValueError('Missing calibration temperature file (*.mat)')
         if 'data_format' not in cfg.keys():
             cfg['data_format'] = 'advanced'
-        self._parser = HyperBBParser(cfg['plaque_file'], cfg['temperature_file'], cfg['data_format'])
+        self._parser = HyperBBParser(cfg['plaque_file'], cfg.get('temperature_file', ''), cfg['data_format'])
+        if self._parser._binary_calibration is not None:
+            cal = self._parser._binary_calibration.cal
+            configured_serial = str(cfg.get('serial_number', '')).strip()
+            if configured_serial and configured_serial != str(cal['serial_number']):
+                raise ValueError('HyperBB calibration serial number does not match instrument setup.')
+            self.logger.info('HyperBB binary calibration SN%s, date %s, temperature date %s, '
+                             'record %s (last in file)', cal['serial_number'], cal['date'],
+                             cal['temperature_date'], cal['record_count'])
         self.signal_reconstructed = np.empty(len(self._parser.wavelength)) * np.nan
         # Overload cfg with received data
         prod_var_names = ['beta_u', 'bb']
@@ -78,7 +87,7 @@ class HyperBB(Instrument):
         self.invalid_packet_alarm_triggered = False
 
     def parse(self, packet):
-        if len(packet) == 0:  # Empty lines on firmware v2 at end of wavelength scan
+        if not packet.strip():  # Empty lines on firmware v2 at end of wavelength scan
             return []
         data = self._parser.parse(packet)
         if len(data) == 0:
@@ -154,7 +163,12 @@ ADVANCED_DATA_FORMAT = 1
 LIGHT_DATA_FORMAT = 2
 
 class HyperBBParser():
-    def __init__(self, plaque_cal_file, temperature_cal_file, data_format='advanced'):
+    def __init__(self, plaque_cal_file, temperature_cal_file='', data_format='advanced'):
+        self._binary_calibration = None
+        binary_file = str(plaque_cal_file).lower().endswith('.hbb_cal')
+        if binary_file and data_format.lower() != 'light':
+            raise ValueError('For .hbb_cal select Light format and HyperBB User serial output '
+                             '(15 fields with onboard temperature correction).')
         # Frame Parser
         if data_format.lower() == 'legacy':
             self.data_format = LEGACY_DATA_FORMAT
@@ -211,6 +225,13 @@ class HyperBBParser():
         else:
             raise ValueError('Firmware version not supported.')
 
+        if binary_file:
+            self.FRAME_VARIABLES = list(USER_FIELDS)
+            self.FRAME_TYPES = list(USER_TYPES)
+            self.FRAME_PRECISIONS = ['%s'] * len(self.FRAME_VARIABLES)
+            for index, name in enumerate(self.FRAME_VARIABLES):
+                setattr(self, 'idx_' + name, index)
+
         # Instrument Specific Attributes
         self._theta = float('nan')
         self.Xp = float('nan')
@@ -219,6 +240,11 @@ class HyperBBParser():
         self.remove_scans_multiple_gain = False
         self.saturation_level = 4000
         self.theta = 135  # calls theta setter which sets Xp
+
+        if binary_file:
+            self._binary_calibration = BinaryCalibration(plaque_cal_file)
+            self.wavelength = self._binary_calibration.wavelength
+            return
 
         # Load Temperature calibration file
         t = loadmat(temperature_cal_file, simplify_cells=True)
@@ -276,8 +302,17 @@ class HyperBBParser():
         if len(tmp) != n:
             return []
         data = [None] * n
-        for k, (v, t) in enumerate(zip(tmp, self.FRAME_TYPES)):
-            data[k] = t(v) if t != str else float('nan')
+        try:
+            for k, (v, t) in enumerate(zip(tmp, self.FRAME_TYPES)):
+                data[k] = t(v) if t != str else float('nan')
+        except (ValueError, OverflowError):
+            if self._binary_calibration is not None:
+                return []
+            raise
+        if self._binary_calibration is not None:
+            if (not np.isfinite(data[3:]).all() or data[self.idx_TempCorrFactor] <= 0 or
+                    data[self.idx_PmtGain] <= 0 or data[self.idx_ChSaturated] not in (0, 1, 2, 3)):
+                return []
         return data
 
     def calibrate(self, raw):
@@ -289,6 +324,15 @@ class HyperBBParser():
                  wl: <nx1 np.ndarray> wavelength (nm)
                  gain: <nx1 np.ndarray> gain used (1: none, 2: low, and 3: high)
         """
+
+        if self._binary_calibration is not None:
+            if self.remove_scans_multiple_gain:
+                raw = raw.copy()
+                for scan in np.unique(raw[:, self.idx_ScanIdx]):
+                    selected = raw[:, self.idx_ScanIdx] == scan
+                    if len(np.unique(raw[selected, self.idx_PmtGain])) > 1:
+                        raw = raw[~selected]
+            return self._binary_calibration.calibrate(raw, self.Xp)
 
         # Remove scans with multiple gains
         if self.remove_scans_multiple_gain:

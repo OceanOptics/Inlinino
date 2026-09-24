@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>515</width>
-    <height>366</height>
+    <height>420</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -309,6 +309,12 @@
          </spacer>
         </item>
        </layout>
+      </item>
+      <item row="3" column="0" colspan="2">
+       <widget class="QLabel" name="label_calibration_help">
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="text"><string>MATLAB calibration: select both plaque and temperature files.</string></property>
+       </widget>
       </item>
      </layout>
     </widget>

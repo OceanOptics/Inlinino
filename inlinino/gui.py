@@ -672,6 +672,9 @@ class DialogInstrumentSetup(QtGui.QDialog):
             self.button_browse_plaque_file.clicked.connect(self.act_browse_plaque_file)
         if 'button_browse_temperature_file' in self.__dict__.keys():
             self.button_browse_temperature_file.clicked.connect(self.act_browse_temperature_file)
+        if self.cfg.get('module') == 'hyperbb':
+            self.le_plaque_file.textChanged.connect(self.act_update_hyperbb_calibration)
+            self.act_update_hyperbb_calibration()
         if 'button_browse_px_reg_prt' in self.__dict__.keys():
             self.button_browse_px_reg_prt.clicked.connect(self.act_browse_px_reg_prt)
         if 'button_browse_px_reg_sbd' in self.__dict__.keys():
@@ -758,8 +761,22 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_browse_plaque_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose plaque calibration file', filter='Plaque File (*.mat)')
-        self.le_plaque_file.setText(file_name)
+            caption='Choose plaque calibration file',
+            filter='HyperBB calibration (*.mat *.hbb_cal);;MATLAB calibration (*.mat);;Binary calibration (*.hbb_cal)')
+        if file_name:
+            self.le_plaque_file.setText(file_name)
+
+    def act_update_hyperbb_calibration(self):
+        binary = self.le_plaque_file.text().strip().lower().endswith('.hbb_cal')
+        self.le_temperature_file.setEnabled(not binary)
+        self.button_browse_temperature_file.setEnabled(not binary)
+        self.combobox_data_format.setEnabled(not binary)
+        if binary:
+            self.combobox_data_format.setCurrentText('light')
+        self.label_calibration_help.setText(
+            'Binary calibration: uses the last record and onboard temperature factors.\n'
+            'Select User serial output on the instrument; no temperature file is needed.'
+            if binary else 'MATLAB calibration: select both plaque and temperature files.')
 
     def act_browse_temperature_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
@@ -863,6 +880,10 @@ class DialogInstrumentSetup(QtGui.QDialog):
             if field_optional:
                 field_name = field_name[9:]
             field_pretty_name = field_name.replace('_', ' ').title()
+            if (self.cfg.get('module') == 'hyperbb' and field_name == 'temperature_file' and
+                    self.le_plaque_file.text().strip().lower().endswith('.hbb_cal')):
+                self.cfg['temperature_file'] = ''
+                continue
             if f in ['combobox_interface', 'combobox_model', *[f'combobox_relay{i}_mode' for i in range(4)]]:
                 self.cfg[field_name] = self.__dict__[f].currentText()
             elif field_prefix in ['le', 'sb', 'dsb']:
