@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import logging
+import traceback
 import uuid
 import zipfile
 import configparser
@@ -23,7 +24,7 @@ from inlinino.instruments import Instrument, SerialInterface, SocketInterface, U
 from inlinino.instruments.acs import ACS
 from inlinino.instruments.apogee import ApogeeQuantumSensor
 from inlinino.instruments.dataq import DATAQ
-from inlinino.instruments.hyperbb import HyperBB
+from inlinino.instruments.hyperbb import HyperBB, HyperBBParser
 from inlinino.instruments.hydroscat import HydroScat
 from inlinino.instruments.hypernav import HyperNav, read_manufacturer_pixel_registration
 from inlinino.instruments.lisst import LISST
@@ -255,7 +256,19 @@ class MainWindow(QtGui.QMainWindow):
         setup_dialog = DialogInstrumentUpdate(self.instrument.uuid, self)
         setup_dialog.show()
         if setup_dialog.exec_():
-            self.instrument.setup(setup_dialog.cfg)
+            try:
+                self.instrument.setup(setup_dialog.cfg)
+            except Exception as e:
+                logger.warning(e)
+                msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: Setup Instrument Warning",
+                                        'ERROR: Failed setting up ' + self.instrument.name + '. ',
+                                        QtGui.QMessageBox.Ok, self)
+                msg.setInformativeText(str(e))
+                msg.setDetailedText(traceback.format_exc())
+                msg.setWindowModality(QtCore.Qt.WindowModal)
+                msg.exec_()
+                self.act_instrument_setup()  # Retry setup
+                return
             self.label_instrument_name.setText(self.instrument.short_name)
             # Set Interface Name
             if self.instrument.interface_name.startswith('com'):
@@ -504,10 +517,10 @@ class MainWindow(QtGui.QMainWindow):
                 continue
             x = self.instrument.spectrum_plot_x_values[i]
             # Replace NaN and Inf by interpolated values
-            nsel = np.logical_or(np.isinf(y), np.isnan(y))
-            sel = np.logical_not(nsel)
-            y[nsel] = np.interp(x[nsel], x[sel], y[sel])
-            # TODO Check with real instrument if really need trick above
+            sel = np.isfinite(y)
+            if 2 < np.sum(sel):
+                nsel = np.logical_not(sel)
+                y[nsel] = np.interp(x[nsel], x[sel], y[sel])
             self.spectrum_plot_widget.plotItem.items[i].setData(x, y, connect="finite")
         self.last_spectrum_plot_refresh = time()
 
@@ -519,14 +532,14 @@ class MainWindow(QtGui.QMainWindow):
                 txt += f"Instument: {self.instrument.name}\n"
             if self.instrument.interface_name is not None:
                 txt += f"Port: {self.instrument.interface_name}\n\n"
-            self.alarm_message_box.show(txt)
+            self.alarm_message_box.queue_message(txt)  # Bypass queue to show immediately
+            # TODO activate sound immediately
         elif not active and self.alarm_message_box.active:
             self.alarm_message_box.hide()
 
     @QtCore.pyqtSlot(str, str)
     def on_custom_alarm(self, text, info_text):
-        if not self.alarm_message_box.active:
-            self.alarm_message_box.show(text, info_text, sound=False)
+        self.alarm_message_box.queue_message(text, info_text, sound=False)
 
     def closeEvent(self, event):
         icon, txt = QtGui.QMessageBox.Question, "Are you sure you want to exit?"
@@ -557,7 +570,7 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
         self.setInformativeText(self.INFO_TEXT)
         self.setWindowModality(QtCore.Qt.WindowModal)
         self.active = False
-        self.buttonClicked.connect(self.ignore)
+        self.finished.connect(self._finished)
 
         # Setup Sound
         self.alarm_sound = QtMultimedia.QMediaPlayer()
@@ -568,6 +581,9 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
             logger.warning('No alarm sounds available: disabled alarm')
         self.alarm_playlist.setPlaybackMode(QtMultimedia.QMediaPlaylist.Loop)  # Playlist is needed for infinite loop
         self.alarm_sound.setPlaylist(self.alarm_playlist)
+
+        # Setup Queue
+        self.message_queue = []
 
     def show(self, txt: str = None, info_txt: str = None, sound: bool = True):
         if not self.active:
@@ -585,9 +601,20 @@ class MessageBoxAlarm(QtWidgets.QMessageBox):
             super().hide()
             self.active = False
 
-    def ignore(self):
+    def _finished(self):
         logger.info('Ignored alarm')
         self.hide()
+        # Process next message in queue outside of this function otherwise will hide new message
+        QtCore.QTimer.singleShot(0, self.next_message)
+
+    def queue_message(self, txt: str = None, info_txt: str = None, sound: bool = True):
+        self.message_queue.append((txt, info_txt, sound))
+        if not self.active:
+            self.show(*self.message_queue.pop(0))
+
+    def next_message(self):
+        if self.message_queue:
+            self.show(*self.message_queue.pop(0))
 
 
 class DialogStartUp(QtGui.QDialog):
@@ -758,13 +785,15 @@ class DialogInstrumentSetup(QtGui.QDialog):
 
     def act_browse_plaque_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose plaque calibration file', filter='Plaque File (*.mat)')
-        self.le_plaque_file.setText(file_name)
+            caption='Choose plaque calibration file', filter='HyperBB calibration (*.mat *.hbb_cal)')
+        if file_name:
+            self.le_plaque_file.setText(file_name)
 
     def act_browse_temperature_file(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
-            caption='Choose temperature calibration file', filter='Temperature File (*.mat)')
-        self.le_temperature_file.setText(file_name)
+            caption='Choose temperature calibration file', filter='Temperature File (*.mat *.hbb_tcal)')
+        if file_name:
+            self.le_optional_temperature_file.setText(file_name)
 
     def act_browse_px_reg_prt(self):
         file_name, selected_filter = QtGui.QFileDialog.getOpenFileName(
@@ -985,6 +1014,18 @@ class DialogInstrumentSetup(QtGui.QDialog):
                 self.cfg['log_raw'] = True
             if 'log_products' not in self.cfg.keys():
                 self.cfg['log_products'] = True
+        elif self.cfg['module'] == 'hyperbb':
+            try:
+                serial_number = HyperBBParser(self.cfg['plaque_file'], self.cfg['temperature_file']).p_cal.serial_number
+            except Exception as e:
+                self.notification('Unable to parse HyperBB plaque or temperature file.', str(e),
+                                  details=traceback.format_exc())
+                return
+            if serial_number is not None and str(serial_number) != self.cfg['serial_number']:
+                self.notification('Serial number mismatch between calibration file and setup.',
+                                  'Calibration file serial number: %s,  setup serial number: %s'
+                                  % (serial_number, self.cfg['serial_number']))
+                return
         elif self.cfg['module'] == 'ontrak':
             self.cfg['model'] = self.combobox_model.currentText()
             for c in range(4):
@@ -1062,7 +1103,7 @@ class DialogInstrumentSetup(QtGui.QDialog):
                         raise ValueError(f'Invalid file extension, only support '
                                          f'{", ".join(pySat.Instrument.VALID_CAL_EXTENSIONS)}and .cgs.')
             except Exception as e:
-                self.notification('Error in HyperNav configuration.', e)
+                self.notification('Error in HyperNav configuration.', details=str(e))
                 return
         elif self.cfg['module'] == 'hydroscat':
             try:
@@ -1113,10 +1154,12 @@ class DialogInstrumentSetup(QtGui.QDialog):
                             return False
         return True
 
-    def notification(self, message, details=None):
+    def notification(self, header, message=None, details=None):
         msg = QtGui.QMessageBox(QtWidgets.QMessageBox.Warning, "Inlinino: Setup Instrument Warning",
-                                message,
+                                header,
                                 QtGui.QMessageBox.Ok, self)
+        if message:
+            msg.setInformativeText(message)
         if details:
             msg.setDetailedText(str(details))
         msg.setWindowModality(QtCore.Qt.WindowModal)
@@ -1523,14 +1566,13 @@ class App(QtGui.QApplication):
                 ))
                 instrument_loaded = True
             except Exception as e:
-                raise e
                 logger.warning('Unable to load instrument.')
                 logger.warning(e)
                 self.closeAllWindows()  # ACS, HyperBB, LISST, and Suna are opening pyqtgraph windows
                 # Dialog Box
                 setup_dialog = DialogInstrumentUpdate(instrument_uuid)
                 setup_dialog.show()
-                setup_dialog.notification('Unable to load instrument. Please check configuration.', e)
+                setup_dialog.notification('Unable to load instrument. Please check configuration.', details=str(e))
                 if setup_dialog.exec_():
                     logger.info('Updated configuration')
                 else:
