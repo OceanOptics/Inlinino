@@ -4,7 +4,7 @@ pyqtgraph==0.12.1
 colorama==0.4.4
 numpy==1.22.*
 scipy==1.9.*
-pyacs
+pyacs==0.1.*
 pysatlantic
 pynmea2==1.18.*
 pyusb==1.2.1
