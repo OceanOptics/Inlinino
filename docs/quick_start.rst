@@ -48,27 +48,11 @@ To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Wind
     ======================================  ============================
 
 .. _qs-figure-startup:
-.. figure:: screenshots/startup_acs.png
+.. figure:: screenshots/startup_select.png
   :scale: 50 %
   :align: center
 
   Screenshot 1. Inlinino Start up window
-
-
-.. _qs-setup-hyperbb:
-
-Sequoia HyperBB
---------------
-
-Inlinino supports five format of output from  Sequoia's HyperBB, depending on the firmware version and the data type selected in the instrument's configuration. Inlinino is able to automatically detect the output data format.
-
-    + **user**: Serial output from HyperBB set in data type "user" with firmware between v1.69 and v1.75 (excluded).
-    + **user v1.75**: Serial output from HyperBB set in data type "user" with firmware v1.75 and later. Includes the field ``TempCorrFactor``, which renders the temperature calibration file optional.
-    + **advanced**: Serial output from HyperBB set in data type "advanced" with firmware between v1.69 and v1.75 (excluded).
-    + **advanced v1.75**: Serial output from HyperBB set in data type "advanced" with firmware v1.75 and later. Includes the field ``TempCorrFactor``, which renders the temperature calibration file optional.
-    + **legacy**: Serial output from HyperBB with firmware v1.69 and earlier.
-
-Inlinino support both the matlab and binary  plaque and temperature calibration files (.mat, .hbb_cal, hbb_tcal) from Sequoia.
 
 .. _qs-setup-generic:
 
@@ -126,6 +110,7 @@ Data acquisition system (DAQ) are required to read and log data from analog inst
     + :ref:`DataQ DI-1100<qs-setup-dataq>` and DI-2108
     + Ontrak ADU100
 
+
 .. _qs-setup-dataq:
 
 DataQ DI-1100
@@ -152,25 +137,6 @@ DataQ DI-1100
   Screenshot 3. Inlinino DataQ DI-1100 setup window for analog instruments
 
 
-.. _qs-setup-lisst:
-
-Setup a Sequoia LISST
-^^^^^^^^^^^^^^^^^^^^^
-Setting up the Sequoia LISST instrument is straightforward as all settings are contained in the manufacturer's device file (.txt) and the initialization file (.ini). The `browse` button on the right side of each field can be used to locate this files on the computer. Both of these files are required.
-
-The folder in which the data is logged is specified in the field `Log Directory`. The button `Browse` can be used to easily browse the computer file system and choose the adequate directory.
-
-``Append prefix to log file Group-Box <left>``
-  This group-box is common to every instrument and explanations are provided in the section :ref:`Edit Instrument Configuration<qs-edit-instrument-configuration>`.
-
-.. _qs-figure-setup-lisst:
-.. figure:: screenshots/setup_lisst.png
-  :scale: 50 %
-  :align: center
-
-  Screenshot 4. Inlinino setup window for a Sequoia LISST
-
-
 .. _qs-setup-acs:
 
 Setup a Sea-Bird Scientific AC-S
@@ -187,7 +153,49 @@ The folder in which the data is logged is specified in the field `Log Directory`
   :scale: 50 %
   :align: center
 
-  Screenshot 5. Inlinino setup window for a Sea-Bird Scientific AC-S
+  Screenshot 4. Inlinino setup window for a Sea-Bird Scientific AC-S
+
+
+.. _qs-setup-hyperbb:
+
+Sequoia HyperBB
+---------------
+
+Inlinino supports five format of output from  Sequoia's HyperBB, depending on the firmware version and the data type selected in the instrument's configuration. Inlinino is able to automatically detect the output data format.
+
+    + **user**: Serial output from HyperBB set in data type "user" with firmware between v1.69 and v1.75 (excluded).
+    + **user v1.75**: Serial output from HyperBB set in data type "user" with firmware v1.75 and later. Includes the field ``TempCorrFactor``, which renders the temperature calibration file optional.
+    + **advanced**: Serial output from HyperBB set in data type "advanced" with firmware between v1.69 and v1.75 (excluded).
+    + **advanced v1.75**: Serial output from HyperBB set in data type "advanced" with firmware v1.75 and later. Includes the field ``TempCorrFactor``, which renders the temperature calibration file optional.
+    + **legacy**: Serial output from HyperBB with firmware v1.69 and earlier.
+
+Inlinino support both the matlab and binary  plaque and temperature calibration files (.mat, .hbb_cal, hbb_tcal) from Sequoia.
+
+.. _qs-figure-setup-hyperbb:
+.. figure:: screenshots/setup_hyperbb.png
+  :scale: 50 %
+  :align: center
+
+  Screenshot 5. Inlinino setup window for a Sequoia HyperBB
+
+
+.. _qs-setup-lisst:
+
+Setup a Sequoia LISST
+^^^^^^^^^^^^^^^^^^^^^
+Setting up the Sequoia LISST instrument is straightforward as all settings are contained in the manufacturer's device file (.txt) and the initialization file (.ini). The `browse` button on the right side of each field can be used to locate this files on the computer. Both of these files are required.
+
+The folder in which the data is logged is specified in the field `Log Directory`. The button `Browse` can be used to easily browse the computer file system and choose the adequate directory.
+
+``Append prefix to log file Group-Box <left>``
+  This group-box is common to every instrument and explanations are provided in the section :ref:`Edit Instrument Configuration<qs-edit-instrument-configuration>`.
+
+.. _qs-figure-setup-lisst:
+.. figure:: screenshots/setup_lisst.png
+  :scale: 50 %
+  :align: center
+
+  Screenshot 6. Inlinino setup window for a Sequoia LISST
 
 
 Main Window
@@ -206,7 +214,7 @@ The last 120 values of selected channels are displayed in the plotting section o
 
 The ``Packets`` Group-Box of the sidebar displays in real-time the number of packets received, logged, and corrupted. When an instrument is turned on a few corrupted packets could be received, they are generally due to the instruments initialization message. If the number of corrupted packets keep increasing, a problem with the data format, the instrument settings, or the connections is occurring. Note that if the raw data is logged, the corrupted packets are logged but not timestamped. The raw data logging option is available in the setup menu of generic instruments. For other instrument types it's activated by defaults.
 
-Instruments with many channels like the Sea-Bird Scientific AC-S and Sequoia LISST have an auxiliary window (:ref:`Figure 8<qs-figure-aux-window>`) which shows the latest value received of each channel. Instruments communicating auxiliary data (e.g. instrument temperature) have it displayed in the ``Auxiliary Data`` Group-Box of the sidebar.
+Instruments with many channels (e.g. AC-S, HyperBB, HyperPro, HyperNav, LISST) will offer a spectral view on top of the timeserie figure. Instruments communicating auxiliary data have it displayed in the ``Auxiliary Data`` Group-Box of the sidebar.
 
 .. _qs-figure-main-window:
 .. figure:: screenshots/main_window_acs.png
@@ -214,13 +222,6 @@ Instruments with many channels like the Sea-Bird Scientific AC-S and Sequoia LIS
   :align: center
 
   Screenshot 6. Inlinino Main Window
-
-.. _qs-figure-aux-window:
-.. figure:: screenshots/aux_window_acs.png
-  :scale: 35 %
-  :align: center
-
-  Screenshot 7. Inlinino Auxiliary window specific to instruments with many channels (e.g. AC-S, LISST)
 
 
 .. _qs-log-data:
@@ -254,14 +255,14 @@ To edit the configuration of an instrument, Inlinino must be started with the in
 ``Append prefix to log file Group-Box``
     Data filenames follow the syntax ``<instrument_model><instrument_serial_number>_YYYYMMDD_HHMMSS.csv``. For example a file for a Sea-Bird Scientific ACS serial number 301 created July 9, 2016 at 16:01:00 UTC would be named: ``ACS301_20160709_160100.csv``.
 
-    One might want to append a prefix to a data file name logged with Inlinino, in the event of instrument calibration or some experiments. To consistently append a prefix to the name of a file logged with Inlinino, select the prefix desired at the bottom of the setup window (:ref:`Screenshot 8<qs-figure-log-prefix>`).
+    One might want to append a prefix to a data file name logged with Inlinino, in the event of instrument calibration or some experiments. To consistently append a prefix to the name of a file logged with Inlinino, select the prefix desired at the bottom of the setup window (:ref:`Screenshot 7<qs-figure-log-prefix>`).
 
     .. _qs-figure-log-prefix:
     .. figure:: screenshots/setup_log_prefix.png
       :scale: 50 %
       :align: center
 
-      Screenshot 8. Append prefix to log file name.
+      Screenshot 7. Append prefix to log file name.
 
     .. warning::
       The ``Append prefix to log file`` settings are only applied to the current Inlinino session and are reset when Inlinino is restarted.
