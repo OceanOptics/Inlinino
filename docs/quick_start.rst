@@ -60,40 +60,15 @@ To start Inlinino double click the executable: Inlinino-v\ |release|.exe on Wind
 Sequoia HyperBB
 --------------
 
-For instruments using a binary plaque calibration (``.hbb_cal``, processing
-version 2.50), select that file in **Plaque File** and enter the matching
-instrument serial number. Inlinino selects **light** format automatically
-and disables **Temperature File**. The temperature correction comes from
-each received measurement, so no separate temperature file is needed.
+Inlinino supports five format of output from  Sequoia's HyperBB, depending on the firmware version and the data type selected in the instrument's configuration. Inlinino is able to automatically detect the output data format.
 
-Use the instrument's **User** serial output, which contains 15 fields:
-scan index, date, time, wavelength, PMT gain, net reference, three net signals,
-LED temperature, water temperature, depth, supply voltage, temperature
-correction factor, and saturated channel. The temperature factor is the
-penultimate field. The onboard ``.hbb_raw`` file format is different and is
-not the input format for this live serial reader.
+    + **user**: Serial output from HyperBB set in data type "user" with firmware between v1.69 and v1.75 (excluded).
+    + **user v1.75**: Serial output from HyperBB set in data type "user" with firmware v1.75 and later. Includes the field ``TempCorrFactor``, which renders the temperature calibration file optional.
+    + **advanced**: Serial output from HyperBB set in data type "advanced" with firmware between v1.69 and v1.75 (excluded).
+    + **advanced v1.75**: Serial output from HyperBB set in data type "advanced" with firmware v1.75 and later. Includes the field ``TempCorrFactor``, which renders the temperature calibration file optional.
+    + **legacy**: Serial output from HyperBB with firmware v1.69 and earlier.
 
-If the calibration contains multiple records, Inlinino selects the last
-record in file order, matching Sequoia's processing script. The selected
-record's serial number and dates are written to the engineering log.
-Calibration files from another instrument are rejected.
-
-Binary processing uses the original dark-offset grids and the temperature
-correction equations from Sequoia's December 8, 2025 ``Hbb_Process.m``:
-measurement signals are divided by their onboard temperature factor, while
-plaque mu factors are multiplied by their stored temperature factor.
-Measurements outside the calibrated wavelength or PMT-gain range produce
-NaN rather than extrapolated values. Invalid temperature factors are rejected.
-
-Keep **Log Raw** enabled to retain the complete original packets, including
-the onboard temperature factor. Product logs also include ``TempCorrFactor``
-alongside ``beta_u`` and ``bb``. Downstream software must support the new
-packet and calibration formats to process these files.
-
-Older instruments continue to use both plaque and temperature ``.mat`` files
-and their existing **light**, **advanced**, or **legacy** data format. A binary
-calibration is not a substitute for an older instrument's temperature file;
-this path requires the new 15-field output with onboard correction factors.
+Inlinino support both the matlab and binary  plaque and temperature calibration files (.mat, .hbb_cal, hbb_tcal) from Sequoia.
 
 .. _qs-setup-generic:
 
