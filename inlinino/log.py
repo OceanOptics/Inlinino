@@ -107,10 +107,10 @@ class Log:
         """
         self._smart_open(file_timestamp if file_timestamp else timestamp)
         if self.variable_precision:
-            self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
+            self._file.write(format_timestamp(timestamp) +
                              ',' + ','.join(p % d for p, d in zip(self.variable_precision, data)) + '\n')
         else:
-            self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
+            self._file.write(format_timestamp(timestamp) +
                              ',' + ','.join(str(d) for d in data) + '\n')
 
     def close(self):
@@ -169,5 +169,17 @@ class LogText(Log):
         :return:
         """
         self._smart_open(timestamp)
-        self._file.write(strftime('%Y/%m/%d %H:%M:%S', gmtime(timestamp)) + ("%.3f" % timestamp)[-4:] +
+        self._file.write(format_timestamp(timestamp) +
                          ',' + self.registration + data.decode(self.ENCODING, self.UNICODE_HANDLING) + '\n')
+
+
+def format_timestamp(timestamp: float) -> str:
+    """
+    Convert timestamp to string in format YYYYMMDD_HHMMSS
+    Needed to avoid rounding issues at millisecond level no carrying over to seconds
+    :param timestamp: timestamp in seconds since epoch
+    :return: string representation of timestamp
+    """
+    timestamp_ms = round(timestamp * 1000)
+    seconds, ms = divmod(timestamp_ms, 1000)
+    return strftime('%Y/%m/%d %H:%M:%S', gmtime(seconds)) + '.%03d' % ms
