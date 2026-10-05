@@ -67,6 +67,21 @@ jobs:
             -P optional/hypernav/hypernav \
             https://misclab.umeoce.maine.edu/ftp/software/Inlinino/hypernav/
 
+      - name: Debug - list optional folder
+        shell: bash
+        run: |
+          echo "== PWD =="; pwd
+          echo "== optional/ (recursive) =="
+          ls -laR optional/ || echo "optional/ not found"
+          # Or, more compact and with a depth limit:
+          find optional -maxdepth 4 -print || true
+          echo "== Executables anywhere in the workspace =="
+          find . -iname "*.exe" -not -path "./.git/*" || true
+          echo "== Installed hypernav package =="
+          python -c "import hypernav, os; p=os.path.dirname(hypernav.__file__); print(p)"
+          ls -laR "$(python -c 'import hypernav, os; print(os.path.dirname(hypernav.__file__))')" || true
+          pip show -f hypernav || true
+
       - name: Install python dependencies
         run: |
           pip install -r requirements.txt
